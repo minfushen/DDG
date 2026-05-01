@@ -1,7 +1,9 @@
 // 企业尽调相关类型定义
 
 export type TaskType = 'first_credit' | 'annual_review' | 'post_loan_warning';
-export type TaskStatus = 'pending' | 'in_progress' | 'completed';
+export type TaskStatus =
+  | 'created' | 'gathering' | 'analyzing' | 'report_ready'
+  | 'under_review' | 'approved' | 'rejected' | 'archived';
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 export interface Enterprise {

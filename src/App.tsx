@@ -5,6 +5,9 @@ import { DataIntegration } from './pages/DataIntegration';
 import { Analysis } from './pages/Analysis';
 import { ReportGenerator } from './pages/ReportGenerator';
 import { AgentConfig } from './pages/AgentConfig';
+// 智能尽调模块
+import { DocumentChecklist } from './pages/DocumentChecklist';
+import { PSAKValidation } from './pages/PSAKValidation';
 // 贷中审批模块
 import { ApprovalDashboard } from './pages/Approval/ApprovalDashboard';
 import { ContractCompare } from './pages/Approval/ContractCompare';
@@ -15,6 +18,8 @@ import { WarningDashboard } from './pages/PostLoan/WarningDashboard';
 import { RiskTracking } from './pages/PostLoan/RiskTracking';
 import { PostLoanCheckPage } from './pages/PostLoan/PostLoanCheck';
 import { WarningConfig } from './pages/PostLoan/WarningConfig';
+// 运营分析模块
+import { Analytics } from './pages/Analytics';
 
 function App() {
   return (
@@ -28,6 +33,10 @@ function App() {
           <Route path="/report/:enterpriseId?" element={<ReportGenerator />} />
           <Route path="/agent-config" element={<AgentConfig />} />
 
+          {/* 智能尽调模块 */}
+          <Route path="/document-checklist/:enterpriseId?" element={<DocumentChecklist />} />
+          <Route path="/psak-validation/:enterpriseId?" element={<PSAKValidation />} />
+
           {/* 贷中审批模块 */}
           <Route path="/approval/dashboard" element={<ApprovalDashboard />} />
           <Route path="/approval/contract-compare" element={<ContractCompare />} />
@@ -39,6 +48,9 @@ function App() {
           <Route path="/post-loan/risk-tracking/:id?" element={<RiskTracking />} />
           <Route path="/post-loan/check" element={<PostLoanCheckPage />} />
           <Route path="/post-loan/config" element={<WarningConfig />} />
+
+          {/* 运营分析模块 */}
+          <Route path="/analytics" element={<Analytics />} />
         </Route>
       </Routes>
     </BrowserRouter>

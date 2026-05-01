@@ -1,0 +1,84 @@
+/**
+ * 设计 Token v2.0 — 更大胆的色彩系统
+ * 全局唯一定色处，所有业务配置从此引用
+ */
+
+/* ========================================
+   品牌主渐变 — 深邃蓝到青色
+   ======================================== */
+--gradient-primary: from-[#1E40AF] via-[#3B82F6] to-[#06B6D4];
+
+/* ========================================
+   渐变类名（Tailwind）
+   ======================================== */
+--gradients: {
+  primary: 'from-[#1E40AF] via-[#3B82F6] to-[#06B6D4]',  /* 品牌主渐变 */
+  blue: 'from-[#1E40AF] via-[#3B82F6] to-[#06B6D4]',      /* 别名 */
+  green: 'from-[#059669] to-[#10B981]',                   /* 成功系 */
+  amber: 'from-[#D97706] to-[#F59E0B]',                   /* 警告系 */
+  red: 'from-[#DC2626] to-[#EF4444]',                     /* 危险系 */
+  cyan: 'from-[#06B6D4] to-[#22D3EE]',                    /* 青色强调 */
+  dark: 'from-[#1F2937] to-[#374151]',                    /* 深色渐变 */
+};
+
+/* ========================================
+   语义化严重程度 — 更鲜明的对比
+   ======================================== */
+--severity: {
+  critical: { bg: 'bg-[#FEE2E2]', text: 'text-[#991B1B]', border: 'border-[#FECACA]' },
+  high:     { bg: 'bg-[#FEE2E2]', text: 'text-[#991B1B]', border: 'border-[#FECACA]' },
+  medium:   { bg: 'bg-[#FEF3C7]', text: 'text-[#92400E]', border: 'border-[#FDE68A]' },
+  low:      { bg: 'bg-[#D1FAE5]', text: 'text-[#065F46]', border: 'border-[#A7F3D0]' },
+  info:     { bg: 'bg-[#DBEAFE]', text: 'text-[#1E40AF]', border: 'border-[#93C5FD]' },
+};
+
+/* ========================================
+   通用任务/审批状态 — 更清晰的视觉区分
+   ======================================== */
+--status: {
+  /* 基础状态 */
+  pending:     { bg: 'bg-[#F3F4F6]', text: 'text-[#4B5563]', border: 'border-[#E5E7EB]' },
+  in_progress: { bg: 'bg-[#DBEAFE]', text: 'text-[#1E40AF]', border: 'border-[#93C5FD]' },
+  completed:   { bg: 'bg-[#D1FAE5]', text: 'text-[#065F46]', border: 'border-[#A7F3D0]' },
+  rejected:    { bg: 'bg-[#FEE2E2]', text: 'text-[#991B1B]', border: 'border-[#FECACA]' },
+  overdue:     { bg: 'bg-[#FEE2E2]', text: 'text-[#991B1B]', border: 'border-[#FECACA]' },
+
+  /* 尽调任务 8 态生命周期 */
+  created:      { bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', border: 'border-[#E5E7EB]' },
+  gathering:    { bg: 'bg-[#DBEAFE]', text: 'text-[#1E40AF]', border: 'border-[#93C5FD]' },
+  analyzing:    { bg: 'bg-[#CFFAFE]', text: 'text-[#0E7490]', border: 'border-[#67E8F9]' },
+  report_ready: { bg: 'bg-[#D1FAE5]', text: 'text-[#065F46]', border: 'border-[#A7F3D0]' },
+  under_review: { bg: 'bg-[#FEF3C7]', text: 'text-[#92400E]', border: 'border-[#FDE68A]' },
+  approved:     { bg: 'bg-[#D1FAE5]', text: 'text-[#065F46]', border: 'border-[#A7F3D0]' },
+  archived:     { bg: 'bg-[#F3F4F6]', text: 'text-[#9CA3AF]', border: 'border-[#E5E7EB]' },
+};
+
+/* ========================================
+   图标尺寸映射
+   ======================================== */
+--icon-size: {
+  sm: 'w-9 h-9 rounded-lg',
+  md: 'w-12 h-12 rounded-xl',
+  lg: 'w-16 h-16 rounded-2xl',
+};
+
+/* ========================================
+   卡片样式预设
+   ======================================== */
+--card-styles: {
+  default: 'bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5',
+  elevated: 'bg-white rounded-2xl border border-[#E5E7EB] shadow-xl shadow-[#1E40AF]/10',
+  interactive: 'bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 hover:shadow-xl hover:shadow-[#1E40AF]/10 hover:border-[#93C5FD] transition-all duration-300',
+  gradient: 'bg-gradient-to-br from-white to-[#F9FAFB] rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5',
+};
+
+/* ========================================
+   按钮样式预设
+   ======================================== */
+--button-styles: {
+  primary: 'bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] text-white font-semibold shadow-lg shadow-[#1E40AF]/25 hover:shadow-xl hover:shadow-[#1E40AF]/30 hover:-translate-y-0.5 transition-all duration-300',
+  secondary: 'bg-white border-2 border-[#E5E7EB] text-[#374151] font-medium hover:border-[#93C5FD] hover:bg-[#DBEAFE]/50 transition-all duration-300',
+  danger: 'bg-gradient-to-r from-[#DC2626] to-[#EF4444] text-white font-semibold shadow-lg shadow-[#DC2626]/25 hover:shadow-xl hover:shadow-[#DC2626]/30 hover:-translate-y-0.5 transition-all duration-300',
+  success: 'bg-gradient-to-r from-[#059669] to-[#10B981] text-white font-semibold shadow-lg shadow-[#059669]/25 hover:shadow-xl hover:shadow-[#059669]/30 hover:-translate-y-0.5 transition-all duration-300',
+  ghost: 'text-[#4B5563] font-medium hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-all duration-200',
+};
