@@ -79,21 +79,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className={`relative flex shrink-0 flex-col bg-white border-r border-[#E5E7EB] transition-[width] duration-300 ease-out ${collapsed ? 'w-[68px]' : 'w-[220px]'}`}
+      className={`relative flex shrink-0 flex-col bg-white border-r border-border-default transition-[width] duration-300 ease-out ${collapsed ? 'w-[68px]' : 'w-[220px]'}`}
     >
       {/* Logo */}
       <div className="flex h-14 shrink-0 items-center px-4">
         {collapsed ? (
-          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#1E40AF] to-[#3B82F6] shadow-lg shadow-[#1E40AF]/25">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-brand-bg">
             <Sparkles className="h-5 w-5 text-white" strokeWidth={2} aria-hidden />
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1E40AF] to-[#3B82F6] shadow-lg shadow-[#1E40AF]/25">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-bg">
               <Sparkles className="h-5 w-5 text-white" strokeWidth={2} aria-hidden />
             </div>
             <div>
-              <h1 className="text-[14px] font-bold text-[#1F2937] leading-tight">信贷智能体</h1>
+              <h1 className="text-[14px] font-medium text-[#1F2937] leading-tight">信贷智能体</h1>
               <p className="text-[10px] font-medium text-[#6B7280]">Credit AI Platform</p>
             </div>
           </div>
@@ -112,7 +112,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.title)}
-                  className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[10px] font-bold uppercase text-[#6B7280] transition-colors hover:text-[#1F2937] hover:bg-[#F3F4F6]"
+                  className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[10px] font-medium uppercase text-text-muted transition-colors hover:text-text-primary hover:bg-surface-hover"
                   style={{ letterSpacing: '0.08em' }}
                 >
                   <span>{group.title}</span>
@@ -141,15 +141,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                             return [
                               'flex items-center justify-center rounded-xl px-2 py-2 transition-all duration-150',
                               isActive
-                                ? 'bg-[#DBEAFE] text-[#1E40AF]'
-                                : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937]',
+                                ? 'bg-surface-active text-brand font-medium'
+                                : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
                             ].join(' ');
                           }
                           return [
-                            'relative flex items-center gap-2.5 rounded-xl pl-3.5 pr-2.5 py-[9px] text-[13px] font-semibold transition-all duration-150',
+                            'relative flex items-center gap-2.5 rounded-xl pl-3.5 pr-2.5 py-[9px] text-[13px] font-medium transition-all duration-150',
                             isActive
-                              ? 'bg-[#DBEAFE] text-[#1E40AF]'
-                              : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#1F2937]',
+                              ? 'bg-surface-active text-brand'
+                              : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
                           ].join(' ');
                         }}
                       >
@@ -158,12 +158,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                             {/* 激活态：3px 品牌色竖条 */}
                             {!collapsed && isActive && (
                               <span
-                                className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[#1E40AF]"
+                                className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-brand"
                                 aria-hidden
                               />
                             )}
                             <Icon
-                              className={`h-[18px] w-[18px] shrink-0 ${isActive && !collapsed ? 'text-[#1E40AF]' : ''}`}
+                              className={`h-[18px] w-[18px] shrink-0 ${isActive && !collapsed ? 'text-brand' : ''}`}
                               strokeWidth={2}
                               aria-hidden
                             />
@@ -181,11 +181,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
         {/* 演示阶段指示器 */}
         {!collapsed && currentStage && (
-          <div className="mx-1 mt-3 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] p-3">
-            <p className="mb-1 text-[10px] font-bold text-[#6B7280]" style={{ letterSpacing: '0.08em' }}>演示进度</p>
+          <div className="mx-1 mt-3 rounded-xl border border-border-default bg-[#F9FAFB] p-3">
+            <p className="mb-1 text-[10px] font-medium text-[#6B7280]" style={{ letterSpacing: '0.08em' }}>演示进度</p>
             <div className="flex items-center gap-2">
               <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#1E40AF]" />
-              <span className="text-[12px] font-semibold text-[#374151]">{stageLabels[currentStage] || currentStage}</span>
+              <span className="text-[12px] font-medium text-[#374151]">{stageLabels[currentStage] || currentStage}</span>
             </div>
             <div className="mt-2 flex gap-1">
               {['dashboard', 'dataIntegration', 'analysis', 'report'].map((stage) => (
@@ -202,7 +202,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       {/* 折叠按钮 */}
-      <div className="flex shrink-0 justify-center border-t border-[#E5E7EB] px-2.5 py-3">
+      <div className="flex shrink-0 justify-center border-t border-border-default px-2.5 py-3">
         <button
           type="button"
           onClick={onToggle}

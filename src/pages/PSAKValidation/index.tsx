@@ -54,7 +54,7 @@ export function PSAKValidation() {
             <Table className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">PSAK 三表联动校验</h1>
+            <h1 className="text-xl font-semibold text-gray-900">PSAK 三表联动校验</h1>
             <p className="text-sm text-gray-500">
               {indoEnterprise.nameZh} — {indoEnterprise.name}
             </p>
@@ -65,16 +65,19 @@ export function PSAKValidation() {
         <div className="flex items-center gap-2">
           {allValidated && !validationRunning && (
             <div className="flex items-center gap-2 mr-2">
-              <span className="text-xs px-2 py-0.5 rounded-lg bg-[var(--risk-low-bg)] text-[var(--risk-low-text)] font-medium">
+              <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md bg-[var(--risk-low-bg)] text-[var(--risk-low-text)] font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--risk-low)]" />
                 通过 {passCount}
               </span>
               {failCount > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-lg bg-[var(--risk-high-bg)] text-[var(--risk-high-text)] font-medium">
+                <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md bg-[var(--risk-high-bg)] text-[var(--risk-high-text)] font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--risk-high)]" />
                   失败 {failCount}
                 </span>
               )}
               {warnCount > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-lg bg-[var(--risk-medium-bg)] text-[var(--risk-medium-text)] font-medium">
+                <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md bg-[var(--risk-medium-bg)] text-[var(--risk-medium-text)] font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--risk-medium)]" />
                   偏差 {warnCount}
                 </span>
               )}
@@ -84,7 +87,7 @@ export function PSAKValidation() {
             type="button"
             onClick={handleRunValidation}
             disabled={validationRunning}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2.5 rounded-xl bg-brand text-white text-sm font-medium hover:bg-brand-dark transition-all disabled:opacity-50 flex items-center gap-2"
           >
             {validationRunning ? (
               <>
@@ -115,7 +118,7 @@ export function PSAKValidation() {
       <div className="flex gap-5">
         {/* 左侧 — PSAK 三表（70%） */}
         <div className="flex-[7] min-w-0">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="rounded-2xl border border-border-default bg-white p-5">
             <FinancialTable
               statements={statements}
               activeTab={activeTab}
@@ -129,9 +132,9 @@ export function PSAKValidation() {
         {/* 右侧 — 校验结果 + CoT（30%） */}
         <div className="flex-[3] min-w-[280px] space-y-4">
           {/* 校验结果面板 */}
-          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-800">钩稽校验结果</h3>
+          <div className="rounded-2xl border border-border-default bg-white overflow-hidden">
+            <div className="px-4 py-3 border-b border-border-default bg-gray-50">
+              <h3 className="text-sm font-medium text-gray-800">钩稽校验结果</h3>
               <p className="text-[11px] text-gray-400 mt-0.5">
                 PSAK 标准校验规则 {validations.length} 条
               </p>
@@ -156,7 +159,7 @@ export function PSAKValidation() {
                         </div>
                         {v.deviation !== undefined && v.status !== 'pending' && (
                           <div className="mt-1">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${cfg.bg} ${cfg.text}`}>
+                            <span className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md font-medium ${cfg.bg} ${cfg.text}`}>
                               {v.status === 'pass' ? '偏差 0%' : `偏差 ${v.deviation.toFixed(2)}%`}
                             </span>
                             <span className="text-[10px] text-gray-400 ml-2">{v.psakRef}</span>

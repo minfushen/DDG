@@ -181,13 +181,13 @@ export function StreamingMarkdown({
     return text.split('\n').map((line, i) => {
       // 标题
       if (line.startsWith('### ')) {
-        return <h4 key={i} className="font-semibold text-gray-800 mt-3 mb-1">{line.slice(4)}</h4>;
+        return <h4 key={i} className="font-medium text-gray-800 mt-3 mb-1">{line.slice(4)}</h4>;
       }
       if (line.startsWith('## ')) {
-        return <h3 key={i} className="font-bold text-gray-800 mt-4 mb-2">{line.slice(3)}</h3>;
+        return <h3 key={i} className="font-medium text-gray-800 mt-4 mb-2">{line.slice(3)}</h3>;
       }
       if (line.startsWith('# ')) {
-        return <h2 key={i} className="font-bold text-gray-900 text-lg mt-4 mb-2">{line.slice(2)}</h2>;
+        return <h2 key={i} className="font-medium text-gray-900 text-lg mt-4 mb-2">{line.slice(2)}</h2>;
       }
 
       // 列表

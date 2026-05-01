@@ -22,7 +22,7 @@ export function Analytics() {
     <div className="mx-auto max-w-[1200px] space-y-6 animate-fade-in-up">
 
       {/* ===== 顶部：AI 看板（三段式卡片） ===== */}
-      <section className="rounded-2xl bg-white shadow-lg shadow-gray-200/50 animate-breathing-glow overflow-hidden">
+      <section className="rounded-2xl bg-white shadow-gray-200/50 animate-breathing-glow overflow-hidden">
 
         {/* 标题区 */}
         <div className="flex items-center justify-between px-6 pt-5 pb-3">
@@ -31,7 +31,7 @@ export function Analytics() {
               <Sparkles className="h-4 w-4 text-blue-500" />
             </div>
             <div>
-              <h3 className="text-[15px] font-semibold text-gray-900">AI 智能看板</h3>
+              <h3 className="text-[15px] font-medium text-gray-900">AI 智能看板</h3>
               <p className="text-[11px] text-gray-400">基于全量数据实时分析</p>
             </div>
           </div>
@@ -42,7 +42,7 @@ export function Analytics() {
         </div>
 
         {/* 正文区：左侧 AI 推荐 + 右侧数据引擎仪表盘 */}
-        <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_320px] border-t border-gray-100">
+        <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_320px] border-t border-border-default">
 
           {/* 左侧：AI 推荐内容 */}
           <div className="px-6 py-5">
@@ -56,7 +56,7 @@ export function Analytics() {
             <div className="mt-4">
               <div className="flex items-center gap-2 mb-2.5">
                 <Database className="h-3.5 w-3.5 text-gray-400" />
-                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">数据引擎</span>
+                <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">数据引擎</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {mockDataSources.map((source) => {
@@ -92,15 +92,15 @@ export function Analytics() {
           </div>
 
           {/* 右侧：数据引擎健康度仪表盘 */}
-          <div className="border-l border-gray-100 bg-gray-50/50 px-6 py-5 flex flex-col items-center justify-center">
+          <div className="border-l border-border-default bg-gray-50/50 px-6 py-5 flex flex-col items-center justify-center">
             <HealthGauge percent={healthPercent} />
-            <p className="mt-3 text-[13px] font-semibold text-gray-800">{connectedCount}/{totalCount} 数据源正常</p>
+            <p className="mt-3 text-[13px] font-medium text-gray-800">{connectedCount}/{totalCount} 数据源正常</p>
             <p className="text-[11px] text-gray-400 mt-0.5">上次同步：10 分钟前</p>
           </div>
         </div>
 
         {/* 操作区 */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-gray-100 bg-gray-50/30">
+        <div className="flex items-center justify-between px-6 py-3.5 border-t border-border-default bg-gray-50/30">
           <p className="text-[12px] text-gray-400">
             基于 {totalCount} 个数据源、{tasks.length} 项任务综合分析
           </p>
@@ -119,19 +119,19 @@ export function Analytics() {
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Activity className="h-4 w-4 text-gray-400" />
-          <h3 className="text-[13px] font-semibold text-gray-700">效率概览</h3>
+          <h3 className="text-[13px] font-medium text-gray-700">效率概览</h3>
           <span className="text-[11px] text-gray-400">本月数据</span>
         </div>
         <div className="grid grid-cols-2 gap-4">
           {/* 自动化率 — 大环形图卡片，跨 2 列 */}
-          <div className="col-span-2 rounded-2xl bg-white px-6 py-5 shadow-md shadow-gray-200/50 flex items-center gap-8">
+          <div className="col-span-2 rounded-2xl bg-white px-6 py-5 shadow-gray-200/50 flex items-center gap-8">
             <div className="shrink-0">
               <AutomationRing value={mockEfficiencyMetrics.automationRate} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-medium text-gray-500 mb-1">自动化率</p>
               <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-bold tracking-tight text-gray-900 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                <span className="text-3xl font-semibold tracking-tight text-gray-900 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {mockEfficiencyMetrics.automationRate}
                 </span>
                 <span className="text-sm text-gray-400">%</span>
@@ -143,15 +143,15 @@ export function Analytics() {
               <p className="text-[11px] text-gray-400 mt-1">行业均值 68%，当前领先 14.5 个百分点</p>
             </div>
             {/* 右侧补充指标 */}
-            <div className="hidden lg:flex items-center gap-6 shrink-0 border-l border-gray-100 pl-8">
+            <div className="hidden lg:flex items-center gap-6 shrink-0 border-l border-border-default pl-8">
               <div>
                 <p className="text-[11px] text-gray-400 mb-0.5">自动处理</p>
-                <p className="text-lg font-bold text-gray-900 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>1,025</p>
+                <p className="text-lg font-semibold text-gray-900 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>1,025</p>
                 <p className="text-[11px] text-gray-400">份报告</p>
               </div>
               <div>
                 <p className="text-[11px] text-gray-400 mb-0.5">人工复核</p>
-                <p className="text-lg font-bold text-gray-900 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>218</p>
+                <p className="text-lg font-semibold text-gray-900 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>218</p>
                 <p className="text-[11px] text-gray-400">份报告</p>
               </div>
             </div>
@@ -226,7 +226,7 @@ function HealthGauge({ percent }: { percent: number }) {
         </defs>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-gray-900">{percent}%</span>
+        <span className="text-2xl font-semibold text-gray-900">{percent}%</span>
         <span className="text-[10px] text-gray-400 mt-0.5">健康度</span>
       </div>
     </div>
@@ -260,7 +260,7 @@ function AutomationRing({ value }: { value: number }) {
         </defs>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[15px] font-bold text-gray-900 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <span className="text-[15px] font-medium text-gray-900 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
           {value}
         </span>
         <span className="text-[9px] text-gray-400 -mt-0.5">%</span>
@@ -277,7 +277,7 @@ function MetricCard({
   unit?: string; trend?: string; trendDetail?: string;
 }) {
   return (
-    <div className="rounded-2xl bg-white px-5 py-4 shadow-lg shadow-gray-200/50">
+    <div className="rounded-2xl bg-white px-5 py-4 shadow-gray-200/50">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           <Icon className="h-4 w-4 text-gray-400" />
@@ -292,7 +292,7 @@ function MetricCard({
       </div>
       <div className="flex items-baseline gap-1">
         <span
-          className="text-2xl font-bold tracking-tight text-gray-900 tabular-nums"
+          className="text-2xl font-semibold tracking-tight text-gray-900 tabular-nums"
           style={{ fontVariantNumeric: 'tabular-nums' }}
         >
           {value}

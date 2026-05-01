@@ -32,12 +32,12 @@ const statusConfig = {
 export function AgentConfig() {
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6">
+      <div className="bg-white rounded-2xl shadow-gray-200/50 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <GradientIcon icon={Settings} gradient="blue" size="lg" />
             <div>
-              <h2 className="text-xl font-bold text-gray-800">智能体配置后台</h2>
+              <h2 className="text-xl font-semibold text-gray-800">智能体配置后台</h2>
               <p className="text-sm text-gray-500 mt-1">低代码拖拽配置尽调智能体工作流</p>
             </div>
           </div>
@@ -46,7 +46,7 @@ export function AgentConfig() {
               <div className="w-2 h-2 bg-[var(--risk-low)] rounded-full animate-pulse" />
               <span className="text-sm text-[var(--risk-low-text)] font-medium">运行环境正常</span>
             </div>
-            <button className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center gap-2">
+            <button className="px-5 py-2.5 bg-brand text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center gap-2">
               <Play className="w-4 h-4" />
               部署配置
             </button>
@@ -55,7 +55,7 @@ export function AgentConfig() {
       </div>
 
       <div className="grid grid-cols-3 gap-6">
-        <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+        <div className="bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           <div className="flex items-center gap-3 mb-5">
             <GradientIcon icon={Zap} gradient="blue" size="md" />
             <div>
@@ -71,7 +71,7 @@ export function AgentConfig() {
 
               return (
                 <div key={component.id}
-                  className="group p-4 bg-gray-50 rounded-xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-white cursor-pointer transition-all duration-200 border border-transparent hover:border-gray-200 hover:shadow-md animate-fade-in-up"
+                  className="group p-4 bg-gray-50 rounded-xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-white cursor-pointer transition-all duration-200 border border-transparent hover:border-border-default hover:shadow-md animate-fade-in-up"
                   style={{ animationDelay: `${index * 50}ms` }}>
                   <div className="flex items-center gap-4">
                     <GradientIcon icon={Icon} gradient={gradient} size="md" className="group-hover:scale-110 transition-transform duration-200" />
@@ -86,7 +86,7 @@ export function AgentConfig() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
+        <div className="bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
           <div className="flex items-center gap-3 mb-5">
             <GradientIcon icon={Activity} gradient="blue" size="md" />
             <div>
@@ -95,7 +95,7 @@ export function AgentConfig() {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 min-h-[400px] border border-gray-200">
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 min-h-[400px] border border-border-default">
             <div className="flex flex-col items-center gap-4">
               {COMPONENT_TEMPLATES.slice(0, 5).map((component, index) => {
                 const Icon = componentIcons[component.type] || Sparkles;
@@ -125,7 +125,7 @@ export function AgentConfig() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+          <div className="bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
             <div className="flex items-center gap-3 mb-5">
               <GradientIcon icon={Server} gradient="green" size="md" />
               <div>
@@ -142,7 +142,7 @@ export function AgentConfig() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '250ms' }}>
+          <div className="bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '250ms' }}>
             <div className="flex items-center gap-3 mb-5">
               <GradientIcon icon={Activity} gradient="amber" size="md" />
               <div>
@@ -159,7 +159,7 @@ export function AgentConfig() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+          <div className="bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
             <div className="flex items-center gap-3 mb-4">
               <GradientIcon icon={Brain} gradient="blue" size="md" />
               <div>
@@ -169,7 +169,7 @@ export function AgentConfig() {
             </div>
 
             <textarea
-              className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all font-mono text-gray-700"
+              className="w-full h-32 p-4 bg-gray-50 border border-border-default rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all font-mono text-gray-700"
               defaultValue={`你是一位专业的银行对公业务尽调分析师。
 请根据以下信息生成尽调报告：
 - 企业基本信息：{enterprise_info}
@@ -182,7 +182,7 @@ export function AgentConfig() {
 3. 识别潜在风险
 4. 给出授信建议`}
             />
-            <button className="mt-4 w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center justify-center gap-2">
+            <button className="mt-4 w-full py-3 bg-brand text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center justify-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               保存配置
             </button>
@@ -220,7 +220,7 @@ function EnvironmentItem({ icon: Icon, name, status, detail, gradient }: {
 function MetricItem({ value, label, gradient }: { value: string; label: string; gradient: GradientKey }) {
   return (
     <div className="p-4 bg-gray-50 rounded-xl text-center hover:bg-gray-100 transition-colors group">
-      <p className={`text-2xl font-bold bg-gradient-to-r ${gradients[gradient]} bg-clip-text text-transparent`}>{value}</p>
+      <p className={`text-2xl font-semibold bg-gradient-to-r ${gradients[gradient]} bg-clip-text text-transparent`}>{value}</p>
       <p className="text-sm text-gray-500 mt-1">{label}</p>
     </div>
   );

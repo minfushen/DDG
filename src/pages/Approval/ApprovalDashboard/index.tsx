@@ -22,19 +22,19 @@ export function ApprovalDashboard() {
   const progressPercent = totalConditions > 0 ? Math.round((verifiedCount / totalConditions) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F9FAFB] via-[#F3F4F6] to-[#E5E7EB]">
+    <div className="min-h-screen bg-surface-page">
       <div className="grid grid-cols-3 gap-8 p-8">
 
         {/* 任务列表 */}
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
-            <div className="px-6 py-5 border-b border-[#E5E7EB] bg-gradient-to-r from-[#F9FAFB] to-white">
+          <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
+            <div className="px-6 py-5 border-b border-border-default bg-gradient-to-r from-[#F9FAFB] to-white">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1E40AF] to-[#3B82F6] flex items-center justify-center shadow-lg shadow-[#1E40AF]/25">
-                  <Calendar className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-brand" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F2937]">审批任务</h3>
+                  <h3 className="text-base font-semibold text-[#1F2937]">审批任务</h3>
                   <p className="text-sm text-[#6B7280]">{tasks.filter((t) => t.status !== 'approved').length} 项待处理</p>
                 </div>
               </div>
@@ -46,12 +46,12 @@ export function ApprovalDashboard() {
                   <button key={task.id} onClick={() => handleSelectTask(task)}
                     className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-300 ${
                       isSelected
-                        ? 'border-[#3B82F6] bg-[#DBEAFE] shadow-lg shadow-[#3B82F6]/20'
-                        : 'border-[#E5E7EB] bg-white hover:border-[#93C5FD] hover:bg-[#F9FAFB]'
+                        ? 'border-[#3B82F6] bg-[#DBEAFE]'
+                        : 'border-border-default bg-white hover:border-[#93C5FD] hover:bg-[#F9FAFB]'
                     }`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-[#1F2937] truncate">{task.enterpriseName}</p>
+                        <p className="font-medium text-[#1F2937] truncate">{task.enterpriseName}</p>
                         <p className="text-sm text-[#6B7280] mt-1">{formatAmount(task.loanAmount / 10000)} · {task.loanType}</p>
                       </div>
                       <StatusBadge status={task.status} config={approvalStatusConfig} />
@@ -68,23 +68,23 @@ export function ApprovalDashboard() {
           {currentTask ? (
             <>
               {/* 头部信息 */}
-              <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
-                <div className="p-6 bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4]">
+              <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
+                <div className="p-6 bg-[#1E40AF]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
                         <Scale className="w-7 h-7 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-white">{currentTask.enterpriseName}</h2>
+                        <h2 className="text-xl font-semibold text-white">{currentTask.enterpriseName}</h2>
                         <p className="text-white/80 text-sm mt-1">{currentTask.unifiedSocialCreditCode}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white text-sm font-semibold border border-white/30">
+                      <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white text-sm font-medium border border-white/30">
                         {currentTask.loanType}
                       </span>
-                      <span className="px-4 py-2 bg-white rounded-xl text-[#1E40AF] text-sm font-bold shadow-lg">
+                      <span className="px-4 py-2 bg-white rounded-xl text-[#1E40AF] text-sm font-medium">
                         {formatAmount(currentTask.loanAmount / 10000)}
                       </span>
                     </div>
@@ -93,20 +93,20 @@ export function ApprovalDashboard() {
               </div>
 
               {/* 放款前提条件 */}
-              <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
-                <div className="px-6 py-5 border-b border-[#E5E7EB] flex items-center justify-between">
+              <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
+                <div className="px-6 py-5 border-b border-border-default flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#059669] to-[#10B981] flex items-center justify-center shadow-lg shadow-[#059669]/25">
-                      <CheckCircle2 className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-xl bg-success-bg flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-success" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-[#1F2937]">放款前提条件核验</h3>
+                      <h3 className="text-base font-semibold text-[#1F2937]">放款前提条件核验</h3>
                       <p className="text-sm text-[#6B7280]">AI自动核验底稿材料</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-[#1F2937]">{verifiedCount}/{totalConditions}</p>
+                      <p className="text-2xl font-semibold text-[#1F2937]">{verifiedCount}/{totalConditions}</p>
                       <p className="text-xs text-[#6B7280]">已通过</p>
                     </div>
                     <div className="w-16 h-16 relative">
@@ -121,7 +121,7 @@ export function ApprovalDashboard() {
                           </linearGradient>
                         </defs>
                       </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[#059669]">
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-[#059669]">
                         {progressPercent}%
                       </span>
                     </div>
@@ -136,15 +136,15 @@ export function ApprovalDashboard() {
                       <div key={condition.id} className={`p-5 rounded-xl border-2 transition-all duration-300 ${
                         condition.status === 'verified' ? 'border-[#A7F3D0] bg-[#D1FAE5]' :
                         condition.status === 'failed' ? 'border-[#FECACA] bg-[#FEE2E2]' :
-                        'border-[#E5E7EB] bg-[#F9FAFB]'
+                        'border-border-default bg-[#F9FAFB]'
                       }`}>
                         <div className="flex items-start gap-4">
-                          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${catC.gradient} flex items-center justify-center flex-shrink-0 shadow-md`}>
+                          <div className={`w-10 h-10 rounded-xl ${catC.gradient} flex items-center justify-center flex-shrink-0`}>
                             <Icon className="w-5 h-5 text-white" />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-[#374151] shadow-sm">{catC.label}</span>
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-[#374151]">{catC.label}</span>
                               <StatusBadge status={condition.status} config={conditionStatusConfig} />
                             </div>
                             <p className="text-sm text-[#374151] font-medium">{condition.content}</p>
@@ -168,13 +168,13 @@ export function ApprovalDashboard() {
               </div>
 
               {/* 风险要素变化 */}
-              <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
-                <div className="px-6 py-5 border-b border-[#E5E7EB] flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D97706] to-[#F59E0B] flex items-center justify-center shadow-lg shadow-[#D97706]/25">
-                    <AlertTriangle className="w-5 h-5 text-white" />
+              <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
+                <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-warning-bg flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-warning" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-[#1F2937]">风险要素变化</h3>
+                    <h3 className="text-base font-semibold text-[#1F2937]">风险要素变化</h3>
                     <p className="text-sm text-[#6B7280]">距尽调报告出具已过 {currentTask.daysSinceDueDiligence} 天</p>
                   </div>
                 </div>
@@ -192,12 +192,12 @@ export function ApprovalDashboard() {
                         return (
                           <div key={delta.id} className={`p-5 rounded-xl border-2 ${sevColors[delta.severity] || sevColors.medium}`}>
                             <div className="flex items-start gap-4">
-                              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${typeC.gradient} flex items-center justify-center flex-shrink-0 shadow-md`}>
+                              <div className={`w-12 h-12 rounded-xl ${typeC.gradient} flex items-center justify-center flex-shrink-0`}>
                                 <Icon className="w-6 h-6 text-white" />
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <span className="font-bold text-[#1F2937]">{typeC.label}</span>
+                                  <span className="font-medium text-[#1F2937]">{typeC.label}</span>
                                   <span className="text-xs text-[#6B7280]">{delta.occurredAt}</span>
                                 </div>
                                 <p className="text-sm text-[#374151]">{delta.description}</p>
@@ -214,7 +214,7 @@ export function ApprovalDashboard() {
                   ) : (
                     <div className="p-8 bg-[#D1FAE5] rounded-xl border-2 border-[#A7F3D0] text-center">
                       <CheckCircle2 className="w-12 h-12 text-[#059669] mx-auto mb-3" />
-                      <p className="text-[#065F46] font-semibold text-lg">暂无风险变化</p>
+                      <p className="text-[#065F46] font-medium text-lg">暂无风险变化</p>
                       <p className="text-sm text-[#059669] mt-1">企业经营状况稳定</p>
                     </div>
                   )}
@@ -224,19 +224,19 @@ export function ApprovalDashboard() {
               {/* 操作按钮 */}
               <div className="flex items-center gap-4">
                 <button onClick={() => navigate('/approval/contract-compare')}
-                  className="flex-1 h-14 bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] text-white rounded-xl text-base font-bold shadow-xl shadow-[#1E40AF]/30 transition-all duration-300 hover:shadow-2xl hover:shadow-[#1E40AF]/40 hover:-translate-y-1 inline-flex items-center justify-center gap-3 group">
+                  className="flex-1 h-14 bg-[#1E40AF] text-white rounded-xl text-base font-semibold transition-all duration-300 inline-flex items-center justify-center gap-3 group">
                   <Zap className="w-5 h-5" />
                   批复合同比对
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
-                <button className="flex-1 h-14 bg-white border-2 border-[#E5E7EB] text-[#374151] rounded-xl text-base font-bold transition-all duration-300 hover:border-[#3B82F6] hover:text-[#1E40AF] inline-flex items-center justify-center gap-3">
+                <button className="flex-1 h-14 bg-white border-2 border-border-default text-[#374151] rounded-xl text-base font-semibold transition-all duration-300 hover:border-[#3B82F6] hover:text-[#1E40AF] inline-flex items-center justify-center gap-3">
                   <FileText className="w-5 h-5" />
                   查看尽调报告
                 </button>
               </div>
             </>
           ) : (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 p-12">
+            <div className="bg-white rounded-2xl border border-border-default p-12">
               <EmptyState icon={Scale} title="请选择左侧的审批任务" />
             </div>
           )}

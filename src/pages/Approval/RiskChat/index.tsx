@@ -67,14 +67,14 @@ export function RiskChat() {
   return (
     <div className="grid grid-cols-3 gap-6 h-[calc(100vh-180px)] animate-fade-in-up">
       {/* 左侧：文档阅读器 */}
-      <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-100/50 overflow-hidden flex flex-col">
-        <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-gray-200/50 border border-border-default/50 overflow-hidden flex flex-col">
+        <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-border-default">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
               <BookOpen className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-800">文档阅读器</h3>
+              <h3 className="font-medium text-gray-800">文档阅读器</h3>
               <p className="text-xs text-gray-500">点击引用跳转原文</p>
             </div>
           </div>
@@ -92,9 +92,9 @@ export function RiskChat() {
       </div>
 
       {/* 右侧：对话区域 */}
-      <div className="col-span-2 bg-white rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-100/50 overflow-hidden flex flex-col">
+      <div className="col-span-2 bg-white rounded-2xl shadow-gray-200/50 border border-border-default/50 overflow-hidden flex flex-col">
         {/* 头部 */}
-        <div className="px-6 py-4 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-gray-100">
+        <div className="px-6 py-4 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-border-default">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
@@ -103,11 +103,11 @@ export function RiskChat() {
               >
                 <ArrowLeft className="w-4 h-4 text-gray-600" />
               </button>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-purple-500/30">
                 <MessageSquare className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-800">风险分析助手</h3>
+                <h3 className="font-medium text-gray-800">风险分析助手</h3>
                 <p className="text-xs text-gray-500">Chat with Docs · 智能问答</p>
               </div>
             </div>
@@ -122,7 +122,7 @@ export function RiskChat() {
         <div className="flex-1 overflow-auto p-6 space-y-6">
           {chatMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30 mb-6">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-purple-500/30 mb-6">
                 <Sparkles className="w-10 h-10 text-white" />
               </div>
               <h3 className="text-lg font-semibold text-gray-800 mb-2">我是您的风险分析助手</h3>
@@ -166,7 +166,7 @@ export function RiskChat() {
         </div>
 
         {/* 输入区域 */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+        <div className="px-6 py-4 border-t border-border-default bg-gray-50">
           <div className="flex items-center gap-3">
             <div className="flex-1 relative">
               <input
@@ -175,7 +175,7 @@ export function RiskChat() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                 placeholder="输入您的问题，例如：抵押物覆盖率够不够？"
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
+                className="w-full px-4 py-3 bg-white border border-border-default rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
               />
             </div>
             <button
@@ -260,7 +260,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 // 引用来源组件
 function ReferenceChip({ reference }: { reference: DocumentReference }) {
   return (
-    <button className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors">
+    <button className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-border-default rounded-lg text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors">
       <ExternalLink className="w-3 h-3" />
       <span>{reference.documentName} P{reference.pageNumber}</span>
     </button>

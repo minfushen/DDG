@@ -16,6 +16,14 @@
   --accent-cyan: #06B6D4;
   --accent-cyan-bg: #CFFAFE;
 
+  /* AI 专属色 — 紫青（智能体操作区） */
+  --accent-ai: #6366F1;
+  --accent-ai-light: #A5B4FC;
+  --accent-ai-bg: #EEF2FF;
+
+  /* 风险高亮增强边框 */
+  --risk-high-glow: rgba(220, 38, 38, 0.25);
+
   /* 语义色 — 更饱和、更醒目 */
   --success: #059669;
   --success-light: #10B981;
@@ -109,6 +117,46 @@
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ========================================
+   Tailwind v4 语义色彩注册
+   ======================================== */
+@theme {
+  /* 品牌 */
+  --color-brand: #1E40AF;
+  --color-brand-light: #3B82F6;
+  --color-brand-dark: #1E3A8A;
+  --color-brand-bg: #DBEAFE;
+  --color-brand-text: #1E40AF;
+
+  /* 表面层级 */
+  --color-surface-page: #F9FAFB;
+  --color-surface-card: #FFFFFF;
+  --color-surface-hover: #F3F4F6;
+  --color-surface-active: #DBEAFE;
+
+  /* 中性文字 */
+  --color-text-primary: #1F2937;
+  --color-text-body: #374151;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+
+  /* 边框 */
+  --color-border-default: #E5E7EB;
+  --color-border-hover: #93C5FD;
+  --color-border-strong: #D1D5DB;
+
+  /* 语义状态 */
+  --color-success: #059669;
+  --color-success-bg: #D1FAE5;
+  --color-success-text: #065F46;
+  --color-warning: #D97706;
+  --color-warning-bg: #FEF3C7;
+  --color-warning-text: #92400E;
+  --color-danger: #DC2626;
+  --color-danger-bg: #FEE2E2;
+  --color-danger-text: #991B1B;
 }
 
 /* ========================================
@@ -284,6 +332,42 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: var(--radius-sm);
+}
+
+/* ========================================
+   金融专业工具类
+   ======================================== */
+
+/* 金融数字等宽 */
+.font-number {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* AI 玻璃卡片 — 智能体操作区专属 */
+.ai-glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-glass-card::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(6, 182, 212, 0.08), transparent);
+  transform: rotate(45deg);
+  animation: shimmer 3s infinite;
+}
+
+/* 风险指示器光晕 — 高风险状态增强 */
+.risk-glow {
+  box-shadow: 0 0 0 1px var(--risk-high-glow), 0 0 12px var(--risk-high-glow);
 }
 
 /* ========================================

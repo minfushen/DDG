@@ -43,7 +43,7 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
       </div>
 
       {/* 分类矩阵 */}
-      <div className="overflow-hidden rounded-xl border border-gray-200">
+      <div className="overflow-hidden rounded-xl border border-border-default">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 text-[11px] text-gray-500 uppercase">
@@ -83,7 +83,7 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
                     return (
                       <td key={status} className="text-center px-3 py-3">
                         {count > 0 ? (
-                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>
                             {count}
                           </span>
                         ) : (
@@ -96,7 +96,7 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500"
+                          className="h-full bg-brand rounded-full transition-all duration-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -114,7 +114,7 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
       {filter && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-800">
+            <h4 className="text-sm font-medium text-gray-800">
               {CHECKLIST_CATEGORY_LABELS[filter as ChecklistCategory]?.zh} — 清单明细
             </h4>
             <button
@@ -130,7 +130,7 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
             const isExpanded = expandedItem === item.id;
 
             return (
-              <div key={item.id} className="rounded-xl border border-gray-200 overflow-hidden">
+              <div key={item.id} className="rounded-xl border border-border-default overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setExpandedItem(isExpanded ? null : item.id)}
@@ -155,7 +155,7 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                 </button>
                 {isExpanded && item.extractedData && (
-                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-sm">
+                  <div className="px-4 py-3 bg-gray-50 border-t border-border-default text-sm">
                     <p className="text-gray-700 mb-2">{item.extractedData}</p>
                     <div className="flex items-center gap-4 text-[11px] text-gray-400">
                       {item.aiConfidence !== undefined && (
@@ -181,8 +181,8 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
 
 function StatBlock({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="rounded-xl bg-white border border-gray-200 px-3 py-3 text-center">
-      <p className={`text-lg font-bold tabular-nums ${color}`}>{value}</p>
+    <div className="rounded-xl bg-white border border-border-default px-3 py-3 text-center">
+      <p className={`text-lg font-medium tabular-nums ${color}`}>{value}</p>
       <p className="text-[11px] text-gray-400 mt-0.5">{label}</p>
     </div>
   );

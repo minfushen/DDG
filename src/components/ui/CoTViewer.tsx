@@ -44,16 +44,16 @@ export function CoTViewer({ steps, expanded, onToggleExpanded, onRun, onReset, r
   const allDone = completedCount === steps.length && steps.length > 0;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+    <div className="rounded-xl border border-border-default bg-white overflow-hidden">
       {/* 头部 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-border-default">
         <button
           type="button"
           onClick={onToggleExpanded}
           className="flex items-center gap-2"
         >
           <Sparkles className="w-4 h-4 text-indigo-500" />
-          <span className="text-sm font-semibold text-gray-800">AI 思维链 (Chain of Thought)</span>
+          <span className="text-sm font-medium text-gray-800">AI 思维链 (Chain of Thought)</span>
           {allDone && (
             <span className="text-[10px] px-1.5 py-0.5 bg-[var(--risk-low-bg)] text-[var(--risk-low-text)] rounded-lg font-medium">
               {completedCount}/{steps.length}
@@ -75,7 +75,7 @@ export function CoTViewer({ steps, expanded, onToggleExpanded, onRun, onReset, r
               type="button"
               onClick={onRun}
               disabled={running}
-              className="text-xs px-3 py-1 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+              className="text-xs px-3 py-1 rounded-lg bg-brand text-white font-medium hover:shadow-md transition-all disabled:opacity-50"
             >
               {running ? '推理中...' : '开始推理'}
             </button>

@@ -25,12 +25,12 @@ export function WarningConfig() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6">
+      <div className="bg-white rounded-2xl shadow-gray-200/50 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <GradientIcon icon={Settings} gradient="purple" size="lg" />
             <div>
-              <h2 className="text-xl font-bold text-gray-800">预警规则配置</h2>
+              <h2 className="text-xl font-semibold text-gray-800">预警规则配置</h2>
               <p className="text-sm text-gray-500 mt-1">智能预警 · 规则引擎 · 风险阈值</p>
             </div>
           </div>
@@ -43,7 +43,7 @@ export function WarningConfig() {
               <XCircle className="w-5 h-5 text-gray-400" />
               <span className="text-sm text-gray-600">已禁用 {disabledCount} 项</span>
             </div>
-            <button className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-4 h-8 text-[13px] font-medium text-white shadow-md shadow-blue-500/20 transition-all hover:shadow-lg hover:-translate-y-0.5">
+            <button className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 h-8 text-[13px] font-medium text-white shadow-blue-500/20 transition-all hover:shadow-lg">
               <Plus className="w-4 h-4" />
               新建规则
             </button>
@@ -51,7 +51,7 @@ export function WarningConfig() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-4 animate-fade-in-up">
+      <div className="bg-white rounded-2xl shadow-gray-200/50 p-4 animate-fade-in-up">
         <div className="flex items-center gap-4">
           <Filter className="w-4 h-4 text-gray-400" />
           <div className="flex items-center gap-2">
@@ -83,7 +83,7 @@ export function WarningConfig() {
           <RuleCard key={rule.id} rule={rule} index={index} onToggle={() => toggleRule(rule.id)} />
         ))}
         {filteredRules.length === 0 && (
-          <div className="col-span-2 p-12 bg-white rounded-2xl shadow-lg shadow-gray-200/50 text-center">
+          <div className="col-span-2 p-12 bg-white rounded-2xl shadow-gray-200/50 text-center">
             <Shield className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">暂无预警规则</p>
           </div>
@@ -99,17 +99,17 @@ function RuleCard({ rule, index, onToggle }: { rule: WarningRule; index: number;
 
   return (
     <div
-      className={`bg-white rounded-2xl shadow-lg shadow-gray-200/50 border transition-all animate-fade-in-up ${
-        !rule.enabled ? 'border-gray-200 opacity-75' : ''
+      className={`bg-white rounded-2xl shadow-gray-200/50 border transition-all animate-fade-in-up ${
+        !rule.enabled ? 'border-border-default opacity-75' : ''
       }`}
       style={{ animationDelay: `${index * 50}ms` }}
     >
-      <div className="p-6 border-b border-gray-100">
+      <div className="p-6 border-b border-border-default">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <GradientIcon icon={Shield} gradient={sourceC.gradient} size="md" />
             <div>
-              <h3 className="font-semibold text-gray-800">{rule.name}</h3>
+              <h3 className="font-medium text-gray-800">{rule.name}</h3>
               <p className="text-xs text-gray-500 mt-0.5">{sourceC.label}</p>
             </div>
           </div>
@@ -146,7 +146,7 @@ function RuleCard({ rule, index, onToggle }: { rule: WarningRule; index: number;
           ))}
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+        <div className="flex items-center justify-between pt-4 border-t border-border-default">
           <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${levelC.bg} ${levelC.text}`}>
             {levelC.label}
           </span>

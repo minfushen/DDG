@@ -7,25 +7,25 @@ import {
   RefreshCw, Shield, TrendingUp, TrendingDown, Gauge, Scale,
   Building2, Eye, FileSearch, ClipboardCheck, Inbox, Archive,
 } from 'lucide-react';
-import { gradients, severity, statusToken } from '../theme/tokens';
+import { severity, statusToken } from '../theme/tokens';
 
 // --- 风险等级 ---
 export const riskLevelConfig = {
   low: {
     label: '低风险', ...severity.low,
-    gradientClass: gradients.green, icon: TrendingUp,
+    gradientClass: 'bg-success-bg text-success', icon: TrendingUp,
   },
   medium: {
     label: '中风险', ...severity.medium,
-    gradientClass: gradients.amber, icon: Gauge,
+    gradientClass: 'bg-warning-bg text-warning', icon: Gauge,
   },
   high: {
     label: '高风险', ...severity.high,
-    gradientClass: gradients.red, icon: TrendingDown,
+    gradientClass: 'bg-danger-bg text-danger', icon: TrendingDown,
   },
   critical: {
     label: '极高风险', ...severity.critical,
-    gradientClass: gradients.red, icon: AlertTriangle,
+    gradientClass: 'bg-danger-bg text-danger', icon: AlertTriangle,
   },
 } as const;
 
@@ -33,9 +33,9 @@ export type RiskLevel = keyof typeof riskLevelConfig;
 
 // --- 任务类型 ---
 export const taskTypeConfig = {
-  first_credit: { label: '首次授信', gradient: gradients.blue },
-  annual_review: { label: '年审尽调', gradient: gradients.blue },
-  post_loan_warning: { label: '贷后预警', gradient: gradients.amber },
+  first_credit: { label: '首次授信', gradient: 'bg-brand-bg text-brand' },
+  annual_review: { label: '年审尽调', gradient: 'bg-brand-bg text-brand' },
+  post_loan_warning: { label: '贷后预警', gradient: 'bg-warning-bg text-warning' },
 } as const;
 
 // --- 任务状态（尽调任务 8 态生命周期）---
@@ -68,35 +68,35 @@ export const conditionStatusConfig = {
 
 // --- 前提条件类别 ---
 export const conditionCategoryConfig = {
-  collateral: { label: '抵押担保', gradient: gradients.blue },
-  guarantee: { label: '保证担保', gradient: gradients.blue },
-  document: { label: '资料文件', gradient: gradients.amber },
-  financial: { label: '财务条件', gradient: gradients.green },
-  other: { label: '其他条件', gradient: gradients.blue },
+  collateral: { label: '抵押担保', gradient: 'bg-brand-bg text-brand' },
+  guarantee: { label: '保证担保', gradient: 'bg-brand-bg text-brand' },
+  document: { label: '资料文件', gradient: 'bg-warning-bg text-warning' },
+  financial: { label: '财务条件', gradient: 'bg-success-bg text-success' },
+  other: { label: '其他条件', gradient: 'bg-brand-bg text-brand' },
 } as const;
 
 // --- 风险变化类型 ---
 export const riskDeltaTypeConfig = {
-  legal: { label: '法律风险', gradient: gradients.red, icon: Scale },
-  financial: { label: '财务风险', gradient: gradients.amber, icon: TrendingDown },
-  management: { label: '管理风险', gradient: gradients.amber, icon: Shield },
-  operation: { label: '经营风险', gradient: gradients.blue, icon: Building2 },
-  market: { label: '市场风险', gradient: gradients.amber, icon: TrendingUp },
+  legal: { label: '法律风险', gradient: 'bg-danger-bg text-danger', icon: Scale },
+  financial: { label: '财务风险', gradient: 'bg-warning-bg text-warning', icon: TrendingDown },
+  management: { label: '管理风险', gradient: 'bg-warning-bg text-warning', icon: Shield },
+  operation: { label: '经营风险', gradient: 'bg-brand-bg text-brand', icon: Building2 },
+  market: { label: '市场风险', gradient: 'bg-warning-bg text-warning', icon: TrendingUp },
 } as const;
 
 // --- 预警等级 ---
 export const warningLevelConfig = {
-  high: { ...severity.high, label: '高风险', gradientClass: gradients.red },
-  medium: { ...severity.medium, label: '中风险', gradientClass: gradients.amber },
-  low: { ...severity.low, label: '低风险', gradientClass: gradients.green },
+  high: { ...severity.high, label: '高风险', gradientClass: 'bg-danger-bg text-danger' },
+  medium: { ...severity.medium, label: '中风险', gradientClass: 'bg-warning-bg text-warning' },
+  low: { ...severity.low, label: '低风险', gradientClass: 'bg-success-bg text-success' },
 } as const;
 
 // --- 预警来源 ---
 export const warningSourceConfig = {
-  external: { label: '外部舆情', gradient: gradients.blue },
-  internal: { label: '内部数据', gradient: gradients.blue },
-  behavior: { label: '行为异常', gradient: gradients.amber },
-  financial: { label: '财务指标', gradient: gradients.green },
+  external: { label: '外部舆情', gradient: 'bg-brand-bg text-brand' },
+  internal: { label: '内部数据', gradient: 'bg-brand-bg text-brand' },
+  behavior: { label: '行为异常', gradient: 'bg-warning-bg text-warning' },
+  financial: { label: '财务指标', gradient: 'bg-success-bg text-success' },
 } as const;
 
 // --- 预警状态 ---
@@ -109,12 +109,12 @@ export const warningStatusConfig = {
 
 // --- 合同差异类型 ---
 export const diffTypeConfig = {
-  rate: { label: '利率条款', gradient: gradients.red },
-  guarantee: { label: '担保条款', gradient: gradients.blue },
-  collateral: { label: '抵押条款', gradient: gradients.blue },
-  term: { label: '期限条款', gradient: gradients.amber },
-  amount: { label: '金额条款', gradient: gradients.green },
-  other: { label: '其他条款', gradient: gradients.blue },
+  rate: { label: '利率条款', gradient: 'bg-danger-bg text-danger' },
+  guarantee: { label: '担保条款', gradient: 'bg-brand-bg text-brand' },
+  collateral: { label: '抵押条款', gradient: 'bg-brand-bg text-brand' },
+  term: { label: '期限条款', gradient: 'bg-warning-bg text-warning' },
+  amount: { label: '金额条款', gradient: 'bg-success-bg text-success' },
+  other: { label: '其他条款', gradient: 'bg-brand-bg text-brand' },
 } as const;
 
 // --- 合同差异严重程度 ---
@@ -134,9 +134,9 @@ export const checkStatusConfig = {
 
 // --- 贷后检查类型 ---
 export const checkTypeConfig = {
-  regular: { label: '常规检查', gradient: gradients.blue },
-  special: { label: '专项检查', gradient: gradients.blue },
-  triggered: { label: '触发检查', gradient: gradients.amber },
+  regular: { label: '常规检查', gradient: 'bg-brand-bg text-brand' },
+  special: { label: '专项检查', gradient: 'bg-brand-bg text-brand' },
+  triggered: { label: '触发检查', gradient: 'bg-warning-bg text-warning' },
 } as const;
 
 // --- 贷后检查结论 ---

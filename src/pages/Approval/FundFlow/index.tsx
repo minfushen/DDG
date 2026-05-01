@@ -194,7 +194,7 @@ export function FundFlow() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* 页面头部 */}
-      <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6">
+      <div className="bg-white rounded-2xl shadow-gray-200/50 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -205,7 +205,7 @@ export function FundFlow() {
             </button>
             <GradientIcon icon={Banknote} gradient="green" size="lg" />
             <div>
-              <h2 className="text-xl font-bold text-gray-800">资金流向穿透图谱</h2>
+              <h2 className="text-xl font-semibold text-gray-800">资金流向穿透图谱</h2>
               <p className="text-sm text-gray-500 mt-1">
                 {currentTask?.enterpriseName || '浙江华创科技有限公司'} · 受托支付合规监控
               </p>
@@ -215,15 +215,15 @@ export function FundFlow() {
           {/* 统计概览 */}
           <div className="flex items-center gap-4">
             <div className="text-center px-4">
-              <p className="text-2xl font-bold text-gray-800">{formatAmount(fundFlowData.totalAmount / 10000)}</p>
+              <p className="text-2xl font-semibold text-gray-800">{formatAmount(fundFlowData.totalAmount / 10000)}</p>
               <p className="text-xs text-gray-500">发放总额</p>
             </div>
-            <div className="text-center px-4 border-l border-gray-200">
-              <p className="text-2xl font-bold text-[var(--risk-low-text)]">{formatAmount((fundFlowData.totalAmount - fundFlowData.violationAmount) / 10000)}</p>
+            <div className="text-center px-4 border-l border-border-default">
+              <p className="text-2xl font-semibold text-[var(--risk-low-text)]">{formatAmount((fundFlowData.totalAmount - fundFlowData.violationAmount) / 10000)}</p>
               <p className="text-xs text-gray-500">合规金额</p>
             </div>
-            <div className="text-center px-4 border-l border-gray-200">
-              <p className="text-2xl font-bold text-[var(--risk-high-text)]">{formatAmount(fundFlowData.violationAmount / 10000)}</p>
+            <div className="text-center px-4 border-l border-border-default">
+              <p className="text-2xl font-semibold text-[var(--risk-high-text)]">{formatAmount(fundFlowData.violationAmount / 10000)}</p>
               <p className="text-xs text-gray-500">违规金额</p>
             </div>
           </div>
@@ -232,7 +232,7 @@ export function FundFlow() {
 
       <div className="grid grid-cols-3 gap-6">
         {/* 左侧：图谱 */}
-        <div className="col-span-2 bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up">
+        <div className="col-span-2 bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up">
           <div className="flex items-center gap-4 mb-4">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 bg-[var(--risk-low)] rounded-full" />
@@ -246,7 +246,7 @@ export function FundFlow() {
               <span className="w-3 h-3 bg-[var(--risk-high)] rounded-full" />
               <span className="text-sm text-gray-600">违规</span>
             </div>
-            <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
+            <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border-default">
               <span className="w-6 h-0.5 bg-[var(--risk-low)]" />
               <span className="text-sm text-gray-600">发票匹配</span>
             </div>
@@ -261,11 +261,11 @@ export function FundFlow() {
         {/* 右侧：风险明细 */}
         <div className="space-y-6">
           {/* 违规预警 */}
-          <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <div className="bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
             <div className="flex items-center gap-3 mb-4">
               <GradientIcon icon={XCircle} gradient="red" size="md" />
               <div>
-                <h3 className="font-semibold text-gray-800">违规预警</h3>
+                <h3 className="font-medium text-gray-800">违规预警</h3>
                 <p className="text-xs text-gray-500">{violationNodes.length} 项违规</p>
               </div>
             </div>
@@ -275,7 +275,7 @@ export function FundFlow() {
                 <div key={node.id} className="p-3 bg-[var(--risk-high-bg)] rounded-xl border border-[var(--risk-high-bg)] animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-medium text-gray-800">{node.name}</p>
-                    <span className="text-sm font-semibold text-[var(--risk-high-text)]">{formatAmount(node.amount / 10000)}</span>
+                    <span className="text-sm font-medium text-[var(--risk-high-text)]">{formatAmount(node.amount / 10000)}</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {node.riskLabels?.map((label, i) => (
@@ -288,11 +288,11 @@ export function FundFlow() {
           </div>
 
           {/* 可疑交易 */}
-          <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+          <div className="bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
             <div className="flex items-center gap-3 mb-4">
               <GradientIcon icon={AlertTriangle} gradient="amber" size="md" />
               <div>
-                <h3 className="font-semibold text-gray-800">可疑交易</h3>
+                <h3 className="font-medium text-gray-800">可疑交易</h3>
                 <p className="text-xs text-gray-500">{suspiciousNodes.length} 项待核实</p>
               </div>
             </div>
@@ -302,7 +302,7 @@ export function FundFlow() {
                 <div key={node.id} className="p-3 bg-[var(--risk-medium-bg)] rounded-xl border border-[var(--risk-medium-bg)] animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-medium text-gray-800">{node.name}</p>
-                    <span className="text-sm font-semibold text-[var(--risk-medium-text)]">{formatAmount(node.amount / 10000)}</span>
+                    <span className="text-sm font-medium text-[var(--risk-medium-text)]">{formatAmount(node.amount / 10000)}</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {node.riskLabels?.map((label, i) => (
@@ -315,11 +315,11 @@ export function FundFlow() {
           </div>
 
           {/* 发票匹配 */}
-          <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+          <div className="bg-white rounded-2xl shadow-gray-200/50 p-6 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
             <div className="flex items-center gap-3 mb-4">
               <GradientIcon icon={FileCheck} gradient="blue" size="md" />
               <div>
-                <h3 className="font-semibold text-gray-800">发票匹配</h3>
+                <h3 className="font-medium text-gray-800">发票匹配</h3>
                 <p className="text-xs text-gray-500">{unmatchedEdges.length} 笔待补发票</p>
               </div>
             </div>

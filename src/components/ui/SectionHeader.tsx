@@ -17,7 +17,7 @@ export function SectionHeader({ icon: Icon, title, subtitle, children, className
       <div className="flex min-w-0 items-start gap-3">
         <Icon className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" strokeWidth={2} />
         <div>
-          <h3 className="text-lg font-semibold tracking-tight text-gray-900">{title}</h3>
+          <h3 className="text-lg font-medium tracking-tight text-gray-900">{title}</h3>
           {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
         </div>
       </div>

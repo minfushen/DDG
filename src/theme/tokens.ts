@@ -17,6 +17,7 @@ export const gradients = {
   red: 'from-[#DC2626] to-[#EF4444]',         // 危险系 — 更饱和
   cyan: 'from-[#06B6D4] to-[#22D3EE]',        // 青色强调
   dark: 'from-[#1F2937] to-[#374151]',        // 深色渐变
+  ai: 'from-[#6366F1] to-[#06B6D4]',          // AI 专属 — 紫青
 } as const;
 
 export type GradientKey = keyof typeof gradients;
@@ -56,19 +57,19 @@ export const iconSize = {
   lg: 'w-16 h-16 rounded-2xl',
 } as const;
 
-// 卡片样式预设
+// 卡片样式预设 — 中性投影，金融专业感
 export const cardStyles = {
-  default: 'bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5',
-  elevated: 'bg-white rounded-2xl border border-[#E5E7EB] shadow-xl shadow-[#1E40AF]/10',
-  interactive: 'bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 hover:shadow-xl hover:shadow-[#1E40AF]/10 hover:border-[#93C5FD] transition-all duration-300',
-  gradient: 'bg-gradient-to-br from-white to-[#F9FAFB] rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5',
+  default: 'bg-white rounded-2xl border border-[#E5E7EB]',
+  elevated: 'bg-white rounded-2xl border border-[#D1D5DB]',
+  interactive: 'bg-white rounded-2xl border border-[#E5E7EB] hover:border-[#93C5FD] transition-all duration-200',
+  gradient: 'bg-[#F9FAFB] rounded-2xl border border-[#E5E7EB]',
 } as const;
 
-// 按钮样式预设
+// 按钮样式预设 — 中性投影
 export const buttonStyles = {
-  primary: 'bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] text-white font-semibold shadow-lg shadow-[#1E40AF]/25 hover:shadow-xl hover:shadow-[#1E40AF]/30 hover:-translate-y-0.5 transition-all duration-300',
-  secondary: 'bg-white border-2 border-[#E5E7EB] text-[#374151] font-medium hover:border-[#93C5FD] hover:bg-[#DBEAFE]/50 transition-all duration-300',
-  danger: 'bg-gradient-to-r from-[#DC2626] to-[#EF4444] text-white font-semibold shadow-lg shadow-[#DC2626]/25 hover:shadow-xl hover:shadow-[#DC2626]/30 hover:-translate-y-0.5 transition-all duration-300',
-  success: 'bg-gradient-to-r from-[#059669] to-[#10B981] text-white font-semibold shadow-lg shadow-[#059669]/25 hover:shadow-xl hover:shadow-[#059669]/30 hover:-translate-y-0.5 transition-all duration-300',
+  primary: 'bg-[#1E40AF] text-white font-medium hover:bg-[#1E3A8A] transition-all duration-200',
+  secondary: 'bg-white border border-[#E5E7EB] text-[#374151] font-medium hover:border-[#93C5FD] hover:bg-[#F9FAFB] transition-all duration-200',
+  danger: 'bg-[#DC2626] text-white font-medium hover:bg-[#B91C1C] transition-all duration-200',
+  success: 'bg-[#059669] text-white font-medium hover:bg-[#047857] transition-all duration-200',
   ghost: 'text-[#4B5563] font-medium hover:bg-[#F3F4F6] hover:text-[#1F2937] transition-all duration-200',
 } as const;

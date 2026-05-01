@@ -55,7 +55,7 @@ export function FinancialTable({
             onClick={() => onTabChange(stmt.type)}
             className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
               activeTab === stmt.type
-                ? 'bg-white text-gray-900 shadow-sm'
+                ? 'bg-white text-gray-900'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -69,7 +69,7 @@ export function FinancialTable({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 text-[11px] text-gray-500 uppercase">
+            <tr className="border-b border-border-default text-[11px] text-gray-500 uppercase">
               <th className="text-left py-2 pr-3 font-medium">科目 / Akun</th>
               <th className="text-right py-2 px-3 font-medium w-[100px]">当期</th>
               <th className="text-right py-2 px-3 font-medium w-[100px]">上期</th>
@@ -90,7 +90,7 @@ export function FinancialTable({
       </div>
 
       {/* PSAK 条款说明 */}
-      <div className="mt-3 pt-3 border-t border-gray-100 text-[11px] text-gray-400">
+      <div className="mt-3 pt-3 border-t border-border-default text-[11px] text-gray-400">
         基于 PSAK (Pernyataan Standar Akuntansi Keuangan) 印尼会计准则编制
       </div>
     </div>
@@ -112,12 +112,12 @@ function FinancialRow({
     <tr
       className={`border-b border-gray-50 cursor-pointer transition-colors ${
         highlighted ? 'bg-[var(--risk-info-bg)]' : 'hover:bg-gray-50'
-      } ${item.isTotal ? 'font-semibold bg-gray-50/80' : ''}`}
+      } ${item.isTotal ? 'font-medium bg-gray-50/80' : ''}`}
       onClick={() => onHighlight(highlighted ? null : item.id)}
     >
       <td className="py-2 pr-3">
         <div style={{ paddingLeft: `${indent * 16}px` }}>
-          <div className={`text-gray-800 ${item.isTotal ? 'font-semibold' : ''}`}>
+          <div className={`text-gray-800 ${item.isTotal ? 'font-medium' : ''}`}>
             {item.labelZh}
             {item.linkedItems && item.linkedItems.length > 0 && (
               <Link2 className="w-3 h-3 text-[var(--risk-info)] inline ml-1" />

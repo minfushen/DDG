@@ -110,12 +110,12 @@ export function TaskTimeline({ steps, onStepClick, compact = false }: TaskTimeli
             {/* 阶段标题 */}
             <div className="flex items-center gap-2 mb-3">
               <GradientIcon icon={config.icon} gradient={config.color} size="sm" />
-              <span className="text-sm font-semibold text-gray-800">{config.label}</span>
+              <span className="text-sm font-medium text-gray-800">{config.label}</span>
               <span className="text-xs text-gray-400">({phaseSteps.length})</span>
             </div>
 
             {/* 步骤列表 */}
-            <div className="space-y-2 ml-4 border-l-2 border-gray-100 pl-4">
+            <div className="space-y-2 ml-4 border-l-2 border-border-default pl-4">
               {phaseSteps.length === 0 ? (
                 <p className="text-xs text-gray-400 italic py-2">暂无步骤</p>
               ) : (
@@ -152,7 +152,7 @@ function TimelineStep({ step, index, isCompact, onClick }: TimelineStepProps) {
 
   const baseClass = `
     relative p-4 rounded-2xl border transition-all cursor-pointer
-    border-gray-200 hover:border-gray-300
+    border-border-default hover:border-gray-300
     ${step.status === 'running' ? 'animate-pulse' : ''}
   `;
 
@@ -211,7 +211,7 @@ function TimelineStep({ step, index, isCompact, onClick }: TimelineStepProps) {
               {step.evidence.map((e, i) => (
                 <button
                   key={i}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-border-default rounded-lg text-xs text-gray-600 hover:bg-gray-50"
                 >
                   {e.type === 'document' && '📄'}
                   {e.type === 'link' && '🔗'}
@@ -258,7 +258,7 @@ export function TaskTimelineCompact({ steps }: { steps: TaskStep[] }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <GradientIcon icon={Brain} gradient="blue" size="sm" />
-          <span className="text-sm font-semibold text-gray-800">执行进度</span>
+          <span className="text-sm font-medium text-gray-800">执行进度</span>
         </div>
         <span className="text-xs text-gray-500">{completedCount}/{steps.length} 完成</span>
       </div>
@@ -266,7 +266,7 @@ export function TaskTimelineCompact({ steps }: { steps: TaskStep[] }) {
       {/* 进度条 */}
       <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-4">
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500"
+          className="h-full bg-brand rounded-full transition-all duration-500"
           style={{ width: `${(completedCount / steps.length) * 100}%` }}
         />
       </div>

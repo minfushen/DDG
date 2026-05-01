@@ -83,30 +83,30 @@ export function DataIntegration() {
   const completedCount = parseItems.filter((p) => p.status === 'completed').length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F9FAFB] via-[#F3F4F6] to-[#E5E7EB]">
+    <div className="min-h-screen bg-surface-page">
       <div className="p-8 space-y-8">
 
         {/* 企业信息头部 */}
         {currentEnterprise && (
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] p-8 shadow-2xl shadow-[#1E40AF]/30">
+          <div className="relative overflow-hidden rounded-2xl bg-[#1E40AF] p-8">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-30" />
             <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 
             <div className="relative flex items-center justify-between">
               <div className="flex items-center gap-6">
-                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
                   <FileText className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-white mb-2">{currentEnterprise.name}</h1>
+                  <h1 className="text-2xl font-semibold text-white mb-2">{currentEnterprise.name}</h1>
                   <p className="text-white/80 text-sm">统一社会信用代码：{currentEnterprise.unifiedSocialCreditCode}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white text-sm font-semibold border border-white/30">
+                <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white text-sm font-medium border border-white/30">
                   {currentEnterprise.industry}
                 </span>
-                <span className="px-4 py-2 bg-white rounded-xl text-[#1E40AF] text-sm font-bold shadow-lg">
+                <span className="px-4 py-2 bg-white rounded-xl text-[#1E40AF] text-sm font-medium">
                   {currentEnterprise.region}
                 </span>
               </div>
@@ -117,13 +117,13 @@ export function DataIntegration() {
         <div className="grid grid-cols-3 gap-8">
           <div className="col-span-2 space-y-8">
             {/* 资料上传 */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
-              <div className="px-6 py-5 border-b border-[#E5E7EB] flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1E40AF] to-[#3B82F6] flex items-center justify-center shadow-lg shadow-[#1E40AF]/25">
-                  <Upload className="w-5 h-5 text-white" />
+            <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
+              <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center">
+                  <Upload className="w-5 h-5 text-brand" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F2937]">资料上传</h3>
+                  <h3 className="text-base font-semibold text-[#1F2937]">资料上传</h3>
                   <p className="text-sm text-[#6B7280]">上传尽调资料，AI自动解析（演示模式：模拟解析中）</p>
                 </div>
               </div>
@@ -132,7 +132,7 @@ export function DataIntegration() {
                   <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#DBEAFE] to-[#CFFAFE] flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                     <Upload className="w-10 h-10 text-[#3B82F6]" />
                   </div>
-                  <p className="text-[#1F2937] font-bold text-lg">拖拽文件到此处上传，或点击选择</p>
+                  <p className="text-[#1F2937] font-medium text-lg">拖拽文件到此处上传，或点击选择</p>
                   <p className="text-sm text-[#6B7280] mt-2">支持 PDF、Excel、图片、音频等格式</p>
                 </div>
 
@@ -141,13 +141,13 @@ export function DataIntegration() {
                     const fc = fileIconConfig[file.type] || fileIconConfig.pdf;
                     const isRunning = file.status === 'processing';
                     return (
-                      <div key={file.id} className="flex items-center gap-4 p-5 bg-[#F9FAFB] rounded-xl border-2 border-[#E5E7EB] hover:border-[#93C5FD] transition-all">
+                      <div key={file.id} className="flex items-center gap-4 p-5 bg-[#F9FAFB] rounded-xl border-2 border-border-default hover:border-[#93C5FD] transition-all">
                         <div className={isRunning ? 'animate-pulse' : ''}>
                           <GradientIcon icon={fc.icon} gradient={fc.gradient} size="md" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-semibold text-[#1F2937]">{file.name}</span>
+                            <span className="font-medium text-[#1F2937]">{file.name}</span>
                             <span className="text-xs">
                               {file.status === 'completed' ? (
                                 <CheckCircle2 className="w-5 h-5 text-[#059669]" />
@@ -173,13 +173,13 @@ export function DataIntegration() {
             </div>
 
             {/* AI 解析过程 */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
-              <div className="px-6 py-5 border-b border-[#E5E7EB] flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#06B6D4] to-[#22D3EE] flex items-center justify-center shadow-lg shadow-[#06B6D4]/25">
-                  <Brain className="w-5 h-5 text-white" />
+            <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
+              <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-brand" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F2937]">AI 解析过程</h3>
+                  <h3 className="text-base font-semibold text-[#1F2937]">AI 解析过程</h3>
                   <p className="text-sm text-[#6B7280]">多模态智能解析引擎</p>
                 </div>
               </div>
@@ -199,13 +199,13 @@ export function DataIntegration() {
 
           <div className="space-y-8">
             {/* 数据交叉核验 */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
-              <div className="px-6 py-5 border-b border-[#E5E7EB] flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D97706] to-[#F59E0B] flex items-center justify-center shadow-lg shadow-[#D97706]/25">
-                  <AlertTriangle className="w-5 h-5 text-white" />
+            <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
+              <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-warning-bg flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-warning" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F2937]">数据交叉核验</h3>
+                  <h3 className="text-base font-semibold text-[#1F2937]">数据交叉核验</h3>
                   <p className="text-sm text-[#6B7280]">智能比对分析</p>
                 </div>
               </div>
@@ -229,7 +229,7 @@ export function DataIntegration() {
                           <Info className="w-5 h-5 text-[#1E40AF] mt-0.5" />
                         )}
                         <div>
-                          <p className={`font-semibold text-sm ${
+                          <p className={`font-medium text-sm ${
                             isError ? 'text-[#991B1B]' :
                             isWarning ? 'text-[#92400E]' :
                             'text-[#1E40AF]'
@@ -244,11 +244,11 @@ export function DataIntegration() {
             </div>
 
             {/* 操作卡片 */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
               <div className="p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${
-                    allDone ? 'bg-gradient-to-br from-[#059669] to-[#10B981]' : 'bg-gradient-to-br from-[#1E40AF] to-[#3B82F6]'
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    allDone ? 'bg-success-bg' : 'bg-brand-bg'
                   }`}>
                     <Sparkles className="w-5 h-5 text-white" />
                   </div>
@@ -257,9 +257,9 @@ export function DataIntegration() {
                   </p>
                 </div>
                 <button onClick={handleNextStep} disabled={!allDone}
-                  className={`w-full h-14 rounded-xl text-base font-bold transition-all duration-300 inline-flex items-center justify-center gap-3 group ${
+                  className={`w-full h-14 rounded-xl text-base font-semibold transition-all duration-300 inline-flex items-center justify-center gap-3 group ${
                     allDone
-                      ? 'bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] text-white shadow-xl shadow-[#1E40AF]/30 hover:shadow-2xl hover:shadow-[#1E40AF]/40 hover:-translate-y-0.5'
+                      ? 'bg-[#1E40AF] text-white'
                       : 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed'
                   }`}>
                   进入智能分析
@@ -279,11 +279,11 @@ function ParseCard({ type, description, status, items, icon: Icon, gradient }: {
   items: string[]; icon: LucideIcon; gradient: GradientKey;
 }) {
   return (
-    <div className="p-5 bg-[#F9FAFB] rounded-xl border-2 border-[#E5E7EB] hover:border-[#93C5FD] transition-all">
+    <div className="p-5 bg-[#F9FAFB] rounded-xl border-2 border-border-default hover:border-[#93C5FD] transition-all">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <GradientIcon icon={Icon} gradient={gradient} size="sm" />
-          <span className="font-bold text-[#1F2937] text-sm">{type}</span>
+          <span className="font-medium text-[#1F2937] text-sm">{type}</span>
         </div>
         {status === 'completed' && <CheckCircle2 className="w-5 h-5 text-[#059669]" />}
         {status === 'processing' && <Loader2 className="w-5 h-5 text-[#3B82F6] animate-spin" />}

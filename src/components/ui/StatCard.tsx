@@ -2,14 +2,15 @@ import type { LucideIcon } from 'lucide-react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import type { GradientKey } from '../../theme/tokens';
 
-const ACCENT_BAR: Record<GradientKey, string> = {
-  primary: 'bg-blue-500',
-  blue: 'bg-blue-500',
-  green: 'bg-[var(--risk-low)]',
-  amber: 'bg-[var(--risk-medium)]',
-  red: 'bg-[var(--risk-high)]',
-  cyan: 'bg-cyan-500',
-  dark: 'bg-gray-700',
+const ACCENT_DOT: Record<GradientKey, string> = {
+  primary: 'bg-[#1E40AF]',
+  blue: 'bg-[#1E40AF]',
+  green: 'bg-[#059669]',
+  amber: 'bg-[#D97706]',
+  red: 'bg-[#DC2626]',
+  cyan: 'bg-[#06B6D4]',
+  dark: 'bg-[#374151]',
+  ai: 'bg-[#6366F1]',
 } as const;
 
 interface StatCardProps {
@@ -22,7 +23,6 @@ interface StatCardProps {
   gradient: GradientKey;
   description?: string;
   className?: string;
-  /** KPI 区强化：略大的底部边距，与列表区分层级 */
   emphasis?: 'primary' | 'default';
 }
 
@@ -36,30 +36,32 @@ export function StatCard({
   description,
   className = '',
 }: StatCardProps) {
-  const bar = ACCENT_BAR[gradient] ?? 'bg-indigo-500';
+  const dot = ACCENT_DOT[gradient] ?? 'bg-[#6B7280]';
 
   return (
     <div
-      className={`relative flex overflow-hidden rounded-2xl bg-white shadow-lg shadow-gray-200/50 transition-all duration-200 hover:shadow-lg ${className}`}
+      className={`relative flex overflow-hidden rounded-2xl bg-white border border-border-default transition-all duration-200 hover:border-[#93C5FD] ${className}`}
     >
-      <div className={`w-1 shrink-0 rounded-l-[13px] ${bar}`} aria-hidden />
       <div className="min-w-0 flex-1 p-5">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+        <div className="flex items-center gap-2 mb-2">
+          <span className={`w-1.5 h-1.5 rounded-full ${dot}`} aria-hidden />
+          <p className="text-xs font-medium text-[#6B7280]">{label}</p>
+        </div>
         <div className="mb-1 flex items-end gap-2">
-          <span className="text-3xl font-semibold tabular-nums text-gray-900">{value}</span>
-          {unit && <span className="mb-1 text-sm text-gray-500">{unit}</span>}
+          <span className="text-[22px] font-medium tabular-nums text-[#1F2937]">{value}</span>
+          {unit && <span className="mb-0.5 text-xs text-[#9CA3AF]">{unit}</span>}
         </div>
         {trend && (
           <div
-            className={`flex items-center gap-1 text-sm ${trendUp ? 'text-emerald-600' : 'text-gray-400'}`}
+            className={`flex items-center gap-1 text-xs font-medium ${trendUp ? 'text-[#059669]' : 'text-[#9CA3AF]'}`}
           >
             {trendUp ? (
-              <ArrowUpRight className="h-4 w-4 shrink-0" strokeWidth={2} />
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
             ) : (
-              <ArrowDownRight className="h-4 w-4 shrink-0" strokeWidth={2} />
+              <ArrowDownRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
             )}
-            <span className="font-medium">{trend}</span>
-            {description && <span className="font-normal text-gray-400">{description}</span>}
+            <span>{trend}</span>
+            {description && <span className="font-normal text-[#9CA3AF]">{description}</span>}
           </div>
         )}
       </div>

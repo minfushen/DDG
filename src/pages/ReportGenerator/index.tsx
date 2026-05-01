@@ -123,25 +123,25 @@ export function ReportGenerator() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F9FAFB] via-[#F3F4F6] to-[#E5E7EB]">
+    <div className="min-h-screen bg-surface-page">
       <div className="h-[calc(100vh-120px)] flex gap-8 p-8">
 
         {/* 报告编辑区 */}
-        <div className="flex-1 flex flex-col bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white rounded-2xl border border-border-default overflow-hidden">
           {/* 工具栏 */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-[#E5E7EB] bg-gradient-to-r from-[#F9FAFB] to-white">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-border-default bg-gradient-to-r from-[#F9FAFB] to-white">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1E40AF] to-[#3B82F6] flex items-center justify-center shadow-lg shadow-[#1E40AF]/25">
-                <FileText className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-xl bg-brand-bg flex items-center justify-center">
+                <FileText className="w-6 h-6 text-brand" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-[#1F2937]">尽调报告</h3>
+                <h3 className="text-lg font-semibold text-[#1F2937]">尽调报告</h3>
                 <p className="text-sm text-[#6B7280]">AI 自动生成，人工复核编辑</p>
               </div>
               <select
                 value={selectedTemplate}
                 onChange={(e) => setSelectedTemplate(e.target.value as ReportTemplate)}
-                className="px-4 py-2.5 bg-[#F3F4F6] border-2 border-[#E5E7EB] rounded-xl text-sm font-medium text-[#374151] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all"
+                className="px-4 py-2.5 bg-[#F3F4F6] border-2 border-border-default rounded-xl text-sm font-medium text-[#374151] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all"
               >
                 {REPORT_TEMPLATE_CONFIGS.map((config) => (
                   <option key={config.id} value={config.id}>{config.name}</option>
@@ -150,15 +150,15 @@ export function ReportGenerator() {
             </div>
             <div className="flex items-center gap-3">
               {reportStatus === 'generating' ? (
-                <span className="flex items-center gap-2 px-4 py-2.5 bg-[#DBEAFE] text-[#1E40AF] rounded-xl text-sm font-semibold">
+                <span className="flex items-center gap-2 px-4 py-2.5 bg-[#DBEAFE] text-[#1E40AF] rounded-xl text-sm font-medium">
                   <RefreshCw className="w-4 h-4 animate-spin" /> 正在生成...
                 </span>
               ) : (
-                <span className="flex items-center gap-2 px-4 py-2.5 bg-[#D1FAE5] text-[#059669] rounded-xl text-sm font-semibold">
+                <span className="flex items-center gap-2 px-4 py-2.5 bg-[#D1FAE5] text-[#059669] rounded-xl text-sm font-medium">
                   <CheckCircle2 className="w-4 h-4" /> 报告已生成
                 </span>
               )}
-              <button className="px-4 py-2.5 bg-[#F3F4F6] text-[#374151] rounded-xl text-sm font-semibold hover:bg-[#E5E7EB] transition-all flex items-center gap-2">
+              <button className="px-4 py-2.5 bg-[#F3F4F6] text-[#374151] rounded-xl text-sm font-medium hover:bg-[#E5E7EB] transition-all flex items-center gap-2">
                 <RefreshCw className="w-4 h-4" /> 重新生成
               </button>
               <button
@@ -170,16 +170,16 @@ export function ReportGenerator() {
                   );
                   addToast('报告已导出，请查看下载文件', 'success');
                 }}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#1E40AF]/25 hover:shadow-xl hover:shadow-[#1E40AF]/30 transition-all flex items-center gap-2">
+                className="px-5 py-2.5 bg-[#1E40AF] text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2">
                 <Download className="w-4 h-4" /> 导出报告
               </button>
             </div>
           </div>
 
           {/* 报告大纲 */}
-          <div className="px-6 py-4 bg-[#F9FAFB] border-b border-[#E5E7EB] overflow-x-auto">
+          <div className="px-6 py-4 bg-[#F9FAFB] border-b border-border-default overflow-x-auto">
             <div className="flex items-center gap-2 text-sm whitespace-nowrap">
-              <span className="text-[#6B7280] font-semibold">报告大纲：</span>
+              <span className="text-[#6B7280] font-medium">报告大纲：</span>
               {mockReportSections.map((section, index) => (
                 <button key={section.id} className="flex items-center gap-1 text-[#1E40AF] hover:text-[#3B82F6] hover:bg-[#DBEAFE] px-3 py-1.5 rounded-lg transition-colors font-medium">
                   {index > 0 && <ChevronRight className="w-3 h-3 text-[#9CA3AF]" />}
@@ -194,14 +194,14 @@ export function ReportGenerator() {
             {reportStatus === 'generating' ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] flex items-center justify-center shadow-xl shadow-[#1E40AF]/30 animate-pulse">
+                  <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-brand flex items-center justify-center animate-pulse">
                     <Sparkles className="w-12 h-12 text-white" />
                   </div>
-                  <p className="text-[#1F2937] font-bold text-xl">AI 正在生成尽调报告...</p>
+                  <p className="text-[#1F2937] font-medium text-xl">AI 正在生成尽调报告...</p>
                   <p className="text-sm text-[#6B7280] mt-2">预计需要 30 秒</p>
                   <div className="mt-6 w-72 mx-auto">
                     <div className="h-3 bg-[#E5E7EB] rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] rounded-full animate-progress" />
+                      <div className="h-full bg-[#1E40AF] rounded-full animate-progress" />
                     </div>
                   </div>
                 </div>
@@ -213,25 +213,25 @@ export function ReportGenerator() {
         </div>
 
         {/* 右侧面板：溯源 + AI */}
-        <div className="w-80 flex flex-col bg-white rounded-2xl border border-[#E5E7EB] shadow-lg shadow-[#1E40AF]/5 overflow-hidden">
-          <div className="flex border-b border-[#E5E7EB] bg-[#F9FAFB]">
+        <div className="w-80 flex flex-col bg-white rounded-2xl border border-border-default overflow-hidden">
+          <div className="flex border-b border-border-default bg-[#F9FAFB]">
             <button
               onClick={() => setActiveTab('source')}
-              className={`flex-1 px-4 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 px-4 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'source' ? 'text-[#1E40AF] bg-white border-b-2 border-[#3B82F6]' : 'text-[#6B7280] hover:bg-[#F3F4F6]'
               }`}>
               <Link2 className="w-4 h-4" /> 数据溯源
             </button>
             <button
               onClick={() => setActiveTab('ai')}
-              className={`flex-1 px-4 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 px-4 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'ai' ? 'text-[#1E40AF] bg-white border-b-2 border-[#3B82F6]' : 'text-[#6B7280] hover:bg-[#F3F4F6]'
               }`}>
               <Wand2 className="w-4 h-4" /> AI 辅助
             </button>
             <button
               onClick={() => setActiveTab('cot')}
-              className={`flex-1 px-4 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 px-4 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'cot' ? 'text-[#1E40AF] bg-white border-b-2 border-[#3B82F6]' : 'text-[#6B7280] hover:bg-[#F3F4F6]'
               }`}>
               <Brain className="w-4 h-4" /> 思维链
@@ -254,16 +254,16 @@ export function ReportGenerator() {
                         onClick={() => handleReferenceClick(ref.id)}
                         className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
                           isHighlighted
-                            ? 'border-[#3B82F6] bg-[#DBEAFE] shadow-lg shadow-[#3B82F6]/20'
-                            : `${ftConfig.bg} border-[#E5E7EB] hover:border-[#93C5FD] hover:shadow-md`
+                            ? 'border-[#3B82F6] bg-[#DBEAFE]'
+                            : `${ftConfig.bg} border-border-default hover:border-[#93C5FD] hover:shadow-md`
                         }`}
                         style={{ animationDelay: `${index * 50}ms` }}>
                         <div className="flex items-start gap-3">
                           <span className="text-xl">{ftConfig.emoji}</span>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-[#1F2937] text-sm truncate">{ref.fileName}</p>
+                            <p className="font-medium text-[#1F2937] text-sm truncate">{ref.fileName}</p>
                             {ref.pageNumber && <p className="text-xs text-[#6B7280] mt-1"><FileSearch className="w-3 h-3 inline" /> 第{ref.pageNumber}页</p>}
-                            {ref.highlightText && <p className="text-xs text-[#1E40AF] mt-1 font-semibold">"{ref.highlightText}"</p>}
+                            {ref.highlightText && <p className="text-xs text-[#1E40AF] mt-1 font-medium">"{ref.highlightText}"</p>}
                             <p className="text-xs text-[#9CA3AF] mt-1">来源：{ref.sectionTitle.replace(/^[一二三四五六七八九十]+、\s*/, '')}</p>
                           </div>
                         </div>
@@ -280,18 +280,18 @@ export function ReportGenerator() {
 
                 {selectedEditorText ? (
                   <div className="p-4 bg-[#DBEAFE] rounded-xl border-2 border-[#93C5FD]">
-                    <p className="text-xs text-[#1E40AF] font-semibold mb-2">已选中文本：</p>
+                    <p className="text-xs text-[#1E40AF] font-medium mb-2">已选中文本：</p>
                     <p className="text-sm text-[#1F2937] line-clamp-3">{selectedEditorText}</p>
                   </div>
                 ) : (
-                  <div className="p-4 bg-[#F3F4F6] rounded-xl text-center border-2 border-[#E5E7EB]">
+                  <div className="p-4 bg-[#F3F4F6] rounded-xl text-center border-2 border-border-default">
                     <MessageSquare className="w-8 h-8 text-[#9CA3AF] mx-auto mb-2" />
                     <p className="text-sm text-[#6B7280]">请在报告中框选需要修改的文字</p>
                   </div>
                 )}
 
                 <div>
-                  <p className="text-xs text-[#6B7280] mb-3 font-semibold">快捷指令</p>
+                  <p className="text-xs text-[#6B7280] mb-3 font-medium">快捷指令</p>
                   <div className="flex flex-wrap gap-2">
                     {quickPrompts.map((item) => (
                       <button
@@ -305,21 +305,21 @@ export function ReportGenerator() {
                 </div>
 
                 <div>
-                  <p className="text-xs text-[#6B7280] mb-2 font-semibold">自定义指令</p>
+                  <p className="text-xs text-[#6B7280] mb-2 font-medium">自定义指令</p>
                   <textarea
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
                     placeholder="输入修改指令，如：将这段话改写得更正式专业..."
-                    className="w-full h-24 p-4 bg-[#F9FAFB] border-2 border-[#E5E7EB] rounded-xl text-sm resize-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all"
+                    className="w-full h-24 p-4 bg-[#F9FAFB] border-2 border-border-default rounded-xl text-sm resize-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all"
                   />
                 </div>
 
                 <button
                   disabled={!selectedEditorText || !aiPrompt || isRewriting}
                   onClick={handleAIRewrite}
-                  className={`w-full py-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  className={`w-full py-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                     selectedEditorText && aiPrompt && !isRewriting
-                      ? 'bg-gradient-to-r from-[#1E40AF] via-[#3B82F6] to-[#06B6D4] text-white shadow-lg shadow-[#1E40AF]/25 hover:shadow-xl'
+                      ? 'bg-[#1E40AF] text-white hover:shadow-xl'
                       : 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed'
                   }`}>
                   {isRewriting ? (

@@ -161,7 +161,7 @@ export function AgentStatusIndicator({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-800">{config.label}</span>
+              <span className="text-sm font-medium text-gray-800">{config.label}</span>
               {activeTool && (
                 <span className="px-2 py-0.5 rounded-lg text-xs bg-blue-50 text-blue-600">
                   {activeTool.name}
@@ -198,7 +198,7 @@ export function AgentStatusIndicator({
 
       {/* 详细面板 */}
       {expanded && (
-        <div className="border-t border-gray-100 px-4 py-3 space-y-3 animate-fade-in-up">
+        <div className="border-t border-border-default px-4 py-3 space-y-3 animate-fade-in-up">
           {/* 当前工具 */}
           {activeTool && (
             <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
@@ -237,7 +237,7 @@ export function AgentStatusIndicator({
           )}
 
           {/* AI 标识 */}
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-2 pt-2 border-t border-border-default">
             <Sparkles className="w-3.5 h-3.5 text-blue-500" />
             <span className="text-xs text-gray-400">由 Claude 智能体驱动</span>
           </div>
@@ -325,6 +325,7 @@ function getGradientClass(gradient: GradientKey): string {
     red: 'from-[#D85A30] to-[#E87040]',
     cyan: 'from-cyan-500 to-teal-500',
     dark: 'from-gray-700 to-gray-800',
+    ai: 'from-indigo-500 to-cyan-500',
   };
   return gradients[gradient];
 }
