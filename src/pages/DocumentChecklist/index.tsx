@@ -7,7 +7,7 @@ import { usePSAKStore } from '../../stores';
 import { indoEnterprise } from '../../data/indonesia-story';
 import { ChecklistMatrix } from '../../components/ui';
 import { CHECKLIST_CATEGORY_LABELS } from '../../types/psak';
-import { PageHeader, SectionHeader } from '../../components/ui';
+import { PageHeader, SectionHeader, AlertBanner, Button } from '../../components/ui';
 
 export function DocumentChecklist() {
   const { checklist, checklistFilter, setChecklistFilter } = usePSAKStore();
@@ -35,18 +35,13 @@ export function DocumentChecklist() {
 
   return (
     <div className="space-y-8 animate-fade-in-up">
-      {/* 页头 */}
+      {/* 页头 - 不显示 KPI，避免重复 */}
       <PageHeader
         title="智能物料清单"
         subtitle={`${indoEnterprise.nameZh} — ${indoEnterprise.name}`}
         icon={ClipboardCheck}
-        kpis={[
-          { label: '已收取', value: received, variant: 'success' },
-          { label: '待收取', value: pending },
-          { label: '逾期', value: overdue, variant: overdue > 0 ? 'danger' : 'default' },
-        ]}
         secondaryActions={
-          <span className="text-xs text-gray-400">NPWP: {indoEnterprise.npwp}</span>
+          <span className="text-xs text-gray-400 font-mono bg-gray-100 rounded-md px-2 py-1">NPWP: {indoEnterprise.npwp}</span>
         }
       />
 
@@ -100,24 +95,24 @@ export function DocumentChecklist() {
             </div>
           </div>
 
-          {/* 缺失项提示 */}
+          {/* 缺失项提示 - 使用 AlertBanner */}
           {missingCount > 0 && (
-            <div className="flex items-center justify-between mt-4 rounded-xl bg-red-50 px-4 py-3 border border-red-200">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <span className="text-sm text-red-700">
-                  <strong>{missingCount}</strong> 项资料缺失或逾期，可能影响授信审批进度
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleIdentifyMissing}
-                className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-2"
-              >
-                <Search className="h-4 w-4" />
-                一键识别缺失
-              </button>
-            </div>
+            <AlertBanner
+              variant="warning"
+              title={`${missingCount} 项资料缺失或逾期`}
+              action={
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleIdentifyMissing}
+                  leftIcon={<Search className="h-4 w-4" />}
+                >
+                  一键识别缺失
+                </Button>
+              }
+            >
+              可能影响授信审批进度
+            </AlertBanner>
           )}
         </div>
       </section>
@@ -185,19 +180,30 @@ export function DocumentChecklist() {
           <div className="flex flex-wrap gap-2">
             {Object.entries(CHECKLIST_CATEGORY_LABELS).map(([key, label]) => {
               const count = checklist.filter((i) => i.category === key).length;
+              const isSelected = checklistFilter === key;
+              const isEmpty = count === 0;
               return (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setChecklistFilter(checklistFilter === key ? null : key)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    checklistFilter === key
-                      ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                  disabled={isEmpty}
+                  onClick={() => setChecklistFilter(isSelected ? null : key)}
+                  className={`
+                    inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+                    ${isSelected
+                      ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-500 scale-[1.02] shadow-sm'
+                      : isEmpty
+                        ? 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-50'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-sm'
+                    }
+                  `}
                 >
                   {label.zh}
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-white/60 tabular-nums">{count}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded font-medium tabular-nums ${
+                    isSelected ? 'bg-blue-200 text-blue-800' : 'bg-white text-gray-500'
+                  }`}>
+                    {count}
+                  </span>
                 </button>
               );
             })}

@@ -101,6 +101,7 @@ export function PageHeader({
               trend={kpi.trend}
               trendUp={kpi.trendUp}
               gradient={kpiVariantMap[kpi.variant || 'default']}
+              emphasized={kpi.variant === 'danger' || kpi.variant === 'warning'}
             />
           ))}
         </div>

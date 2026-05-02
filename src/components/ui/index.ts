@@ -1,5 +1,5 @@
 export { GradientIcon } from './GradientIcon';
-export { StatusBadge } from './StatusBadge';
+export { StatusBadge, Badge } from './StatusBadge';
 export { StatCard } from './StatCard';
 export { PageHeader } from './PageHeader';
 export { SectionHeader } from './SectionHeader';
@@ -15,3 +15,9 @@ export { ChecklistMatrix } from './ChecklistMatrix';
 export { TaskTimeline, TaskTimelineCompact } from './TaskTimeline';
 export { StreamingText, StreamingMarkdown, StreamingCode } from './StreamingText';
 export { AgentStatusIndicator, AgentStatusMini } from './AgentStatusIndicator';
+export { Button } from './Button';
+export { AlertBanner } from './AlertBanner';
+export { ScoreGauge } from './ScoreGauge';
+export { UploadListItem } from './UploadListItem';
+export { DataTable } from './DataTable';
+export type { DataTableColumn } from './DataTable';

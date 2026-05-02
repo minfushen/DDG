@@ -7,7 +7,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useDueDiligenceStore, useDemoStore } from '../../stores';
 import { mockParseProgress, mockCrossValidation } from '../../services/mockData';
-import { PageHeader, SectionHeader, ProgressBar } from '../../components/ui';
+import { PageHeader, SectionHeader, UploadListItem } from '../../components/ui';
 
 const fileIconConfig: Record<string, { icon: LucideIcon; color: string }> = {
   pdf: { icon: FileText, color: 'text-red-600' },
@@ -97,7 +97,7 @@ export function DataIntegration() {
       />
 
       {/* 主内容区：2/3 + 1/3 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[65fr_35fr] gap-6">
         {/* 主内容 */}
         <div className="space-y-8">
           {/* 资料上传（主任务区） */}
@@ -110,50 +110,33 @@ export function DataIntegration() {
             />
             <div className="px-6 pb-8">
               {/* 上传区 */}
-              <div className="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer mb-8">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-blue-100 flex items-center justify-center">
-                  <Upload className="h-6 w-6 text-blue-600" />
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer mb-6">
+                <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <Upload className="h-7 w-7 text-blue-600" />
                 </div>
                 <p className="text-base text-gray-700 font-medium">拖拽文件到此处上传，或点击选择</p>
                 <p className="text-sm text-gray-500 mt-2">支持 PDF、Excel、图片、音频等格式</p>
               </div>
 
+              {/* 分隔线 */}
+              <hr className="border-gray-200 mb-6" />
+
               {/* 文件列表 */}
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {parseItems.map((file) => {
                   const fc = fileIconConfig[file.type] || fileIconConfig.pdf;
-                  const isRunning = file.status === 'processing';
+                  const tone = file.type === 'pdf' ? 'red' : file.type === 'excel' ? 'green' : file.type === 'audio' ? 'amber' : 'blue';
                   return (
-                    <div
+                    <UploadListItem
                       key={file.id}
-                      className={`flex items-center gap-4 p-5 rounded-xl border transition-colors ${
-                        isRunning ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <div className={isRunning ? 'animate-pulse' : ''}>
-                        <fc.icon className={`h-5 w-5 ${fc.color}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-900">{file.name}</span>
-                          <span className="text-xs">
-                            {file.status === 'completed' ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            ) : isRunning ? (
-                              <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-                            ) : (
-                              <span className="text-gray-400">等待中</span>
-                            )}
-                          </span>
-                        </div>
-                        <ProgressBar value={file.progress} animated={isRunning} />
-                        {file.result && (
-                          <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                            <Eye className="h-3 w-3" /> {file.result}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                      fileIcon={fc.icon}
+                      fileName={file.name}
+                      description={file.result || (file.status === 'processing' ? 'AI 正在解析中...' : '等待处理')}
+                      status={file.status as 'pending' | 'processing' | 'completed'}
+                      progress={file.progress}
+                      iconTone={tone}
+                      tags={file.result ? [file.result] : []}
+                    />
                   );
                 })}
               </div>
@@ -169,7 +152,7 @@ export function DataIntegration() {
               className="px-6 pt-6"
             />
             <div className="px-6 pb-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <ParseCard
                   type="视觉/图像(CV)"
                   description="现场照片自动打标"
@@ -299,23 +282,27 @@ function ParseCard({
   active?: boolean;
 }) {
   return (
-    <div className={`p-4 rounded-xl border transition-colors ${
-      active ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'
+    <div className={`p-5 rounded-xl border transition-all ${
+      active ? 'bg-blue-50 border-blue-300 scale-[1.02] shadow-md' : 'bg-gray-50 border-gray-200'
     }`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            active ? 'bg-blue-100' : 'bg-gray-200'
+          }`}>
+            <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
+          </div>
           <span className="text-sm font-medium text-gray-900">{type}</span>
         </div>
-        {status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-        {status === 'processing' && <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />}
-        {status === 'pending' && <Clock className="h-4 w-4 text-gray-400" />}
+        {status === 'completed' && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+        {status === 'processing' && <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />}
+        {status === 'pending' && <Clock className="h-5 w-5 text-gray-400" />}
       </div>
       <p className="text-xs text-gray-500 mb-3">{description}</p>
       <div className="space-y-1.5">
         {items.map((item, i) => (
           <div key={i} className="text-xs text-gray-600 flex items-center gap-2">
-            <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-blue-500' : 'bg-gray-400'}`} />
+            <span className={`w-2 h-2 rounded-full ${active ? 'bg-blue-500' : 'bg-gray-400'}`} />
             {item}
           </div>
         ))}

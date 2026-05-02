@@ -1,110 +1,99 @@
 # 对公尽调智能体平台
 
-基于 React 18 + TypeScript + Vite 6 + TailwindCSS v4 + Zustand 构建的对公业务尽调智能体平台原型系统。
+面向对公信贷场景的智能体工作台前端项目，覆盖贷前尽调、贷中审批、贷后预警与运营分析等核心流程。
 
 ## 技术栈
 
-- **框架**: React 18 + TypeScript
-- **构建工具**: Vite 6
-- **样式**: TailwindCSS v4
-- **状态管理**: Zustand
-- **路由**: React Router v6
-- **图表**: ECharts
-- **富文本编辑**: TipTap
-- **图标**: Lucide React
+- **框架**：React 19 + TypeScript 6
+- **构建工具**：Vite 8
+- **样式系统**：TailwindCSS v4
+- **状态管理**：Zustand v5
+- **路由**：React Router v7
+- **图表**：ECharts + echarts-for-react
+- **富文本编辑**：TipTap
+- **图标**：Lucide React
 
 ## 快速开始
 
 ```bash
-# 安装依赖
 npm install
+npm run dev
+```
 
-# 启动开发服务器
+## 可用脚本
+
+```bash
+# 启动开发环境
 npm run dev
 
-# 构建生产版本
+# 类型检查 + 构建产物
 npm run build
+
+# 代码规范检查
+npm run lint
+
+# 本地预览构建结果
+npm run preview
 ```
 
-## 页面结构
+## 路由与模块
 
-### 1. 工作台首页 (`/`)
-- 待办任务列表（区分：首次授信、年审尽调、贷后预警）
-- 一键发起尽调表单
-- 效率指标看板
-- 数据源连接状态
+### 一、贷前尽调模块
 
-### 2. 数据整合页 (`/data-integration/:enterpriseId`)
-- 文件上传区（支持 PDF/Excel/图片/音频）
-- AI 解析过程可视化（CV/ASR/NLP）
-- 数据交叉核验提示
+- `/`：工作台首页（Dashboard）
+- `/data-integration/:enterpriseId?`：数据整合
+- `/analysis/:enterpriseId?`：智能分析
+- `/report/:enterpriseId?`：报告生成
+- `/agent-config`：智能体配置
 
-### 3. 智能分析页 (`/analysis/:enterpriseId`)
-- 三维画像雷达图
-- 股权与担保穿透网络（知识图谱）
-- 智能风险短评
-- 风险因素列表
+### 二、智能尽调模块
 
-### 4. 报告生成页 (`/report/:enterpriseId`) - 核心页面
-- 模板选择器
-- 报告编辑器（TipTap）
-- 数据溯源面板
-- AI 辅助重写面板
+- `/document-checklist/:enterpriseId?`：资料清单核查
+- `/psak-validation/:enterpriseId?`：PSAK 校验
 
-### 5. 智能体配置页 (`/agent-config`)
-- 低代码工作流展示
-- 信创环境状态
-- Prompt 配置面板
+### 三、贷中审批模块
 
-## 四层架构
+- `/approval/dashboard`：审批看板
+- `/approval/contract-compare`：合同对比
+- `/approval/risk-chat`：风险问答
+- `/approval/fund-flow`：资金流向分析
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    应用服务层 (Application)                   │
-│         报告生成页面 │ 人机协同编辑 │ 溯源引用展示             │
-├─────────────────────────────────────────────────────────────┤
-│                    智能分析层 (Analysis)                      │
-│         知识图谱可视化 │ 风险评分引擎 │ 关系穿透分析           │
-├─────────────────────────────────────────────────────────────┤
-│                    数据整合层 (Integration)                   │
-│         多模态解析 │ 数据源接入 │ 交叉核验                    │
-├─────────────────────────────────────────────────────────────┤
-│                    统一接入层 (Gateway)                       │
-│         工作台首页 │ 任务驱动列表 │ 效率指标看板               │
-└─────────────────────────────────────────────────────────────┘
-```
+### 四、贷后预警模块
+
+- `/post-loan/dashboard`：预警看板
+- `/post-loan/risk-tracking/:id?`：风险追踪
+- `/post-loan/check`：贷后检查
+- `/post-loan/config`：预警配置
+
+### 五、运营分析模块
+
+- `/analytics`：运营分析
 
 ## 目录结构
 
-```
+```text
 src/
-├── components/           # 通用组件
-│   ├── layout/           # 布局组件
-│   ├── common/           # 基础组件
-│   └── charts/           # 图表组件
-├── pages/                # 页面组件
-│   ├── Dashboard/        # 工作台首页
-│   ├── DataIntegration/  # 数据整合页
-│   ├── Analysis/         # 智能分析页
-│   ├── ReportGenerator/  # 报告生成页（核心）
-│   └── AgentConfig/      # 智能体配置页
+├── components/           # 通用组件（layout/ui/charts/business）
+├── pages/                # 页面模块（Dashboard/Approval/PostLoan/...）
 ├── stores/               # Zustand 状态管理
-├── services/             # 模拟服务
-├── types/                # TypeScript 类型定义
-└── utils/                # 工具函数
+├── services/             # Mock 数据与服务层
+├── protocol/             # AG-UI / A2UI 协议适配
+├── theme/                # 设计令牌（tokens）
+├── types/                # 类型定义
+├── utils/                # 工具函数
+├── data/                 # 演示数据
+└── config/               # 展示配置与映射
 ```
 
-## 面试演示要点
+## 相关文档
 
-1. **工作台首页**: 展示任务驱动的工作流，体现"统一接入层"设计
-2. **数据整合页**: 展示多模态解析能力（CV/ASR/NLP），体现"数据整合层"
-3. **智能分析页**: 展示知识图谱和风险评分，体现"智能分析层"
-4. **报告生成页**: 展示溯源引用和 AI 辅助重写，体现"应用服务层"（核心）
-5. **智能体配置页**: 展示低代码工作流和信创环境，体现平台工程能力
+- `docs/BUSINESS-DESIGN.md`：业务状态机与指标语义
+- `docs/UI_DESIGN_SPEC.md`：统一 UI 设计规范
+- `docs/UI_REFACTOR_TASK_LIST.md`：UI 重构任务清单
 
-## 核心卖点
+## 核心特性
 
-- **防幻觉机制**: 数据溯源功能，点击报告中的数字可查看原始出处
-- **人机协同**: AI 辅助重写，业务人员可框选文字进行修改
-- **多模态感知**: 支持 CV/ASR/NLP 多种解析能力
-- **信创适配**: 支持国产化服务器和向量数据库
+- **任务驱动工作流**：覆盖贷前、贷中、贷后关键节点
+- **多模态尽调能力**：文档/结构化数据融合分析
+- **可解释风控输出**：图谱、雷达、风险摘要等可视化结果
+- **人机协同报告生成**：富文本编辑与辅助重写能力

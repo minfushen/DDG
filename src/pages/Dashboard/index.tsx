@@ -8,7 +8,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useDueDiligenceStore, useDemoStore } from '../../stores';
 import { taskTypeConfig, taskStatusConfig, priorityConfig } from '../../config/display';
 import { getEnterpriseInitials, getIndustryAvatarClasses } from '../../config/industryAvatar';
-import { PageHeader, StatusBadge, EmptyState } from '../../components/ui';
+import { PageHeader, StatusBadge, EmptyState, Button } from '../../components/ui';
 import type { DueDiligenceTask, TaskStatus } from '../../types';
 
 // ── 排序：5 级优先级组 ──────────────────────────────────
@@ -259,19 +259,15 @@ function TaskRow({
 
       {/* 企业信息 */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 mb-0.5">
-          <h4 className="truncate text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+        <div className="flex items-center gap-2 mb-1">
+          <h4 className="truncate text-base font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
             {task.enterprise.name}
           </h4>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-gray-500">
           <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${priorityC.bg} ${priorityC.text}`}>
             {priorityC.label}
           </span>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-            {task.enterprise.unifiedSocialCreditCode}
-          </span>
-          <span className="text-gray-300">•</span>
           <span>{task.createdAt}</span>
           {task.assignee && (
             <>
@@ -295,18 +291,14 @@ function TaskRow({
 
       {/* 操作按钮 */}
       <div className="w-[120px] shrink-0 flex justify-center">
-        <button
-          type="button"
+        <Button
+          variant={action.variant === 'primary' ? 'primary' : 'secondary'}
+          size="sm"
           onClick={() => onAction(task, action.navigateTo)}
-          className={
-            action.variant === 'primary'
-              ? 'inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700'
-              : 'inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-blue-300 hover:text-blue-600'
-          }
+          leftIcon={<ActionIcon className="h-3.5 w-3.5" />}
         >
-          <ActionIcon className="h-3.5 w-3.5" />
           {action.label}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -47,7 +47,7 @@ export function MainLayout() {
     <div className="flex h-screen w-full overflow-hidden">
       <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <div className="flex min-w-0 flex-1 flex-col bg-gray-50">
-        <Header title={pageTitle} />
+        <Header title={pageTitle} subtitle="企业尽调与风控工作流" />
         <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           <div className="mx-auto max-w-[1600px] px-8 py-8 lg:px-10 lg:py-10">
             <Outlet />

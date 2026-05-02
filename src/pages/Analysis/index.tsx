@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useDueDiligenceStore } from '../../stores';
 import { mockRelationshipData, mockRiskAssessment } from '../../services/mockData';
 import { RadarChart, KnowledgeGraph } from '../../components/charts';
-import { PageHeader, SectionHeader } from '../../components/ui';
+import { PageHeader, SectionHeader, ScoreGauge } from '../../components/ui';
 import { riskLevelConfig } from '../../config/display';
 
 const CATEGORY_LABELS: Record<number, string> = {
@@ -53,40 +53,29 @@ export function Analysis() {
       />
 
       {/* 结论与评级 */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-        <div className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* 风险等级 */}
-            <div className={`p-6 rounded-xl ${levelC.bg} border-2 ${levelC.border || 'border-transparent'}`}>
-              <p className="text-sm text-gray-600 mb-2">风险等级</p>
-              <div className="flex items-center justify-between">
-                <span className={`px-3 py-1 rounded-lg text-sm font-medium ${levelC.bg} ${levelC.text}`}>
-                  {levelC.label}
-                </span>
-                <span className="text-3xl font-semibold text-gray-900">{assessment.overallScore}</span>
-              </div>
-              <div className="mt-5 h-2 bg-white rounded-full overflow-hidden">
-                <div
-                  className={`h-full ${levelC.gradientClass} rounded-full`}
-                  style={{ width: `${assessment.overallScore}%` }}
-                />
-              </div>
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)]">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+          <div className="w-[200px] space-y-2">
+            <p className="text-[12px] leading-4 font-medium text-slate-500">综合评分</p>
+            <ScoreGauge score={assessment.overallScore} label="综合评分" size={120} strokeWidth={10} />
+          </div>
+          <div className="w-[160px] space-y-2">
+            <p className="text-[12px] leading-4 font-medium text-slate-500">风险等级</p>
+            <div className={`inline-flex items-center rounded-lg px-4 py-2 text-[13px] font-semibold ${levelC.bg} ${levelC.text}`}>
+              {levelC.label}
             </div>
-
-            {/* 分项评分 */}
+          </div>
+          <div className="grid flex-1 grid-cols-3 gap-4">
             {[
-              { label: '经营评分', value: assessment.businessScore },
-              { label: '财务评分', value: assessment.financialScore },
-              { label: '行业评分', value: assessment.industryScore },
+              { label: '经营评分', value: assessment.businessScore, color: 'bg-[#2563EB]' },
+              { label: '财务评分', value: assessment.financialScore, color: 'bg-[#6366F1]' },
+              { label: '行业评分', value: assessment.industryScore, color: 'bg-[#8B5CF6]' },
             ].map((item) => (
-              <div key={item.label} className="p-6 rounded-xl bg-gray-50 border border-gray-200">
-                <p className="text-sm text-gray-500 mb-2">{item.label}</p>
-                <p className="text-2xl font-semibold text-gray-900">{item.value}</p>
-                <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-600 rounded-full"
-                    style={{ width: `${item.value}%` }}
-                  />
+              <div key={item.label} className="space-y-1">
+                <p className="text-[11px] leading-4 text-slate-500">{item.label}</p>
+                <p className="text-[20px] leading-7 font-semibold text-slate-900">{item.value}</p>
+                <div className="h-1 rounded-full bg-slate-100">
+                  <div className={`h-1 rounded-full ${item.color}`} style={{ width: `${item.value}%` }} />
                 </div>
               </div>
             ))}
@@ -95,7 +84,7 @@ export function Analysis() {
       </section>
 
       {/* 图谱与详情 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
         {/* 知识图谱 */}
         <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
           <SectionHeader
@@ -124,7 +113,7 @@ export function Analysis() {
               nodes={mockRelationshipData.nodes}
               links={mockRelationshipData.links}
               onNodeClick={handleNodeClick}
-              height={380}
+              height={420}
             />
           </div>
         </section>
@@ -180,7 +169,7 @@ export function Analysis() {
       </div>
 
       {/* 风险摘要与风险因素 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[60fr_40fr]">
         {/* 智能风险短评 */}
         <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
           <SectionHeader

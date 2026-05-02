@@ -5,32 +5,32 @@
    统一设计语言、统一布局骨架、统一交互语义
    ======================================== */
 :root {
-  /* 品牌主色 — 唯一主操作色 */
-  --brand-primary: #1E40AF;
+  /* Figma 色彩 Token */
+  --brand-primary: #2563EB;
   --brand-primary-light: #3B82F6;
-  --brand-primary-lighter: #60A5FA;
-  --brand-primary-bg: #DBEAFE;
-  --brand-primary-bg-dark: #BFDBFE;
+  --brand-primary-lighter: #93C5FD;
+  --brand-primary-bg: #EFF6FF;
+  --brand-primary-bg-dark: #DBEAFE;
 
   /* 语义状态色 — 仅用于状态，不作装饰 */
-  --success: #059669;
-  --success-light: #10B981;
-  --success-bg: #D1FAE5;
-  --success-text: #065F46;
+  --success: #10B981;
+  --success-light: #34D399;
+  --success-bg: #ECFDF5;
+  --success-text: #047857;
 
-  --warning: #D97706;
-  --warning-light: #F59E0B;
-  --warning-bg: #FEF3C7;
-  --warning-text: #92400E;
+  --warning: #F59E0B;
+  --warning-light: #FBBF24;
+  --warning-bg: #FFFBEB;
+  --warning-text: #B45309;
 
-  --danger: #DC2626;
-  --danger-light: #EF4444;
-  --danger-bg: #FEE2E2;
-  --danger-text: #991B1B;
+  --danger: #EF4444;
+  --danger-light: #F87171;
+  --danger-bg: #FEF2F2;
+  --danger-text: #B91C1C;
 
-  --info: #1E40AF;
-  --info-bg: #DBEAFE;
-  --info-text: #1E40AF;
+  --info: #2563EB;
+  --info-bg: #EFF6FF;
+  --info-text: #1D4ED8;
 
   /* 风险等级 — 语义状态别名 */
   --risk-high: #DC2626;
@@ -56,16 +56,16 @@
 
   /* 中性色 */
   --gray-25: #FCFCFD;
-  --gray-50: #F9FAFB;
-  --gray-100: #F3F4F6;
-  --gray-200: #E5E7EB;
-  --gray-300: #D1D5DB;
-  --gray-400: #9CA3AF;
-  --gray-500: #6B7280;
-  --gray-600: #4B5563;
-  --gray-700: #374151;
-  --gray-800: #1F2937;
-  --gray-900: #111827;
+  --gray-50: #F8FAFC;
+  --gray-100: #F1F5F9;
+  --gray-200: #E2E8F0;
+  --gray-300: #CBD5E1;
+  --gray-400: #94A3B8;
+  --gray-500: #64748B;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1E293B;
+  --gray-900: #0F172A;
 
   /* 布局 Token */
   --page-max-width: 1440px;
@@ -73,20 +73,20 @@
   --sidebar-collapsed-width: 64px;
   --header-height: 56px;
   --section-gap: 24px;
-  --card-padding: 24px;
+  --card-padding: 20px;
   --card-padding-sm: 16px;
 
   /* 圆角 — 统一体系 */
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 10px;
+  --radius-lg: 12px;
   --radius-xl: 12px;
   --radius-2xl: 16px;
 
   /* 阴影 — 弱化，以边框分层为主 */
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05);
-  --shadow-elevated: 0 4px 6px -1px rgb(0 0 0 / 0.05);
-  --shadow-modal: 0 10px 25px -5px rgb(0 0 0 / 0.1);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-elevated: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.03);
+  --shadow-modal: 0 10px 15px rgba(0,0,0,0.08), 0 4px 6px rgba(0,0,0,0.04);
 
   /* 过渡 */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -98,39 +98,39 @@
    ======================================== */
 @theme {
   /* 品牌 */
-  --color-brand: #1E40AF;
+  --color-brand: #2563EB;
   --color-brand-light: #3B82F6;
-  --color-brand-dark: #1E3A8A;
-  --color-brand-bg: #DBEAFE;
-  --color-brand-text: #1E40AF;
+  --color-brand-dark: #1D4ED8;
+  --color-brand-bg: #EFF6FF;
+  --color-brand-text: #1D4ED8;
 
   /* 表面层级 */
-  --color-surface-page: #F9FAFB;
+  --color-surface-page: #F8FAFC;
   --color-surface-card: #FFFFFF;
-  --color-surface-hover: #F3F4F6;
-  --color-surface-active: #DBEAFE;
+  --color-surface-hover: #F1F5F9;
+  --color-surface-active: #EFF6FF;
 
   /* 中性文字 */
-  --color-text-primary: #1F2937;
-  --color-text-body: #374151;
-  --color-text-secondary: #6B7280;
-  --color-text-muted: #9CA3AF;
+  --color-text-primary: #0F172A;
+  --color-text-body: #334155;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748B;
 
   /* 边框 */
-  --color-border-default: #E5E7EB;
-  --color-border-hover: #93C5FD;
-  --color-border-strong: #D1D5DB;
+  --color-border-default: #E2E8F0;
+  --color-border-hover: #BFDBFE;
+  --color-border-strong: #CBD5E1;
 
   /* 语义状态 */
-  --color-success: #059669;
-  --color-success-bg: #D1FAE5;
-  --color-success-text: #065F46;
-  --color-warning: #D97706;
-  --color-warning-bg: #FEF3C7;
-  --color-warning-text: #92400E;
-  --color-danger: #DC2626;
-  --color-danger-bg: #FEE2E2;
-  --color-danger-text: #991B1B;
+  --color-success: #10B981;
+  --color-success-bg: #ECFDF5;
+  --color-success-text: #047857;
+  --color-warning: #F59E0B;
+  --color-warning-bg: #FFFBEB;
+  --color-warning-text: #B45309;
+  --color-danger: #EF4444;
+  --color-danger-bg: #FEF2F2;
+  --color-danger-text: #B91C1C;
 }
 
 /* ========================================
@@ -148,7 +148,7 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', Roboto, sans-serif;
+  font-family: Inter, 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--gray-50);
   color: var(--gray-800);
   line-height: 1.6;
@@ -186,7 +186,7 @@ body {
 /* 基础卡片 — 边框分层，弱阴影 */
 .card-base {
   background: white;
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--gray-200);
   padding: var(--card-padding);
 }
@@ -194,7 +194,7 @@ body {
 /* 可交互卡片 */
 .card-interactive {
   background: white;
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--gray-200);
   padding: var(--card-padding);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
@@ -208,7 +208,7 @@ body {
 /* 紧凑卡片 */
 .card-compact {
   background: white;
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--gray-200);
   padding: var(--card-padding-sm);
 }
