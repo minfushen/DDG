@@ -6,10 +6,10 @@ interface HeaderProps {
 
 export function Header({ title }: HeaderProps) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-5 lg:px-7">
       {/* 左侧：页面标题 */}
       <div className="flex min-w-0 flex-1 items-center gap-4">
-        <h2 className="truncate text-sm font-medium text-gray-900">
+        <h2 className="truncate text-base font-medium text-gray-900">
           {title || '对公尽调工作台'}
         </h2>
       </div>
@@ -18,17 +18,17 @@ export function Header({ title }: HeaderProps) {
       <div className="flex shrink-0 items-center gap-2">
         {/* 搜索入口 — 辅助功能 */}
         <button
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
           title="搜索功能开发中"
         >
           <Search className="h-[18px] w-[18px]" />
         </button>
 
         {/* 通知 */}
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
+        <button className="relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
           <Bell className="h-[18px] w-[18px]" />
           {/* 通知角标 */}
-          <span className="absolute right-1.5 top-1.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-blue-600 px-0.5 text-[9px] font-medium text-white leading-none ring-2 ring-white">
+          <span className="absolute right-1.5 top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-blue-600 px-0.5 text-[9px] font-medium text-white leading-none ring-2 ring-white">
             3
           </span>
         </button>

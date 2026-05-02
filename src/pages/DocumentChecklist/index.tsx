@@ -34,7 +34,7 @@ export function DocumentChecklist() {
   const missingItems = checklist.filter((i) => i.status === 'pending' || i.status === 'overdue');
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="智能物料清单"
@@ -65,7 +65,7 @@ export function DocumentChecklist() {
         </div>
 
         <div className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
             {/* 完成率 */}
             <div className="p-4 bg-gray-50 rounded-xl text-center">
               <p className="text-3xl font-semibold text-gray-900 tabular-nums">{completionRate}%</p>
@@ -136,10 +136,10 @@ export function DocumentChecklist() {
             icon={AlertTriangle}
             title="缺失资料清单"
             subtitle={`${missingItems.length} 项`}
-            className="px-5 pt-5"
+            className="px-6 pt-6"
             variant="risk"
           />
-          <div className="px-5 pb-5">
+          <div className="px-6 pb-6">
             <div className="space-y-2">
               {missingItems.map((item) => {
                 const categoryLabel = CHECKLIST_CATEGORY_LABELS[item.category]?.zh ?? item.category;
@@ -179,9 +179,9 @@ export function DocumentChecklist() {
           icon={FileSearch}
           title="AI 自动分类结果"
           subtitle="点击筛选对应类别"
-          className="px-5 pt-5"
+          className="px-6 pt-6"
         />
-        <div className="px-5 pb-5">
+        <div className="px-6 pb-6">
           <div className="flex flex-wrap gap-2">
             {Object.entries(CHECKLIST_CATEGORY_LABELS).map(([key, label]) => {
               const count = checklist.filter((i) => i.category === key).length;

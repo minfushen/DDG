@@ -100,7 +100,7 @@ export function TaskTimeline({ steps, onStepClick, compact = false }: TaskTimeli
   const phases: TaskPhase[] = ['plan', 'act', 'observe', 'reflect'];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {phases.map((phase) => {
         const phaseSteps = groupedSteps[phase] || [];
         const config = PHASE_CONFIG[phase];

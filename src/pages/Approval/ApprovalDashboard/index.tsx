@@ -29,7 +29,7 @@ export function ApprovalDashboard() {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="审批工作台"
@@ -42,16 +42,16 @@ export function ApprovalDashboard() {
       />
 
       {/* 主内容：任务列表 + 详情 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-8">
         {/* 任务列表 */}
         <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
           <SectionHeader
             icon={Calendar}
             title="审批任务"
             subtitle={`${tasks.length} 项`}
-            className="px-5 pt-5"
+            className="px-6 pt-6"
           />
-          <div className="px-5 pb-5">
+          <div className="px-6 pb-6">
             <div className="space-y-2">
               {tasks.map((task) => {
                 const isSelected = currentTask?.id === task.id;
@@ -59,7 +59,7 @@ export function ApprovalDashboard() {
                   <button
                     key={task.id}
                     onClick={() => handleSelectTask(task)}
-                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                    className={`w-full text-left p-4 rounded-lg border transition-colors ${
                       isSelected
                         ? 'border-blue-300 bg-blue-50'
                         : 'border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-white'
@@ -82,7 +82,7 @@ export function ApprovalDashboard() {
         </section>
 
         {/* 任务详情 */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {currentTask ? (
             <>
               {/* 放款前提条件 */}
@@ -159,10 +159,10 @@ export function ApprovalDashboard() {
                   icon={AlertTriangle}
                   title="风险要素变化"
                   subtitle={`距尽调报告出具已过 ${currentTask.daysSinceDueDiligence} 天`}
-                  className="px-5 pt-5"
+                  className="px-6 pt-6"
                   variant="risk"
                 />
-                <div className="px-5 pb-5">
+                <div className="px-6 pb-6">
                   {riskDeltas.length > 0 ? (
                     <div className="space-y-3">
                       {riskDeltas.sort((a, b) => {

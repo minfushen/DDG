@@ -31,7 +31,7 @@ export function Analysis() {
   const getCategoryLabel = (category: number) => CATEGORY_LABELS[category] ?? '其他';
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="智能分析"
@@ -54,10 +54,10 @@ export function Analysis() {
 
       {/* 结论与评级 */}
       <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="p-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* 风险等级 */}
-            <div className={`p-5 rounded-xl ${levelC.bg} border-2 ${levelC.border || 'border-transparent'}`}>
+            <div className={`p-6 rounded-xl ${levelC.bg} border-2 ${levelC.border || 'border-transparent'}`}>
               <p className="text-sm text-gray-600 mb-2">风险等级</p>
               <div className="flex items-center justify-between">
                 <span className={`px-3 py-1 rounded-lg text-sm font-medium ${levelC.bg} ${levelC.text}`}>
@@ -65,7 +65,7 @@ export function Analysis() {
                 </span>
                 <span className="text-3xl font-semibold text-gray-900">{assessment.overallScore}</span>
               </div>
-              <div className="mt-4 h-2 bg-white rounded-full overflow-hidden">
+              <div className="mt-5 h-2 bg-white rounded-full overflow-hidden">
                 <div
                   className={`h-full ${levelC.gradientClass} rounded-full`}
                   style={{ width: `${assessment.overallScore}%` }}
@@ -79,7 +79,7 @@ export function Analysis() {
               { label: '财务评分', value: assessment.financialScore },
               { label: '行业评分', value: assessment.industryScore },
             ].map((item) => (
-              <div key={item.label} className="p-5 rounded-xl bg-gray-50 border border-gray-200">
+              <div key={item.label} className="p-6 rounded-xl bg-gray-50 border border-gray-200">
                 <p className="text-sm text-gray-500 mb-2">{item.label}</p>
                 <p className="text-2xl font-semibold text-gray-900">{item.value}</p>
                 <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -95,14 +95,14 @@ export function Analysis() {
       </section>
 
       {/* 图谱与详情 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8">
         {/* 知识图谱 */}
         <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
           <SectionHeader
             icon={Network}
             title="股权与担保穿透网络"
             subtitle="点击节点查看详情"
-            className="px-6 pt-6"
+            className="px-6 pt-7"
             actions={
               <div className="flex items-center gap-4 text-xs">
                 {[
@@ -119,7 +119,7 @@ export function Analysis() {
               </div>
             }
           />
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-8">
             <KnowledgeGraph
               nodes={mockRelationshipData.nodes}
               links={mockRelationshipData.links}
@@ -130,16 +130,16 @@ export function Analysis() {
         </section>
 
         {/* 右侧：雷达图 + 详情 */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* 企业画像评分 */}
           <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
             <SectionHeader
               icon={Target}
               title="企业画像评分"
               subtitle="多维度评估"
-              className="px-5 pt-5"
+              className="px-5 pt-6"
             />
-            <div className="px-5 pb-5">
+            <div className="px-5 pb-6">
               <RadarChart
                 data={[
                   { name: '经营能力', value: assessment.businessScore },
@@ -154,7 +154,7 @@ export function Analysis() {
 
           {/* 节点详情 */}
           {selectedNode && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -180,18 +180,18 @@ export function Analysis() {
       </div>
 
       {/* 风险摘要与风险因素 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* 智能风险短评 */}
         <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
           <SectionHeader
             icon={Shield}
             title="智能风险短评"
             subtitle="AI 生成的风险分析摘要"
-            className="px-6 pt-6"
+            className="px-6 pt-7"
             variant="success"
           />
-          <div className="px-6 pb-6">
-            <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
+          <div className="px-6 pb-8">
+            <div className="p-6 bg-gray-50 rounded-xl border border-gray-200">
               <p className="text-gray-700 leading-relaxed text-sm">{assessment.riskSummary}</p>
             </div>
           </div>
@@ -203,15 +203,15 @@ export function Analysis() {
             icon={AlertTriangle}
             title="主要风险因素"
             subtitle="需重点关注的风险点"
-            className="px-6 pt-6"
+            className="px-6 pt-7"
             variant="risk"
           />
-          <div className="px-6 pb-6">
-            <div className="space-y-3">
+          <div className="px-6 pb-8">
+            <div className="space-y-4">
               {assessment.riskFactors.map((factor, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200"
+                  className="flex items-start gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200"
                 >
                   <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
                   <span className="text-sm text-amber-800 font-medium">{factor}</span>

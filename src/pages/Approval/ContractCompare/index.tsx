@@ -6,7 +6,7 @@ import {
 import { useApprovalStore } from '../../../stores';
 import { mockApprovalDocContent, mockContractDocContent } from '../../../services/mockApprovalData';
 import { diffTypeConfig, diffSeverityConfig } from '../../../config/display';
-import { PageHeader } from '../../../components/ui';
+import { PageHeader, SplitPane } from '../../../components/ui';
 
 export function ContractCompare() {
   const navigate = useNavigate();
@@ -16,8 +16,129 @@ export function ContractCompare() {
   const warningCount = documentDiffs.filter((d) => d.severity === 'warning').length;
   const infoCount = documentDiffs.filter((d) => d.severity === 'info').length;
 
+  // 批复文档面板
+  const approvalDocPanel = (
+    <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] xl:min-h-0">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-blue-600" />
+          <div>
+            <h3 className="text-sm font-medium text-gray-900">授信审批批复</h3>
+            <p className="text-xs text-gray-500">SX-2024-0015</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto p-4 bg-gray-50/50">
+        <DocContent content={mockApprovalDocContent} />
+      </div>
+    </div>
+  );
+
+  // 差异分析面板
+  const diffPanel = (
+    <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] xl:min-h-0">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <div>
+            <h3 className="text-sm font-medium text-gray-900">AI 差异分析</h3>
+            <p className="text-xs text-gray-500">语义级比对 · {documentDiffs.length} 项差异</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto p-4">
+        <div className="space-y-3">
+          {documentDiffs.map((diff) => {
+            const typeC = diffTypeConfig[diff.type];
+            const sevC = diffSeverityConfig[diff.severity];
+            const SevIcon = sevC.icon;
+            const isHL = highlightedDiff === diff.id;
+            return (
+              <button
+                key={diff.id}
+                onClick={() => setHighlightedDiff(isHL ? null : diff.id)}
+                className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
+                  isHL
+                    ? 'bg-blue-50 border-blue-300'
+                    : 'bg-gray-50 border-gray-200 hover:border-blue-200 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                      diff.severity === 'critical' ? 'bg-red-100' :
+                      diff.severity === 'warning' ? 'bg-amber-100' : 'bg-gray-100'
+                    }`}>
+                      <SevIcon className={`w-3 h-3 ${
+                        diff.severity === 'critical' ? 'text-red-600' :
+                        diff.severity === 'warning' ? 'text-amber-600' : 'text-gray-600'
+                      }`} />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">{typeC.label}</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${sevC.bg} ${sevC.text}`}>
+                    {sevC.label}
+                  </span>
+                </div>
+
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-1">批复要求：</p>
+                  <p className="text-sm text-gray-700 bg-white p-2 rounded-lg border border-gray-200">
+                    {diff.approvalContent}
+                  </p>
+                </div>
+
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-1">合同约定：</p>
+                  <p className="text-sm text-gray-700 bg-white p-2 rounded-lg border border-gray-200">
+                    {diff.contractContent}
+                  </p>
+                </div>
+
+                <div className={`p-3 rounded-lg ${
+                  diff.severity === 'critical' ? 'bg-red-50' :
+                  diff.severity === 'warning' ? 'bg-amber-50' : 'bg-gray-100'
+                }`}>
+                  <p className="text-sm text-gray-700">{diff.description}</p>
+                  {diff.suggestion && (
+                    <p className="text-sm text-gray-600 mt-2 flex items-start gap-1">
+                      <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <span>建议：{diff.suggestion}</span>
+                    </p>
+                  )}
+                </div>
+
+                {diff.clause && (
+                  <p className="text-xs text-gray-400 mt-2">{diff.clause}</p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  // 借款合同面板
+  const contractDocPanel = (
+    <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] xl:min-h-0">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-blue-600" />
+          <div>
+            <h3 className="text-sm font-medium text-gray-900">借款合同</h3>
+            <p className="text-xs text-gray-500">HT-2024-0020 · 待签署</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto p-4 bg-gray-50/50">
+        <DocContent content={mockContractDocContent} />
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="批复合同智能比对"
@@ -39,126 +160,13 @@ export function ContractCompare() {
         ]}
       />
 
-      {/* 三栏布局：文档 30% / 差异 40% / 文档 30% */}
-      <div className="grid grid-cols-1 xl:grid-cols-[3fr_4fr_3fr] gap-6">
-        {/* 批复文档 */}
-        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] xl:min-h-0">
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-blue-600" />
-              <div>
-                <h3 className="text-sm font-medium text-gray-900">授信审批批复</h3>
-                <p className="text-xs text-gray-500">SX-2024-0015</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto p-4 bg-gray-50/50">
-            <DocContent content={mockApprovalDocContent} />
-          </div>
-        </div>
-
-        {/* 差异列表（主导区） */}
-        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] xl:min-h-0">
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <div>
-                <h3 className="text-sm font-medium text-gray-900">AI 差异分析</h3>
-                <p className="text-xs text-gray-500">语义级比对 · {documentDiffs.length} 项差异</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto p-4">
-            <div className="space-y-3">
-              {documentDiffs.map((diff) => {
-                const typeC = diffTypeConfig[diff.type];
-                const sevC = diffSeverityConfig[diff.severity];
-                const SevIcon = sevC.icon;
-                const isHL = highlightedDiff === diff.id;
-                return (
-                  <button
-                    key={diff.id}
-                    onClick={() => setHighlightedDiff(isHL ? null : diff.id)}
-                    className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
-                      isHL
-                        ? 'bg-blue-50 border-blue-300'
-                        : 'bg-gray-50 border-gray-200 hover:border-blue-200 hover:bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-5 h-5 rounded flex items-center justify-center ${
-                          diff.severity === 'critical' ? 'bg-red-100' :
-                          diff.severity === 'warning' ? 'bg-amber-100' : 'bg-gray-100'
-                        }`}>
-                          <SevIcon className={`w-3 h-3 ${
-                            diff.severity === 'critical' ? 'text-red-600' :
-                            diff.severity === 'warning' ? 'text-amber-600' : 'text-gray-600'
-                          }`} />
-                        </div>
-                        <span className="text-sm font-medium text-gray-900">{typeC.label}</span>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${sevC.bg} ${sevC.text}`}>
-                        {sevC.label}
-                      </span>
-                    </div>
-
-                    {/* 批复要求 */}
-                    <div className="mb-2">
-                      <p className="text-xs text-gray-500 mb-1">批复要求：</p>
-                      <p className="text-sm text-gray-700 bg-white p-2 rounded-lg border border-gray-200">
-                        {diff.approvalContent}
-                      </p>
-                    </div>
-
-                    {/* 合同约定 */}
-                    <div className="mb-2">
-                      <p className="text-xs text-gray-500 mb-1">合同约定：</p>
-                      <p className="text-sm text-gray-700 bg-white p-2 rounded-lg border border-gray-200">
-                        {diff.contractContent}
-                      </p>
-                    </div>
-
-                    {/* 差异说明 */}
-                    <div className={`p-3 rounded-lg ${
-                      diff.severity === 'critical' ? 'bg-red-50' :
-                      diff.severity === 'warning' ? 'bg-amber-50' : 'bg-gray-100'
-                    }`}>
-                      <p className="text-sm text-gray-700">{diff.description}</p>
-                      {diff.suggestion && (
-                        <p className="text-sm text-gray-600 mt-2 flex items-start gap-1">
-                          <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                          <span>建议：{diff.suggestion}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {diff.clause && (
-                      <p className="text-xs text-gray-400 mt-2">{diff.clause}</p>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* 借款合同 */}
-        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] xl:min-h-0">
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-blue-600" />
-              <div>
-                <h3 className="text-sm font-medium text-gray-900">借款合同</h3>
-                <p className="text-xs text-gray-500">HT-2024-0020 · 待签署</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto p-4 bg-gray-50/50">
-            <DocContent content={mockContractDocContent} />
-          </div>
-        </div>
-      </div>
+      {/* 三栏布局：使用 SplitPane compare 模式 */}
+      <SplitPane
+        mode="compare"
+        left={approvalDocPanel}
+        center={diffPanel}
+        right={contractDocPanel}
+      />
 
       {/* 底部操作 */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4">

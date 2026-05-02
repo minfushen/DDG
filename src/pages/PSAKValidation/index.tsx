@@ -45,7 +45,7 @@ export function PSAKValidation() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="PSAK 三表联动校验"
@@ -93,7 +93,7 @@ export function PSAKValidation() {
       />
 
       {/* 主内容区：左侧三表 + 右侧校验面板 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
         {/* 左侧 — PSAK 三表 */}
         <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] lg:min-h-0">
           <FinancialTable
@@ -106,17 +106,17 @@ export function PSAKValidation() {
         </section>
 
         {/* 右侧 — 校验结果 + CoT */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* 校验结果面板 */}
           <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
             <SectionHeader
               icon={CheckCircle2}
               title="钩稽校验结果"
               subtitle={`PSAK 标准校验规则 ${validations.length} 条`}
-              className="px-5 pt-5"
+              className="px-6 pt-6"
               variant="success"
             />
-            <div className="px-5 pb-5">
+            <div className="px-6 pb-6">
               <div className="space-y-3">
                 {validations.map((v) => {
                   const cfg = validationStatusConfig[v.status];

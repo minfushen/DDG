@@ -123,7 +123,7 @@ export function ReportGenerator() {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="报告生成"
@@ -159,7 +159,7 @@ export function ReportGenerator() {
       />
 
       {/* 主内容区：编辑器 + 侧栏 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 min-h-0">
         {/* 编辑器 */}
         <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[500px] lg:min-h-0">
           {/* 工具栏 */}
@@ -251,9 +251,9 @@ export function ReportGenerator() {
           </div>
 
           {/* 面板内容 */}
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-auto p-5">
             {activeTab === 'source' ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <p className="text-xs text-gray-500 flex items-center gap-1">
                   <Eye className="h-3 w-3" />
                   点击溯源条目，报告中对应数据将高亮

@@ -89,7 +89,7 @@ export function RiskChat() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="风险分析助手"
@@ -107,11 +107,11 @@ export function RiskChat() {
       />
 
       {/* 主内容区：文档 + 对话 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-8 min-h-0">
         {/* 左侧：证据面板 */}
         <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col">
           {/* 面板头部 */}
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-blue-600" />
               <h3 className="text-sm font-medium text-gray-900">证据文档</h3>
@@ -119,7 +119,7 @@ export function RiskChat() {
           </div>
 
           {/* 文档列表 */}
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-auto p-5">
             <div className="space-y-2">
               <DocumentItem title="尽调报告" pages={32} hits={5} active />
               <DocumentItem title="财务审计报告" pages={48} hits={3} />
@@ -130,7 +130,7 @@ export function RiskChat() {
           </div>
 
           {/* 搜索入口 */}
-          <div className="px-4 py-3 border-t border-gray-200">
+          <div className="px-5 py-4 border-t border-gray-200">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
@@ -145,7 +145,7 @@ export function RiskChat() {
         {/* 右侧：对话区域 */}
         <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[500px] lg:min-h-0">
           {/* 状态指示 */}
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <FileSearch className="h-4 w-4" />
               <span>基于 5 份文档分析</span>
@@ -216,7 +216,7 @@ export function RiskChat() {
           </div>
 
           {/* 输入区域 */}
-          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+          <div className="px-5 py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
                 <input

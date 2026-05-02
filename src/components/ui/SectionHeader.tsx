@@ -36,17 +36,17 @@ const variantStyles = {
 const sizeStyles = {
   sm: {
     icon: 'w-4 h-4',
-    title: 'text-base font-medium',
+    title: 'text-base font-semibold',
     gap: 'gap-2',
   },
   md: {
     icon: 'w-5 h-5',
-    title: 'text-lg font-medium',
+    title: 'text-xl font-semibold',
     gap: 'gap-3',
   },
   lg: {
     icon: 'w-6 h-6',
-    title: 'text-xl font-medium',
+    title: 'text-2xl font-semibold',
     gap: 'gap-3',
   },
 } as const;
@@ -65,7 +65,7 @@ export function SectionHeader({
   const sizeStyle = sizeStyles[size];
 
   return (
-    <div className={`mb-6 flex items-start justify-between gap-4 ${className}`}>
+    <div className={`mb-8 flex items-start justify-between gap-5 ${className}`}>
       <div className={`flex min-w-0 items-start ${sizeStyle.gap}`}>
         <Icon
           className={`mt-0.5 shrink-0 ${sizeStyle.icon} ${variantStyle.icon}`}
@@ -79,7 +79,7 @@ export function SectionHeader({
             {meta && <div className="shrink-0">{meta}</div>}
           </div>
           {subtitle && (
-            <p className={`mt-1 text-sm ${variantStyle.subtitle}`}>{subtitle}</p>
+            <p className={`mt-2 text-sm ${variantStyle.subtitle}`}>{subtitle}</p>
           )}
         </div>
       </div>

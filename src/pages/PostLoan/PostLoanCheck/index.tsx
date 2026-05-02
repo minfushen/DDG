@@ -24,7 +24,7 @@ export function PostLoanCheckPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="贷后检查管理"
@@ -39,8 +39,8 @@ export function PostLoanCheckPage() {
       />
 
       {/* 主内容 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
+        <div className="space-y-8">
           {/* 逾期任务 */}
           {postLoanChecks.filter((c) => c.status === 'overdue').length > 0 && (
             <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
@@ -48,10 +48,10 @@ export function PostLoanCheckPage() {
                 icon={AlertTriangle}
                 title="逾期任务"
                 subtitle="请尽快处理"
-                className="px-5 pt-5"
+                className="px-6 pt-6"
                 variant="risk"
               />
-              <div className="px-5 pb-5">
+              <div className="px-6 pb-6">
                 <div className="space-y-3">
                   {postLoanChecks.filter((c) => c.status === 'overdue').map((check, index) => (
                     <CheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
@@ -67,7 +67,7 @@ export function PostLoanCheckPage() {
               icon={Clock}
               title="待检查任务"
               subtitle={`${pendingChecks.length} 项待处理`}
-              className="px-5 pt-5"
+              className="px-6 pt-6"
               actions={
                 <button className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors">
                   <Plus className="w-3 h-3" />
@@ -75,7 +75,7 @@ export function PostLoanCheckPage() {
                 </button>
               }
             />
-            <div className="px-5 pb-5">
+            <div className="px-6 pb-6">
               {pendingChecks.filter((c) => c.status !== 'overdue').length > 0 ? (
                 <div className="space-y-3">
                   {pendingChecks.filter((c) => c.status !== 'overdue').map((check, index) => (
@@ -96,9 +96,9 @@ export function PostLoanCheckPage() {
               icon={Eye}
               title="检查中"
               subtitle={`${inProgressChecks.length} 项进行中`}
-              className="px-5 pt-5"
+              className="px-6 pt-6"
             />
-            <div className="px-5 pb-5">
+            <div className="px-6 pb-6">
               {inProgressChecks.length > 0 ? (
                 <div className="space-y-3">
                   {inProgressChecks.map((check, index) => (
@@ -120,10 +120,10 @@ export function PostLoanCheckPage() {
             icon={CheckCircle2}
             title="已完成"
             subtitle="最近检查记录"
-            className="px-5 pt-5"
+            className="px-6 pt-6"
             variant="success"
           />
-          <div className="px-5 pb-5">
+          <div className="px-6 pb-6">
             {completedChecks.length > 0 ? (
               <div className="space-y-2">
                 {completedChecks.slice(0, 8).map((check, index) => (

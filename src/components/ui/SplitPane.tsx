@@ -54,8 +54,8 @@ export function SplitPane({
   // 主内容 + 侧栏模式 (2/3 + 1/3)
   if (mode === 'main-sidebar' && main && right) {
     return (
-      <div className={`grid gap-6 ${className}`}>
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+      <div className={`grid gap-8 ${className}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
           <div className="min-w-0">{main}</div>
           <div className="min-w-0">
             {collapsible && (
@@ -86,8 +86,8 @@ export function SplitPane({
   // 侧栏 + 主内容模式 (1/3 + 2/3)
   if (mode === 'sidebar-main' && left && main) {
     return (
-      <div className={`grid gap-6 ${className}`}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6">
+      <div className={`grid gap-8 ${className}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-8">
           <div className="min-w-0">
             {collapsible && (
               <button
@@ -118,8 +118,8 @@ export function SplitPane({
   // 等宽双栏模式 (1/2 + 1/2)
   if (mode === 'equal' && left && right) {
     return (
-      <div className={`grid gap-6 ${className}`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className={`grid gap-8 ${className}`}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="min-w-0">{left}</div>
           <div className="min-w-0">{right}</div>
         </div>

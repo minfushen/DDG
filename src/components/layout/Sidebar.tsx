@@ -101,11 +101,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={`relative flex shrink-0 flex-col bg-white border-r border-gray-200 transition-[width] duration-300 ease-out ${
-        collapsed ? 'w-[68px]' : 'w-[220px]'
+        collapsed ? 'w-[72px]' : 'w-[248px]'
       }`}
     >
       {/* Logo */}
-      <div className="flex h-14 shrink-0 items-center px-4">
+      <div className="flex h-16 shrink-0 items-center px-5">
         {collapsed ? (
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
             <Sparkles className="h-5 w-5 text-white" strokeWidth={2} aria-hidden />
@@ -124,7 +124,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       {/* 导航菜单 */}
-      <nav className="mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 pb-2">
+      <nav className="mt-2 flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3">
         {navGroups.map((group) => {
           const isOpen = openGroups[group.title] ?? true;
           const moduleActive = isModuleActive(group.title);
@@ -136,7 +136,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.title)}
-                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[10px] font-medium uppercase transition-colors ${
+                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[11px] font-medium uppercase transition-colors ${
                     moduleActive
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
@@ -160,7 +160,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
               {/* 菜单项 */}
               {(collapsed || isOpen) && (
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {group.items.map((item) => {
                     const Icon = item.icon;
 
@@ -179,7 +179,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                             ].join(' ');
                           }
                           return [
-                            'relative flex items-center gap-2.5 rounded-xl pl-3.5 pr-2.5 py-[9px] text-[13px] font-medium transition-all duration-150',
+                              'relative flex items-center gap-3 rounded-xl pl-4 pr-3 py-[11px] text-[14px] font-medium transition-all duration-150',
                             isActive
                               ? 'bg-blue-50 text-blue-600'
                               : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',

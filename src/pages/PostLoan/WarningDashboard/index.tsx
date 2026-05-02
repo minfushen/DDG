@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertTriangle, Bell, TrendingUp,
-  Clock, CheckCircle2, AlertCircle, Building2, ArrowRight, Shield, Eye,
+  AlertTriangle, Bell,
+  Clock, CheckCircle2, Building2, ArrowRight, Shield, Eye,
 } from 'lucide-react';
 import { usePostLoanStore } from '../../../stores';
 import { formatAmount } from '../../../utils';
 import { warningLevelConfig, warningSourceConfig, warningStatusConfig } from '../../../config/display';
-import { PageHeader, SectionHeader, StatusBadge } from '../../../components/ui';
+import { PageHeader, SectionHeader, StatusBadge, StatCard } from '../../../components/ui';
 import type { WarningSignal } from '../../../types';
 
 export function WarningDashboard() {
@@ -27,7 +27,7 @@ export function WarningDashboard() {
   const processingWarnings = warningSignals.filter((w) => w.status === 'processing');
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="贷后预警工作台"
@@ -37,28 +37,27 @@ export function WarningDashboard() {
           { label: '预警总数', value: statistics.total },
           { label: '高风险', value: statistics.high, variant: 'danger' },
           { label: '中风险', value: statistics.medium, variant: 'warning' },
-          { label: '低风险', value: statistics.low, variant: 'success' },
         ]}
       />
 
-      {/* 统计卡片 */}
+      {/* 风险分布统计 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="待处理预警" value={statistics.active} icon={AlertCircle} variant="danger" trend="+3" />
-        <StatCard title="处理中" value={statistics.processing} icon={Clock} variant="default" />
-        <StatCard title="已解决" value={statistics.resolved} icon={CheckCircle2} variant="success" trend="+5" />
-        <StatCard title="本月新增" value={statistics.total} icon={TrendingUp} variant="default" trend="-2" />
+        <StatCard label="低风险" value={statistics.low} gradient="green" />
+        <StatCard label="待处理预警" value={statistics.active} gradient="red" trend="+3" />
+        <StatCard label="处理中" value={statistics.processing} gradient="blue" />
+        <StatCard label="已解决" value={statistics.resolved} gradient="green" trend="+5" />
       </div>
 
       {/* 主内容 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
+        <div className="space-y-8">
           {/* 紧急预警 */}
           <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
             <SectionHeader
               icon={AlertTriangle}
               title="紧急预警"
               subtitle="需立即处理的高风险信号"
-              className="px-5 pt-5"
+              className="px-6 pt-6"
               variant="risk"
               actions={
                 <span className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm font-medium">
@@ -66,7 +65,7 @@ export function WarningDashboard() {
                 </span>
               }
             />
-            <div className="px-5 pb-5">
+            <div className="px-6 pb-6">
               {activeWarnings.filter((w) => w.level === 'high').length > 0 ? (
                 <div className="space-y-3">
                   {activeWarnings.filter((w) => w.level === 'high').map((warning, index) => (
@@ -89,9 +88,9 @@ export function WarningDashboard() {
               icon={Clock}
               title="待处理预警"
               subtitle="中低风险预警信号"
-              className="px-5 pt-5"
+              className="px-6 pt-6"
             />
-            <div className="px-5 pb-5">
+            <div className="px-6 pb-6">
               {activeWarnings.filter((w) => w.level !== 'high').concat(processingWarnings).length > 0 ? (
                 <div className="space-y-3">
                   {activeWarnings.filter((w) => w.level !== 'high').concat(processingWarnings).map((warning, index) => (
@@ -108,16 +107,16 @@ export function WarningDashboard() {
         </div>
 
         {/* 右侧栏 */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* 预警来源 */}
           <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
             <SectionHeader
               icon={Shield}
               title="预警来源"
               subtitle="按类型分布"
-              className="px-5 pt-5"
+              className="px-6 pt-6"
             />
-            <div className="px-5 pb-5">
+            <div className="px-6 pb-6">
               <div className="space-y-3">
                 {Object.entries(warningSourceConfig).map(([key, config]) => {
                   const count = warningSignals.filter((w) => w.type === key).length;
@@ -147,9 +146,9 @@ export function WarningDashboard() {
               icon={Eye}
               title="快捷操作"
               subtitle="常用功能入口"
-              className="px-5 pt-5"
+              className="px-6 pt-6"
             />
-            <div className="px-5 pb-5">
+            <div className="px-6 pb-6">
               <div className="space-y-2">
                 <button
                   onClick={() => navigate('/post-loan/check')}
@@ -215,36 +214,5 @@ function WarningCard({ warning, onClick }: { warning: WarningSignal; index: numb
         <ArrowRight className="w-4 h-4 text-gray-400 shrink-0" />
       </div>
     </button>
-  );
-}
-
-function StatCard({ title, value, icon: Icon, variant, trend }: {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  variant: 'danger' | 'success' | 'default';
-  trend?: string;
-}) {
-  const iconColors = {
-    danger: 'bg-red-100 text-red-600',
-    success: 'bg-green-100 text-green-600',
-    default: 'bg-blue-100 text-blue-600',
-  };
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${iconColors[variant]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        {trend && (
-          <span className={`text-xs font-medium ${trend.startsWith('+') ? 'text-red-600' : 'text-green-600'}`}>
-            {trend}
-          </span>
-        )}
-      </div>
-      <p className="text-2xl font-semibold text-gray-900">{value}</p>
-      <p className="text-sm text-gray-500 mt-1">{title}</p>
-    </div>
   );
 }

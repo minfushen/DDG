@@ -20,7 +20,7 @@ export function Analytics() {
   const createdTasks = tasks.filter((t) => t.status === 'created');
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-8 animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="效能分析"
@@ -53,9 +53,9 @@ export function Analytics() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px]">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px]">
           {/* 左侧：AI 推荐内容 */}
-          <div className="p-5">
+          <div className="p-6">
             <p className="text-sm leading-relaxed text-gray-700">
               今日建议优先处理 <strong className="text-gray-900">浙江华创科技</strong>，该企业近期舆情波动较大，自动化尽调已完成 90%。
               当前数据引擎健康度 <strong className="text-green-600">{healthPercent}%</strong>，共{' '}
@@ -102,7 +102,7 @@ export function Analytics() {
           </div>
 
           {/* 右侧：数据引擎健康度仪表盘 */}
-          <div className="border-l border-gray-200 bg-gray-50/50 p-5 flex flex-col items-center justify-center">
+          <div className="border-l border-gray-200 bg-gray-50/50 p-6 flex flex-col items-center justify-center">
             <HealthGauge percent={healthPercent} />
             <p className="mt-3 text-sm font-medium text-gray-800">{connectedCount}/{totalCount} 数据源正常</p>
             <p className="text-xs text-gray-400 mt-0.5">上次同步：10 分钟前</p>
@@ -123,12 +123,12 @@ export function Analytics() {
           icon={Activity}
           title="效率概览"
           subtitle="本月数据"
-          className="px-5 pt-5"
+          className="px-6 pt-6"
         />
-        <div className="px-5 pb-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="px-6 pb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {/* 自动化率 */}
-            <div className="md:col-span-2 p-5 bg-gray-50 rounded-xl border border-gray-200 flex items-center gap-6">
+            <div className="md:col-span-2 p-6 bg-gray-50 rounded-xl border border-gray-200 flex items-center gap-8">
               <div className="shrink-0">
                 <AutomationRing value={mockEfficiencyMetrics.automationRate} />
               </div>
@@ -146,7 +146,7 @@ export function Analytics() {
                 </div>
                 <p className="text-xs text-gray-400 mt-1">行业均值 68%，当前领先 14.5 个百分点</p>
               </div>
-              <div className="hidden lg:flex items-center gap-6 shrink-0 border-l border-gray-200 pl-6">
+              <div className="hidden lg:flex items-center gap-8 shrink-0 border-l border-gray-200 pl-8">
                 <div>
                   <p className="text-xs text-gray-400 mb-0.5">自动处理</p>
                   <p className="text-base font-semibold text-gray-900 tabular-nums">1,025</p>
