@@ -11,7 +11,7 @@ import Underline from '@tiptap/extension-underline';
 import { useReportStore, useDueDiligenceStore, useDemoStore, usePSAKStore } from '../../stores';
 import { REPORT_TEMPLATE_CONFIGS, type ReportTemplate } from '../../types';
 import { mockReportSections } from '../../services/mockData';
-import { CoTViewer } from '../../components/ui';
+import { PageHeader, CoTViewer } from '../../components/ui';
 import { fileTypeConfig } from '../../config/display';
 import { downloadFile } from '../../utils';
 
@@ -35,7 +35,7 @@ export function ReportGenerator() {
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[500px] p-6',
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[400px] p-6',
       },
     },
     onSelectionUpdate: ({ editor: ed }) => {
@@ -74,7 +74,7 @@ export function ReportGenerator() {
     if (targetEl) {
       targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
       targetEl.style.transition = 'all 0.3s ease';
-      targetEl.style.boxShadow = '0 0 0 4px #3B82F6, 0 0 20px rgba(59,130,246,0.4)';
+      targetEl.style.boxShadow = '0 0 0 2px #3B82F6';
       highlightedElRef.current = targetEl;
 
       const timer = setTimeout(() => {
@@ -111,8 +111,8 @@ export function ReportGenerator() {
   const allReferences = useMemo(() =>
     mockReportSections.flatMap((section) =>
       section.sourceReferences.map((ref) => ({ ...ref, sectionTitle: section.title }))
-    ), []
-  );
+    ),
+  []);
 
   const quickPrompts = [
     { text: '语气更保守谨慎' },
@@ -123,148 +123,167 @@ export function ReportGenerator() {
   ];
 
   return (
-    <div className="min-h-screen bg-surface-page">
-      <div className="h-[calc(100vh-120px)] flex gap-8 p-8">
+    <div className="space-y-6 animate-fade-in-up">
+      {/* 页头 */}
+      <PageHeader
+        title="报告生成"
+        subtitle={currentEnterprise?.name || '尽调报告编辑'}
+        icon={FileText}
+        primaryAction={
+          <button
+            onClick={() => {
+              downloadFile(
+                editor?.getHTML() || '',
+                `尽调报告-${currentEnterprise?.name || '企业'}-${new Date().toISOString().split('T')[0]}.html`,
+                'text/html;charset=utf-8'
+              );
+              addToast('报告已导出', 'success');
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Download className="h-4 w-4" />
+            导出报告
+          </button>
+        }
+        secondaryActions={
+          <select
+            value={selectedTemplate}
+            onChange={(e) => setSelectedTemplate(e.target.value as ReportTemplate)}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-blue-300"
+          >
+            {REPORT_TEMPLATE_CONFIGS.map((config) => (
+              <option key={config.id} value={config.id}>{config.name}</option>
+            ))}
+          </select>
+        }
+      />
 
-        {/* 报告编辑区 */}
-        <div className="flex-1 flex flex-col bg-white rounded-2xl border border-border-default overflow-hidden">
+      {/* 主内容区：编辑器 + 侧栏 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 min-h-0">
+        {/* 编辑器 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[500px] lg:min-h-0">
           {/* 工具栏 */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-border-default bg-gradient-to-r from-[#F9FAFB] to-white">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-brand-bg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-brand" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-[#1F2937]">尽调报告</h3>
-                <p className="text-sm text-[#6B7280]">AI 自动生成，人工复核编辑</p>
-              </div>
-              <select
-                value={selectedTemplate}
-                onChange={(e) => setSelectedTemplate(e.target.value as ReportTemplate)}
-                className="px-4 py-2.5 bg-[#F3F4F6] border-2 border-border-default rounded-xl text-sm font-medium text-[#374151] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all"
-              >
-                {REPORT_TEMPLATE_CONFIGS.map((config) => (
-                  <option key={config.id} value={config.id}>{config.name}</option>
-                ))}
-              </select>
-            </div>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center gap-3">
               {reportStatus === 'generating' ? (
-                <span className="flex items-center gap-2 px-4 py-2.5 bg-[#DBEAFE] text-[#1E40AF] rounded-xl text-sm font-medium">
-                  <RefreshCw className="w-4 h-4 animate-spin" /> 正在生成...
+                <span className="flex items-center gap-2 text-sm text-blue-600">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  正在生成...
                 </span>
               ) : (
-                <span className="flex items-center gap-2 px-4 py-2.5 bg-[#D1FAE5] text-[#059669] rounded-xl text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4" /> 报告已生成
+                <span className="flex items-center gap-2 text-sm text-green-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                  报告已生成
                 </span>
               )}
-              <button className="px-4 py-2.5 bg-[#F3F4F6] text-[#374151] rounded-xl text-sm font-medium hover:bg-[#E5E7EB] transition-all flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" /> 重新生成
-              </button>
-              <button
-                onClick={() => {
-                  downloadFile(
-                    editor?.getHTML() || '',
-                    `尽调报告-${currentEnterprise?.name || '企业'}-${new Date().toISOString().split('T')[0]}.html`,
-                    'text/html;charset=utf-8'
-                  );
-                  addToast('报告已导出，请查看下载文件', 'success');
-                }}
-                className="px-5 py-2.5 bg-[#1E40AF] text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2">
-                <Download className="w-4 h-4" /> 导出报告
-              </button>
             </div>
+            <button className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50">
+              <RefreshCw className="h-4 w-4" />
+              重新生成
+            </button>
           </div>
 
-          {/* 报告大纲 */}
-          <div className="px-6 py-4 bg-[#F9FAFB] border-b border-border-default overflow-x-auto">
-            <div className="flex items-center gap-2 text-sm whitespace-nowrap">
-              <span className="text-[#6B7280] font-medium">报告大纲：</span>
+          {/* 大纲 */}
+          <div className="px-5 py-3 border-b border-gray-200 bg-gray-50 overflow-x-auto">
+            <div className="flex items-center gap-2 text-xs whitespace-nowrap">
+              <span className="text-gray-500">大纲：</span>
               {mockReportSections.map((section, index) => (
-                <button key={section.id} className="flex items-center gap-1 text-[#1E40AF] hover:text-[#3B82F6] hover:bg-[#DBEAFE] px-3 py-1.5 rounded-lg transition-colors font-medium">
-                  {index > 0 && <ChevronRight className="w-3 h-3 text-[#9CA3AF]" />}
-                  <span className="text-xs">{section.title.replace(/^[一二三四五六七八九十]+、\s*/, '')}</span>
+                <button
+                  key={section.id}
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                >
+                  {index > 0 && <ChevronRight className="w-3 h-3 text-gray-400 inline" />}
+                  {section.title.replace(/^[一二三四五六七八九十]+、\s*/, '')}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 编辑器 */}
-          <div className="flex-1 overflow-auto bg-gradient-to-b from-white to-[#F9FAFB]">
+          {/* 编辑器内容 */}
+          <div className="flex-1 overflow-auto bg-white">
             {reportStatus === 'generating' ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-brand flex items-center justify-center animate-pulse">
-                    <Sparkles className="w-12 h-12 text-white" />
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <Sparkles className="h-8 w-8 text-blue-600 animate-pulse" />
                   </div>
-                  <p className="text-[#1F2937] font-medium text-xl">AI 正在生成尽调报告...</p>
-                  <p className="text-sm text-[#6B7280] mt-2">预计需要 30 秒</p>
-                  <div className="mt-6 w-72 mx-auto">
-                    <div className="h-3 bg-[#E5E7EB] rounded-full overflow-hidden">
-                      <div className="h-full bg-[#1E40AF] rounded-full animate-progress" />
-                    </div>
-                  </div>
+                  <p className="text-gray-700 font-medium">AI 正在生成尽调报告...</p>
+                  <p className="text-sm text-gray-500 mt-1">预计需要 30 秒</p>
                 </div>
               </div>
             ) : (
               <EditorContent editor={editor} />
             )}
           </div>
-        </div>
+        </section>
 
-        {/* 右侧面板：溯源 + AI */}
-        <div className="w-80 flex flex-col bg-white rounded-2xl border border-border-default overflow-hidden">
-          <div className="flex border-b border-border-default bg-[#F9FAFB]">
+        {/* 右侧面板 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] lg:min-h-0">
+          {/* 标签栏 */}
+          <div className="flex border-b border-gray-200 bg-gray-50">
             <button
               onClick={() => setActiveTab('source')}
-              className={`flex-1 px-4 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'source' ? 'text-[#1E40AF] bg-white border-b-2 border-[#3B82F6]' : 'text-[#6B7280] hover:bg-[#F3F4F6]'
-              }`}>
-              <Link2 className="w-4 h-4" /> 数据溯源
+              className={`flex-1 px-3 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                activeTab === 'source' ? 'text-blue-600 bg-white border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <Link2 className="h-4 w-4" />
+              证据
             </button>
             <button
               onClick={() => setActiveTab('ai')}
-              className={`flex-1 px-4 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'ai' ? 'text-[#1E40AF] bg-white border-b-2 border-[#3B82F6]' : 'text-[#6B7280] hover:bg-[#F3F4F6]'
-              }`}>
-              <Wand2 className="w-4 h-4" /> AI 辅助
+              className={`flex-1 px-3 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                activeTab === 'ai' ? 'text-blue-600 bg-white border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <Wand2 className="h-4 w-4" />
+              AI 辅助
             </button>
             <button
               onClick={() => setActiveTab('cot')}
-              className={`flex-1 px-4 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'cot' ? 'text-[#1E40AF] bg-white border-b-2 border-[#3B82F6]' : 'text-[#6B7280] hover:bg-[#F3F4F6]'
-              }`}>
-              <Brain className="w-4 h-4" /> 思维链
+              className={`flex-1 px-3 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                activeTab === 'cot' ? 'text-blue-600 bg-white border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <Brain className="h-4 w-4" />
+              思维链
             </button>
           </div>
 
-          <div className="flex-1 overflow-auto p-6">
+          {/* 面板内容 */}
+          <div className="flex-1 overflow-auto p-4">
             {activeTab === 'source' ? (
-              <div className="space-y-4">
-                <p className="text-sm text-[#6B7280] flex items-center gap-2 font-medium">
-                  <Eye className="w-4 h-4" /> 点击溯源条目，报告中对应数据将高亮定位
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <Eye className="h-3 w-3" />
+                  点击溯源条目，报告中对应数据将高亮
                 </p>
-                <div className="space-y-3">
-                  {allReferences.map((ref, index) => {
+                <div className="space-y-2">
+                  {allReferences.map((ref) => {
                     const ftConfig = fileTypeConfig[ref.type] || fileTypeConfig.pdf;
                     const isHighlighted = highlightedReference === ref.id;
                     return (
                       <button
                         key={ref.id}
                         onClick={() => handleReferenceClick(ref.id)}
-                        className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                        className={`w-full text-left p-3 rounded-lg border transition-colors ${
                           isHighlighted
-                            ? 'border-[#3B82F6] bg-[#DBEAFE]'
-                            : `${ftConfig.bg} border-border-default hover:border-[#93C5FD] hover:shadow-md`
+                            ? 'border-blue-300 bg-blue-50'
+                            : 'bg-gray-50 border-gray-200 hover:border-blue-200'
                         }`}
-                        style={{ animationDelay: `${index * 50}ms` }}>
-                        <div className="flex items-start gap-3">
-                          <span className="text-xl">{ftConfig.emoji}</span>
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-sm">{ftConfig.emoji}</span>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-[#1F2937] text-sm truncate">{ref.fileName}</p>
-                            {ref.pageNumber && <p className="text-xs text-[#6B7280] mt-1"><FileSearch className="w-3 h-3 inline" /> 第{ref.pageNumber}页</p>}
-                            {ref.highlightText && <p className="text-xs text-[#1E40AF] mt-1 font-medium">"{ref.highlightText}"</p>}
-                            <p className="text-xs text-[#9CA3AF] mt-1">来源：{ref.sectionTitle.replace(/^[一二三四五六七八九十]+、\s*/, '')}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{ref.fileName}</p>
+                            {ref.pageNumber && (
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                <FileSearch className="w-3 h-3 inline" /> 第{ref.pageNumber}页
+                              </p>
+                            )}
+                            {ref.highlightText && (
+                              <p className="text-xs text-blue-600 mt-0.5">"{ref.highlightText}"</p>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -274,30 +293,32 @@ export function ReportGenerator() {
               </div>
             ) : activeTab === 'ai' ? (
               <div className="space-y-4">
-                <p className="text-sm text-[#6B7280] flex items-center gap-2 font-medium">
-                  <MessageSquare className="w-4 h-4" /> 框选报告文字，AI 智能改写
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <MessageSquare className="h-3 w-3" />
+                  框选报告文字，AI 智能改写
                 </p>
 
                 {selectedEditorText ? (
-                  <div className="p-4 bg-[#DBEAFE] rounded-xl border-2 border-[#93C5FD]">
-                    <p className="text-xs text-[#1E40AF] font-medium mb-2">已选中文本：</p>
-                    <p className="text-sm text-[#1F2937] line-clamp-3">{selectedEditorText}</p>
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-xs text-blue-700 font-medium mb-1">已选中文本：</p>
+                    <p className="text-sm text-gray-700 line-clamp-3">{selectedEditorText}</p>
                   </div>
                 ) : (
-                  <div className="p-4 bg-[#F3F4F6] rounded-xl text-center border-2 border-border-default">
-                    <MessageSquare className="w-8 h-8 text-[#9CA3AF] mx-auto mb-2" />
-                    <p className="text-sm text-[#6B7280]">请在报告中框选需要修改的文字</p>
+                  <div className="p-4 bg-gray-50 rounded-lg text-center border border-gray-200">
+                    <MessageSquare className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">请在报告中框选需要修改的文字</p>
                   </div>
                 )}
 
                 <div>
-                  <p className="text-xs text-[#6B7280] mb-3 font-medium">快捷指令</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-xs text-gray-500 mb-2">快捷指令</p>
+                  <div className="flex flex-wrap gap-1.5">
                     {quickPrompts.map((item) => (
                       <button
                         key={item.text}
                         onClick={() => setAiPrompt(item.text)}
-                        className="px-3 py-2 bg-[#F3F4F6] rounded-lg text-xs text-[#374151] font-medium hover:bg-[#DBEAFE] hover:text-[#1E40AF] transition-all">
+                        className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      >
                         {item.text}
                       </button>
                     ))}
@@ -305,38 +326,42 @@ export function ReportGenerator() {
                 </div>
 
                 <div>
-                  <p className="text-xs text-[#6B7280] mb-2 font-medium">自定义指令</p>
+                  <p className="text-xs text-gray-500 mb-1">自定义指令</p>
                   <textarea
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
-                    placeholder="输入修改指令，如：将这段话改写得更正式专业..."
-                    className="w-full h-24 p-4 bg-[#F9FAFB] border-2 border-border-default rounded-xl text-sm resize-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all"
+                    placeholder="输入修改指令..."
+                    className="w-full h-20 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm resize-none outline-none focus:border-blue-300"
                   />
                 </div>
 
                 <button
                   disabled={!selectedEditorText || !aiPrompt || isRewriting}
                   onClick={handleAIRewrite}
-                  className={`w-full py-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  className={`w-full py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                     selectedEditorText && aiPrompt && !isRewriting
-                      ? 'bg-[#1E40AF] text-white hover:shadow-xl'
-                      : 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed'
-                  }`}>
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
                   {isRewriting ? (
                     <>
-                      <RefreshCw className="w-4 h-4 animate-spin" /> AI 重写中...
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      重写中...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4" /> AI 重写
+                      <Sparkles className="h-4 w-4" />
+                      AI 重写
                     </>
                   )}
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-[#6B7280] flex items-center gap-2 font-medium">
-                  <Brain className="w-4 h-4" /> 报告生成时的 AI 推理过程
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <Brain className="h-3 w-3" />
+                  报告生成时的 AI 推理过程
                 </p>
                 <CoTViewer
                   steps={cotSteps}
@@ -349,7 +374,7 @@ export function ReportGenerator() {
               </div>
             )}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
@@ -360,16 +385,16 @@ function mockAIRewrite(text: string, prompt: string): string {
     return `${text}（经审慎评估，建议在落实相应风险缓释措施后方可执行）`;
   }
   if (prompt.includes('风险') && prompt.includes('提示')) {
-    return `${text}。⚠️ 特别风险提示：上述情形存在不确定性，建议持续跟踪监测。`;
+    return `${text}。特别风险提示：上述情形存在不确定性，建议持续跟踪监测。`;
   }
   if (prompt.includes('财务') && prompt.includes('细节')) {
-    return `${text}。从财务结构来看，企业资产负债率处于行业中上水平，流动比率和速动比率尚在合理区间，但需关注应收账款周转效率变化对流动性的潜在影响。`;
+    return `${text}。从财务结构来看，企业资产负债率处于行业中上水平，流动比率和速动比率尚在合理区间。`;
   }
   if (prompt.includes('简化')) {
-    return text.replace(/[，,]\s*具体而言[^。]*。/g, '。').replace(/[，,]\s*需要关注[^。]*。/g, '。').slice(0, Math.floor(text.length * 0.6)) + '。';
+    return text.replace(/[，,]\s*具体而言[^。]*。/g, '。').slice(0, Math.floor(text.length * 0.6)) + '。';
   }
   if (prompt.includes('行业') && prompt.includes('下行')) {
-    return `${text}。从行业环境维度审视，当前软件行业面临竞争加剧、技术迭代加速、下游需求波动等多重挑战，需关注行业下行对企业经营产生的传导效应。`;
+    return `${text}。从行业环境维度审视，当前软件行业面临竞争加剧、技术迭代加速等多重挑战。`;
   }
   return `${text}（已根据要求优化表述）`;
 }

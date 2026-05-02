@@ -143,15 +143,15 @@ export interface RiskFactor {
 
 // 标签配置
 export const WARNING_LEVEL_CONFIG: Record<WarningLevel, { label: string; bg: string; text: string; border: string; gradient: string }> = {
-  high: { label: '高风险', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', gradient: 'from-red-500 to-pink-500' },
-  medium: { label: '中风险', bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', gradient: 'from-yellow-500 to-amber-500' },
-  low: { label: '低风险', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', gradient: 'from-blue-500 to-cyan-500' },
+  high: { label: '高风险', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', gradient: 'from-red-500 to-red-600' },
+  medium: { label: '中风险', bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', gradient: 'from-amber-500 to-orange-500' },
+  low: { label: '低风险', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', gradient: 'from-blue-500 to-blue-600' },
 };
 
 export const WARNING_SOURCE_CONFIG: Record<WarningSourceType, { label: string; gradient: string }> = {
-  external: { label: '外部舆情', gradient: 'from-purple-500 to-violet-500' },
-  internal: { label: '内部数据', gradient: 'from-blue-500 to-cyan-500' },
-  behavior: { label: '行为异常', gradient: 'from-orange-500 to-red-500' },
+  external: { label: '外部舆情', gradient: 'from-blue-500 to-blue-600' },
+  internal: { label: '内部数据', gradient: 'from-blue-500 to-blue-600' },
+  behavior: { label: '行为异常', gradient: 'from-amber-500 to-red-500' },
   financial: { label: '财务指标', gradient: 'from-green-500 to-emerald-500' },
 };
 
@@ -163,7 +163,7 @@ export const CHECK_STATUS_CONFIG: Record<CheckStatus, { label: string; bg: strin
 };
 
 export const CHECK_TYPE_CONFIG: Record<CheckType, { label: string; gradient: string }> = {
-  regular: { label: '常规检查', gradient: 'from-blue-500 to-cyan-500' },
-  special: { label: '专项检查', gradient: 'from-purple-500 to-pink-500' },
-  triggered: { label: '触发检查', gradient: 'from-orange-500 to-red-500' },
+  regular: { label: '常规检查', gradient: 'from-blue-500 to-blue-600' },
+  special: { label: '专项检查', gradient: 'from-amber-500 to-orange-500' },
+  triggered: { label: '触发检查', gradient: 'from-red-500 to-red-600' },
 };

@@ -179,9 +179,9 @@ registerA2UIComponent('Button', {
     const sizeClass = size === 'sm' ? 'h-8 px-3 text-sm' : size === 'lg' ? 'h-12 px-6 text-base' : 'h-10 px-4 text-sm';
 
     const variantClasses = {
-      primary: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md shadow-blue-500/20 hover:shadow-lg',
+      primary: 'bg-blue-600 text-white shadow-md shadow-blue-500/20 hover:bg-blue-700',
       secondary: 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
-      danger: 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-md shadow-red-500/20',
+      danger: 'bg-red-600 text-white shadow-md shadow-red-500/20 hover:bg-red-700',
     };
 
     return (

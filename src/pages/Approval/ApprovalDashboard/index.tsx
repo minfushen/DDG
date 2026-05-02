@@ -3,15 +3,17 @@ import {
   Scale, CheckCircle2, AlertTriangle, FileText,
   ArrowRight, Calendar, AlertCircle, Zap,
 } from 'lucide-react';
+import { useState } from 'react';
 import { useApprovalStore } from '../../../stores';
 import { formatAmount } from '../../../utils';
-import { StatusBadge, EmptyState } from '../../../components/ui';
+import { PageHeader, SectionHeader, StatusBadge, EmptyState } from '../../../components/ui';
 import { approvalStatusConfig, conditionStatusConfig, conditionCategoryConfig, riskDeltaTypeConfig } from '../../../config/display';
 import type { ApprovalTask } from '../../../types';
 
 export function ApprovalDashboard() {
   const navigate = useNavigate();
   const { tasks, currentTask, preConditions, riskDeltas, loadApprovalData } = useApprovalStore();
+  const [conditionFilter, setConditionFilter] = useState<'all' | 'failed' | 'pending'>('all');
 
   if (!currentTask && tasks.length > 0) loadApprovalData(tasks[0].id);
 
@@ -19,40 +21,56 @@ export function ApprovalDashboard() {
 
   const verifiedCount = preConditions.filter((c) => c.status === 'verified').length;
   const totalConditions = preConditions.length;
-  const progressPercent = totalConditions > 0 ? Math.round((verifiedCount / totalConditions) * 100) : 0;
+
+  const filteredConditions = preConditions.filter((c) => {
+    if (conditionFilter === 'failed') return c.status === 'failed';
+    if (conditionFilter === 'pending') return c.status === 'pending';
+    return true;
+  });
 
   return (
-    <div className="min-h-screen bg-surface-page">
-      <div className="grid grid-cols-3 gap-8 p-8">
+    <div className="space-y-6 animate-fade-in-up">
+      {/* 页头 */}
+      <PageHeader
+        title="审批工作台"
+        subtitle={`${tasks.filter((t) => t.status !== 'approved').length} 项待处理`}
+        icon={Scale}
+        kpis={[
+          { label: '待审批', value: tasks.filter((t) => t.status === 'pending').length },
+          { label: '已通过', value: tasks.filter((t) => t.status === 'approved').length, variant: 'success' },
+        ]}
+      />
 
+      {/* 主内容：任务列表 + 详情 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
         {/* 任务列表 */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-            <div className="px-6 py-5 border-b border-border-default bg-gradient-to-r from-[#F9FAFB] to-white">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-brand" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-[#1F2937]">审批任务</h3>
-                  <p className="text-sm text-[#6B7280]">{tasks.filter((t) => t.status !== 'approved').length} 项待处理</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 space-y-3">
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <SectionHeader
+            icon={Calendar}
+            title="审批任务"
+            subtitle={`${tasks.length} 项`}
+            className="px-5 pt-5"
+          />
+          <div className="px-5 pb-5">
+            <div className="space-y-2">
               {tasks.map((task) => {
                 const isSelected = currentTask?.id === task.id;
                 return (
-                  <button key={task.id} onClick={() => handleSelectTask(task)}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-300 ${
+                  <button
+                    key={task.id}
+                    onClick={() => handleSelectTask(task)}
+                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
                       isSelected
-                        ? 'border-[#3B82F6] bg-[#DBEAFE]'
-                        : 'border-border-default bg-white hover:border-[#93C5FD] hover:bg-[#F9FAFB]'
-                    }`}>
-                    <div className="flex items-start justify-between gap-3">
+                        ? 'border-blue-300 bg-blue-50'
+                        : 'border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-[#1F2937] truncate">{task.enterpriseName}</p>
-                        <p className="text-sm text-[#6B7280] mt-1">{formatAmount(task.loanAmount / 10000)} · {task.loanType}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{task.enterpriseName}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {formatAmount(task.loanAmount / 10000)} · {task.loanType}
+                        </p>
                       </div>
                       <StatusBadge status={task.status} config={approvalStatusConfig} />
                     </div>
@@ -61,150 +79,124 @@ export function ApprovalDashboard() {
               })}
             </div>
           </div>
-        </div>
+        </section>
 
         {/* 任务详情 */}
-        <div className="col-span-2 space-y-6">
+        <div className="space-y-6">
           {currentTask ? (
             <>
-              {/* 头部信息 */}
-              <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-                <div className="p-6 bg-[#1E40AF]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                        <Scale className="w-7 h-7 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-semibold text-white">{currentTask.enterpriseName}</h2>
-                        <p className="text-white/80 text-sm mt-1">{currentTask.unifiedSocialCreditCode}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white text-sm font-medium border border-white/30">
-                        {currentTask.loanType}
-                      </span>
-                      <span className="px-4 py-2 bg-white rounded-xl text-[#1E40AF] text-sm font-medium">
-                        {formatAmount(currentTask.loanAmount / 10000)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* 放款前提条件 */}
-              <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-                <div className="px-6 py-5 border-b border-border-default flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-success-bg flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-success" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-[#1F2937]">放款前提条件核验</h3>
-                      <p className="text-sm text-[#6B7280]">AI自动核验底稿材料</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-2xl font-semibold text-[#1F2937]">{verifiedCount}/{totalConditions}</p>
-                      <p className="text-xs text-[#6B7280]">已通过</p>
-                    </div>
-                    <div className="w-16 h-16 relative">
-                      <svg className="w-16 h-16 -rotate-90">
-                        <circle cx="32" cy="32" r="28" fill="none" stroke="#E5E7EB" strokeWidth="6" />
-                        <circle cx="32" cy="32" r="28" fill="none" stroke="url(#progressGradient)" strokeWidth="6"
-                          strokeDasharray={`${progressPercent * 1.76} 176`} strokeLinecap="round" />
-                        <defs>
-                          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#059669" />
-                            <stop offset="100%" stopColor="#10B981" />
-                          </linearGradient>
-                        </defs>
-                      </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-[#059669]">
-                        {progressPercent}%
-                      </span>
-                    </div>
+              <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                  <SectionHeader
+                    icon={CheckCircle2}
+                    title="放款前提条件核验"
+                    subtitle={`${verifiedCount}/${totalConditions} 已通过`}
+                    className="!mb-0"
+                    variant="success"
+                  />
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={conditionFilter}
+                      onChange={(e) => setConditionFilter(e.target.value as 'all' | 'failed' | 'pending')}
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 outline-none"
+                    >
+                      <option value="all">全部</option>
+                      <option value="failed">仅失败</option>
+                      <option value="pending">仅待补充</option>
+                    </select>
                   </div>
                 </div>
-                <div className="p-6 space-y-4">
-                  {preConditions.map((condition) => {
-                    const condC = conditionStatusConfig[condition.status];
-                    const catC = conditionCategoryConfig[condition.category];
-                    const Icon = condC.icon;
-                    return (
-                      <div key={condition.id} className={`p-5 rounded-xl border-2 transition-all duration-300 ${
-                        condition.status === 'verified' ? 'border-[#A7F3D0] bg-[#D1FAE5]' :
-                        condition.status === 'failed' ? 'border-[#FECACA] bg-[#FEE2E2]' :
-                        'border-border-default bg-[#F9FAFB]'
-                      }`}>
-                        <div className="flex items-start gap-4">
-                          <div className={`w-10 h-10 rounded-xl ${catC.gradient} flex items-center justify-center flex-shrink-0`}>
-                            <Icon className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-[#374151]">{catC.label}</span>
-                              <StatusBadge status={condition.status} config={conditionStatusConfig} />
+                <div className="p-5">
+                  <div className="space-y-3">
+                    {filteredConditions.map((condition) => {
+                      const condC = conditionStatusConfig[condition.status];
+                      const catC = conditionCategoryConfig[condition.category];
+                      const Icon = condC.icon;
+                      return (
+                        <div
+                          key={condition.id}
+                          className={`p-4 rounded-lg border ${
+                            condition.status === 'verified' ? 'border-green-200 bg-green-50' :
+                            condition.status === 'failed' ? 'border-red-200 bg-red-50' :
+                            'border-gray-200 bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                              condition.status === 'verified' ? 'bg-green-100' :
+                              condition.status === 'failed' ? 'bg-red-100' : 'bg-gray-200'
+                            }`}>
+                              <Icon className={`h-4 w-4 ${
+                                condition.status === 'verified' ? 'text-green-600' :
+                                condition.status === 'failed' ? 'text-red-600' : 'text-gray-500'
+                              }`} />
                             </div>
-                            <p className="text-sm text-[#374151] font-medium">{condition.content}</p>
-                            {condition.remark && (
-                              <p className="text-sm text-[#991B1B] mt-2 flex items-center gap-2 bg-white px-3 py-2 rounded-lg">
-                                <AlertCircle className="w-4 h-4" /> {condition.remark}
-                              </p>
-                            )}
-                            {condition.evidence && (
-                              <div className="flex items-center gap-2 mt-2 text-xs text-[#6B7280]">
-                                <FileText className="w-4 h-4" />
-                                <span>{condition.evidence.join('、')}</span>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs text-gray-500">{catC.label}</span>
+                                <StatusBadge status={condition.status} config={conditionStatusConfig} />
                               </div>
-                            )}
+                              <p className="text-sm text-gray-700">{condition.content}</p>
+                              {condition.remark && (
+                                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  {condition.remark}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              </section>
 
               {/* 风险要素变化 */}
-              <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-                <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-warning-bg flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-warning" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-[#1F2937]">风险要素变化</h3>
-                    <p className="text-sm text-[#6B7280]">距尽调报告出具已过 {currentTask.daysSinceDueDiligence} 天</p>
-                  </div>
-                </div>
-                <div className="p-6">
+              <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+                <SectionHeader
+                  icon={AlertTriangle}
+                  title="风险要素变化"
+                  subtitle={`距尽调报告出具已过 ${currentTask.daysSinceDueDiligence} 天`}
+                  className="px-5 pt-5"
+                  variant="risk"
+                />
+                <div className="px-5 pb-5">
                   {riskDeltas.length > 0 ? (
-                    <div className="space-y-4">
-                      {riskDeltas.map((delta) => {
+                    <div className="space-y-3">
+                      {riskDeltas.sort((a, b) => {
+                        const order = { high: 0, medium: 1, low: 2 };
+                        return order[a.severity] - order[b.severity];
+                      }).map((delta) => {
                         const typeC = riskDeltaTypeConfig[delta.type];
                         const Icon = typeC.icon;
-                        const sevColors: Record<string, string> = {
-                          high: 'border-[#FECACA] bg-[#FEE2E2]',
-                          medium: 'border-[#FDE68A] bg-[#FEF3C7]',
-                          low: 'border-[#93C5FD] bg-[#DBEAFE]'
-                        };
                         return (
-                          <div key={delta.id} className={`p-5 rounded-xl border-2 ${sevColors[delta.severity] || sevColors.medium}`}>
-                            <div className="flex items-start gap-4">
-                              <div className={`w-12 h-12 rounded-xl ${typeC.gradient} flex items-center justify-center flex-shrink-0`}>
-                                <Icon className="w-6 h-6 text-white" />
+                          <div
+                            key={delta.id}
+                            className={`p-4 rounded-lg border ${
+                              delta.severity === 'high' ? 'border-red-200 bg-red-50' :
+                              delta.severity === 'medium' ? 'border-amber-200 bg-amber-50' :
+                              'border-blue-200 bg-blue-50'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                delta.severity === 'high' ? 'bg-red-100' :
+                                delta.severity === 'medium' ? 'bg-amber-100' : 'bg-blue-100'
+                              }`}>
+                                <Icon className={`h-4 w-4 ${
+                                  delta.severity === 'high' ? 'text-red-600' :
+                                  delta.severity === 'medium' ? 'text-amber-600' : 'text-blue-600'
+                                }`} />
                               </div>
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="font-medium text-[#1F2937]">{typeC.label}</span>
-                                  <span className="text-xs text-[#6B7280]">{delta.occurredAt}</span>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium text-gray-900">{typeC.label}</span>
+                                  <span className="text-xs text-gray-500">{delta.occurredAt}</span>
                                 </div>
-                                <p className="text-sm text-[#374151]">{delta.description}</p>
-                                <p className="text-sm text-[#4B5563] mt-2 font-medium">
-                                  <span className="text-[#6B7280]">影响：</span>{delta.impact}
-                                </p>
-                                <p className="text-xs text-[#9CA3AF] mt-1">来源：{delta.source}</p>
+                                <p className="text-sm text-gray-700">{delta.description}</p>
+                                <p className="text-xs text-gray-600 mt-1">影响：{delta.impact}</p>
                               </div>
                             </div>
                           </div>
@@ -212,31 +204,33 @@ export function ApprovalDashboard() {
                       })}
                     </div>
                   ) : (
-                    <div className="p-8 bg-[#D1FAE5] rounded-xl border-2 border-[#A7F3D0] text-center">
-                      <CheckCircle2 className="w-12 h-12 text-[#059669] mx-auto mb-3" />
-                      <p className="text-[#065F46] font-medium text-lg">暂无风险变化</p>
-                      <p className="text-sm text-[#059669] mt-1">企业经营状况稳定</p>
+                    <div className="p-6 bg-green-50 rounded-lg border border-green-200 text-center">
+                      <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                      <p className="text-green-700 font-medium">暂无风险变化</p>
+                      <p className="text-sm text-green-600 mt-1">企业经营状况稳定</p>
                     </div>
                   )}
                 </div>
-              </div>
+              </section>
 
               {/* 操作按钮 */}
-              <div className="flex items-center gap-4">
-                <button onClick={() => navigate('/approval/contract-compare')}
-                  className="flex-1 h-14 bg-[#1E40AF] text-white rounded-xl text-base font-semibold transition-all duration-300 inline-flex items-center justify-center gap-3 group">
-                  <Zap className="w-5 h-5" />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigate('/approval/contract-compare')}
+                  className="flex-1 h-12 bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors hover:bg-blue-700 inline-flex items-center justify-center gap-2"
+                >
+                  <Zap className="h-4 w-4" />
                   批复合同比对
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-4 w-4" />
                 </button>
-                <button className="flex-1 h-14 bg-white border-2 border-border-default text-[#374151] rounded-xl text-base font-semibold transition-all duration-300 hover:border-[#3B82F6] hover:text-[#1E40AF] inline-flex items-center justify-center gap-3">
-                  <FileText className="w-5 h-5" />
+                <button className="flex-1 h-12 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 inline-flex items-center justify-center gap-2">
+                  <FileText className="h-4 w-4" />
                   查看尽调报告
                 </button>
               </div>
             </>
           ) : (
-            <div className="bg-white rounded-2xl border border-border-default p-12">
+            <div className="rounded-2xl border border-gray-200 bg-white p-12">
               <EmptyState icon={Scale} title="请选择左侧的审批任务" />
             </div>
           )}

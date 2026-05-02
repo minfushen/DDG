@@ -318,14 +318,11 @@ function getStatusTextClass(status: AgentStatus): string {
 
 function getGradientClass(gradient: GradientKey): string {
   const gradients: Record<GradientKey, string> = {
-    primary: 'from-blue-500 to-indigo-500',
-    blue: 'from-blue-500 to-indigo-500',
+    primary: 'from-blue-500 to-blue-600',
+    blue: 'from-blue-500 to-blue-600',
     green: 'from-emerald-500 to-teal-500',
     amber: 'from-amber-500 to-orange-500',
     red: 'from-[#D85A30] to-[#E87040]',
-    cyan: 'from-cyan-500 to-teal-500',
-    dark: 'from-gray-700 to-gray-800',
-    ai: 'from-indigo-500 to-cyan-500',
   };
-  return gradients[gradient];
+  return gradients[gradient] || 'from-blue-500 to-blue-600';
 }

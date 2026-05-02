@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { usePSAKStore } from '../../stores';
 import { indoEnterprise } from '../../data/indonesia-story';
-import { FinancialTable, CoTViewer } from '../../components/ui';
+import { FinancialTable, CoTViewer, PageHeader, SectionHeader } from '../../components/ui';
 import { validationStatusConfig } from '../../config/display';
 
 export function PSAKValidation() {
@@ -24,7 +24,6 @@ export function PSAKValidation() {
   const handleRunValidation = () => {
     resetValidation();
     runValidation();
-    // 校验完成后自动触发 CoT
     setTimeout(() => {
       runCoT();
     }, validations.length * 800 + 500);
@@ -33,13 +32,13 @@ export function PSAKValidation() {
   const StatusIcon = ({ status }: { status: string }) => {
     switch (status) {
       case 'pass':
-        return <CheckCircle2 className="w-4 h-4 text-[var(--risk-low)]" />;
+        return <CheckCircle2 className="w-4 h-4 text-green-600" />;
       case 'fail':
-        return <XCircle className="w-4 h-4 text-[var(--risk-high)]" />;
+        return <XCircle className="w-4 h-4 text-red-600" />;
       case 'warning':
-        return <AlertTriangle className="w-4 h-4 text-[var(--risk-medium)]" />;
+        return <AlertTriangle className="w-4 h-4 text-amber-600" />;
       case 'running':
-        return <Clock className="w-4 h-4 text-[var(--risk-info)] animate-pulse" />;
+        return <Clock className="w-4 h-4 text-blue-600 animate-pulse" />;
       default:
         return <Clock className="w-4 h-4 text-gray-300" />;
     }
@@ -47,131 +46,110 @@ export function PSAKValidation() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* 页面标题 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center">
-            <Table className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">PSAK 三表联动校验</h1>
-            <p className="text-sm text-gray-500">
-              {indoEnterprise.nameZh} — {indoEnterprise.name}
-            </p>
-          </div>
-        </div>
-
-        {/* 校验操作按钮 */}
-        <div className="flex items-center gap-2">
-          {allValidated && !validationRunning && (
-            <div className="flex items-center gap-2 mr-2">
-              <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md bg-[var(--risk-low-bg)] text-[var(--risk-low-text)] font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--risk-low)]" />
-                通过 {passCount}
-              </span>
-              {failCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md bg-[var(--risk-high-bg)] text-[var(--risk-high-text)] font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--risk-high)]" />
-                  失败 {failCount}
-                </span>
-              )}
-              {warnCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md bg-[var(--risk-medium-bg)] text-[var(--risk-medium-text)] font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--risk-medium)]" />
-                  偏差 {warnCount}
-                </span>
-              )}
-            </div>
-          )}
+      {/* 页头 */}
+      <PageHeader
+        title="PSAK 三表联动校验"
+        subtitle={`${indoEnterprise.nameZh} — ${indoEnterprise.name}`}
+        icon={Table}
+        primaryAction={
           <button
             type="button"
             onClick={handleRunValidation}
             disabled={validationRunning}
-            className="px-4 py-2.5 rounded-xl bg-brand text-white text-sm font-medium hover:bg-brand-dark transition-all disabled:opacity-50 flex items-center gap-2"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
           >
             {validationRunning ? (
               <>
-                <Clock className="w-4 h-4 animate-spin" />
+                <Clock className="h-4 w-4 animate-spin" />
                 校验中...
               </>
             ) : (
               <>
-                <Play className="w-4 h-4" />
+                <Play className="h-4 w-4" />
                 开始校验
               </>
             )}
           </button>
-          {allValidated && !validationRunning && (
-            <button
-              type="button"
-              onClick={() => { resetValidation(); resetCoT(); }}
-              className="px-3 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200 transition-all flex items-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              重置
-            </button>
-          )}
-        </div>
-      </div>
+        }
+        secondaryActions={
+          allValidated && !validationRunning && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { resetValidation(); resetCoT(); }}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                <RotateCcw className="h-4 w-4" />
+                重置
+              </button>
+            </div>
+          )
+        }
+        kpis={[
+          { label: '通过', value: passCount, variant: 'success' },
+          { label: '失败', value: failCount, variant: failCount > 0 ? 'danger' : 'default' },
+          { label: '偏差', value: warnCount, variant: warnCount > 0 ? 'warning' : 'default' },
+        ]}
+      />
 
       {/* 主内容区：左侧三表 + 右侧校验面板 */}
-      <div className="flex gap-5">
-        {/* 左侧 — PSAK 三表（70%） */}
-        <div className="flex-[7] min-w-0">
-          <div className="rounded-2xl border border-border-default bg-white p-5">
-            <FinancialTable
-              statements={statements}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              highlightedItemId={highlightedItemId}
-              onHighlightItem={setHighlightedItem}
-            />
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+        {/* 左侧 — PSAK 三表 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[400px] lg:min-h-0">
+          <FinancialTable
+            statements={statements}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            highlightedItemId={highlightedItemId}
+            onHighlightItem={setHighlightedItem}
+          />
+        </section>
 
-        {/* 右侧 — 校验结果 + CoT（30%） */}
-        <div className="flex-[3] min-w-[280px] space-y-4">
+        {/* 右侧 — 校验结果 + CoT */}
+        <div className="space-y-6">
           {/* 校验结果面板 */}
-          <div className="rounded-2xl border border-border-default bg-white overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-default bg-gray-50">
-              <h3 className="text-sm font-medium text-gray-800">钩稽校验结果</h3>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                PSAK 标准校验规则 {validations.length} 条
-              </p>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {validations.map((v) => {
-                const cfg = validationStatusConfig[v.status];
-                return (
-                  <div key={v.id} className="px-4 py-3">
-                    <div className="flex items-start gap-2.5">
-                      <StatusIcon status={v.status} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-800 leading-tight">{v.rule}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{v.formula}</p>
-                        <div className="flex items-center gap-3 mt-1.5 text-[10px]">
-                          <span className="text-gray-500">
-                            左: {v.leftLabel}
-                          </span>
-                          <span className="text-gray-500">
-                            右: {v.rightLabel}
-                          </span>
-                        </div>
-                        {v.deviation !== undefined && v.status !== 'pending' && (
-                          <div className="mt-1">
-                            <span className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md font-medium ${cfg.bg} ${cfg.text}`}>
-                              {v.status === 'pass' ? '偏差 0%' : `偏差 ${v.deviation.toFixed(2)}%`}
-                            </span>
-                            <span className="text-[10px] text-gray-400 ml-2">{v.psakRef}</span>
+          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <SectionHeader
+              icon={CheckCircle2}
+              title="钩稽校验结果"
+              subtitle={`PSAK 标准校验规则 ${validations.length} 条`}
+              className="px-5 pt-5"
+              variant="success"
+            />
+            <div className="px-5 pb-5">
+              <div className="space-y-3">
+                {validations.map((v) => {
+                  const cfg = validationStatusConfig[v.status];
+                  return (
+                    <div
+                      key={v.id}
+                      className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <StatusIcon status={v.status} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 leading-tight">{v.rule}</p>
+                          <p className="text-xs text-gray-400 mt-0.5 font-mono">{v.formula}</p>
+                          <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                            <span>左: {v.leftLabel}</span>
+                            <span>右: {v.rightLabel}</span>
                           </div>
-                        )}
+                          {v.deviation !== undefined && v.status !== 'pending' && (
+                            <div className="mt-2">
+                              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg font-medium ${cfg.bg} ${cfg.text}`}>
+                                {v.status === 'pass' ? '偏差 0%' : `偏差 ${v.deviation.toFixed(2)}%`}
+                              </span>
+                              <span className="text-xs text-gray-400 ml-2">{v.psakRef}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </section>
 
           {/* 思维链面板 */}
           <CoTViewer

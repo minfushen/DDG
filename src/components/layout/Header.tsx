@@ -1,80 +1,49 @@
-import { Bell, User, Sparkles, Moon, Sun } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, User, Search } from 'lucide-react';
 
 interface HeaderProps {
   title?: string;
 }
 
 export function Header({ title }: HeaderProps) {
-  const [darkMode, setDarkMode] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
-
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-default bg-white px-5">
-      {/* 左侧：标题 */}
-      <div className="flex items-center gap-4 w-[180px] shrink-0">
-        <h2 className="text-sm font-medium text-[#1F2937] truncate">{title || '对公尽调工作台'}</h2>
-      </div>
-
-      {/* 中间：AI 搜索 */}
-      <div className="flex flex-1 justify-center px-8">
-        <div className={`relative flex items-center transition-all duration-300 ${searchFocused ? 'max-w-[560px] w-full' : 'w-[48%] min-w-[320px]'}`}>
-          <Sparkles className={`absolute left-3 h-4 w-4 shrink-0 transition-colors ${searchFocused ? 'text-[#1E40AF]' : 'text-[#9CA3AF]'}`} />
-          <input
-            type="text"
-            placeholder="输入企业名称或自然语言问题…"
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            className={`w-full rounded-xl bg-white py-[7px] pl-9 pr-4 text-[13px] text-[#1F2937] outline-none placeholder:text-[#9CA3AF] transition-all duration-300 ${
-              searchFocused
-                ? 'border-2 border-[#3B82F6] shadow-[0_0_0_3px_rgba(59,130,246,0.1)]'
-                : 'border-2 border-border-default hover:border-[#93C5FD]'
-            }`}
-          />
-          {/* 快捷键提示 */}
-          {!searchFocused && (
-            <span className="absolute right-3 text-[10px] text-[#9CA3AF] font-mono pointer-events-none select-none border border-border-default rounded-lg px-1.5 py-0.5 leading-none bg-[#F9FAFB]">
-              ⌘K
-            </span>
-          )}
-        </div>
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6">
+      {/* 左侧：页面标题 */}
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        <h2 className="truncate text-sm font-medium text-gray-900">
+          {title || '对公尽调工作台'}
+        </h2>
       </div>
 
       {/* 右侧：操作区 */}
-      <div className="flex items-center gap-2 w-[180px] shrink-0 justify-end">
-        {/* 主题切换 */}
+      <div className="flex shrink-0 items-center gap-2">
+        {/* 搜索入口 — 辅助功能 */}
         <button
-          onClick={() => setDarkMode(!darkMode)}
-          className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-all text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F3F4F6]"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          title="搜索功能开发中"
         >
-          {darkMode ? (
-            <Sun className="w-[18px] h-[18px]" />
-          ) : (
-            <Moon className="w-[18px] h-[18px]" />
-          )}
+          <Search className="h-[18px] w-[18px]" />
         </button>
 
         {/* 通知 */}
-        <button className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-all text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F3F4F6]">
-          <Bell className="w-[18px] h-[18px]" />
-          {/* 品牌蓝角标 */}
-          <span className="absolute top-1 right-1 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[#1E40AF] px-0.5 text-[9px] font-medium text-white leading-none ring-2 ring-white">
+        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
+          <Bell className="h-[18px] w-[18px]" />
+          {/* 通知角标 */}
+          <span className="absolute right-1.5 top-1.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-blue-600 px-0.5 text-[9px] font-medium text-white leading-none ring-2 ring-white">
             3
           </span>
         </button>
 
         {/* 分隔线 */}
-        <div className="w-px h-5 bg-[#E5E7EB] mx-1" />
+        <div className="mx-1 h-5 w-px bg-gray-200" />
 
         {/* 用户信息 */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="relative shrink-0 flex h-8 w-8 items-center justify-center rounded-xl bg-[#F3F4F6]">
-            <User className="w-4 h-4 text-[#6B7280]" />
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#10B981] rounded-full ring-2 ring-white" />
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
+            <User className="h-4 w-4 text-gray-500" />
           </div>
-          <div className="hidden md:block min-w-0 max-w-[90px]">
-            <p className="text-[13px] font-medium text-[#1F2937] truncate">张经理</p>
-            <p className="text-[11px] text-[#6B7280] truncate">对公业务部</p>
+          <div className="hidden min-w-0 md:block">
+            <p className="truncate text-sm font-medium text-gray-900">张经理</p>
+            <p className="truncate text-xs text-gray-500">对公业务部</p>
           </div>
         </div>
       </div>

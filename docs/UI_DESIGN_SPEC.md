@@ -1,6 +1,6 @@
-# UI 设计规范文档
+# UI 设计规范文档 v3.0
 
-> 以工作台首页（Dashboard）为基准，统一全站设计语言
+> 金融工作台统一设计语言 — 统一视觉、统一骨架、统一交互
 
 ---
 
@@ -9,366 +9,394 @@
 ### 1.1 核心原则
 
 - **一致性优先**：相同功能使用相同组件，避免重复造轮子
-- **克制使用色彩**：主色调（品牌蓝）+ 3个语义色（成功/警告/危险）
-- **圆角统一**：全局使用 `rounded-2xl`（16px）作为主圆角
-- **阴影分层**：`shadow-md` → `shadow-lg` → `shadow-xl` 三级阴影
+- **克制使用色彩**：主色调（品牌蓝）+ 语义色（成功/警告/危险/信息）
+- **边框分层为主**：阴影为辅，减少视觉噪音
+- **响应式优先**：所有布局必须支持移动端到桌面端
 
 ### 1.2 设计 Token 来源
 
 所有颜色、渐变、状态映射统一从 `src/theme/tokens.ts` 引用，禁止硬编码颜色值。
 
+### 1.3 禁止事项
+
+❌ 以下内容禁止使用：
+
+- `purple/pink/cyan` 作为业务页主视觉
+- 固定 `h-[600px]` 主内容高度
+- 页面级重复大 Hero
+- 无断点的 `grid-cols-3/4`
+- 页面自带 `min-h-screen bg-surface-page p-8`
+
 ---
 
 ## 二、色彩规范
 
-### 2.1 品牌主色
+### 2.1 品牌主色（唯一主操作色）
 
 ```
-品牌蓝：#3B82F6 (blue-500)
-品牌蓝渐变：from-blue-500 to-indigo-500
+品牌蓝：#1E40AF
+品牌蓝浅：#3B82F6
+品牌蓝背景：#DBEAFE
 ```
 
-**使用场景**：主按钮、激活状态、重要图标、链接
+**使用场景**：主按钮、激活状态、重要图标、链接、主操作
 
-### 2.2 语义色（全局唯一）
+### 2.2 语义色（仅用于状态）
 
 | 语义 | 颜色 | CSS变量 | 使用场景 |
 |------|------|---------|----------|
-| 成功/低风险 | 深绿 #3B6D11 | `--risk-low` | 成功状态、低风险标签 |
-| 警告/中风险 | 琥珀 #BA7517 | `--risk-medium` | 警告状态、中风险标签 |
-| 危险/高风险 | 橙红 #D85A30 | `--risk-high` | 错误状态、高风险标签 |
-| 信息/进行中 | 品牌蓝 #3B82F6 | `--risk-info` | 信息提示、进行中状态 |
+| 成功/低风险 | 深绿 #059669 | `--success` | 成功状态、低风险标签 |
+| 警告/中风险 | 琥珀 #D97706 | `--warning` | 警告状态、中风险标签 |
+| 危险/高风险 | 红 #DC2626 | `--danger` | 错误状态、高风险标签 |
+| 信息/进行中 | 品牌蓝 #1E40AF | `--info` | 信息提示、进行中状态 |
 
 ### 2.3 渐变映射
 
 ```typescript
 // 从 tokens.ts 引用
 gradients.primary   // 品牌蓝（主按钮、主图标）
-gradients.green     // 成功系
-gradients.amber     // 警告系
-gradients.red       // 危险系
+gradients.green     // 成功系 — 仅用于成功状态
+gradients.amber     // 警告系 — 仅用于警告状态
+gradients.red       // 危险系 — 仅用于危险状态
 ```
-
-### 2.4 禁止使用的颜色
-
-❌ 以下颜色造成视觉混乱，禁止使用：
-- `purple-500`、`pink-500`（非语义色）
-- `cyan-500`、`teal-500`（非语义色）
-- `rose-500`（与危险色冲突）
 
 ---
 
-## 三、圆角规范
+## 三、页面骨架规范
 
-### 3.1 统一圆角体系
+### 3.1 页面结构三层
+
+```
+┌─────────────────────────────────────────┐
+│              PageHeader                 │  ← 页面级标题、操作、KPI
+├─────────────────────────────────────────┤
+│  ┌─────────────────────────────────┐    │
+│  │        SectionHeader            │    │  ← 区块标题
+│  ├─────────────────────────────────┤    │
+│  │        Content                  │    │  ← 内容区
+│  └─────────────────────────────────┘    │
+│  ┌─────────────────────────────────┐    │
+│  │        SectionHeader            │    │
+│  ├─────────────────────────────────┤    │
+│  │        Content                  │    │
+│  └─────────────────────────────────┘    │
+└─────────────────────────────────────────┘
+```
+
+### 3.2 PageHeader 组件
+
+**两种变体**：
+
+1. **standard（标准页头）**：标题 + 副标题 + 操作按钮
+2. **risk（风险页头）**：仅用于预警/异常页面，允许更强提示色
+
+```tsx
+interface PageHeaderProps {
+  title: string;
+  subtitle?: string;
+  meta?: React.ReactNode;
+  actions?: React.ReactNode;
+  kpis?: KpiItem[];
+  variant?: 'standard' | 'risk';
+}
+
+// 使用示例
+<PageHeader
+  title="工作台"
+  subtitle="今日有 3 项待处理任务"
+  actions={<Button>发起尽调</Button>}
+  kpis={[{ label: '待处理', value: 12 }]}
+/>
+```
+
+### 3.3 SectionHeader 组件
+
+```tsx
+interface SectionHeaderProps {
+  icon: LucideIcon;
+  title: string;
+  subtitle?: string;
+  actions?: React.ReactNode;
+  variant?: 'default' | 'risk' | 'success';
+}
+
+// 使用示例
+<SectionHeader
+  icon={FileText}
+  title="任务列表"
+  actions={<Button size="sm">筛选</Button>}
+/>
+```
+
+### 3.4 KpiStrip 组件
+
+**限制**：首屏 KPI 不超过 3 个，超过则折叠到次级区域。
+
+```tsx
+interface KpiItem {
+  label: string;
+  value: string | number;
+  trend?: 'up' | 'down' | 'flat';
+  variant?: 'default' | 'success' | 'warning' | 'danger';
+}
+
+// 使用示例
+<KpiStrip items={[
+  { label: '待处理', value: 12 },
+  { label: '进行中', value: 5, variant: 'warning' },
+  { label: '已完成', value: 48, variant: 'success' },
+]} />
+```
+
+### 3.5 SplitPane 组件
+
+**布局模式**：
+
+| 模式 | 比例 | 使用场景 |
+|------|------|----------|
+| main-sidebar | 2/3 + 1/3 | 数据整合、分析、报告 |
+| equal | 1/2 + 1/2 | 对比、双栏表单 |
+| compare | 30/40/30 | 合同对比 |
+
+**响应式规则**：
+- 桌面（≥1024px）：分栏显示
+- 平板（768-1023px）：双栏或上下
+- 移动端（<768px）：单列上下
+
+---
+
+## 四、Hero 使用边界
+
+### 4.1 轻量页头（默认）
+
+**适用**：所有普通业务页面
+
+```tsx
+<PageHeader
+  title="页面标题"
+  subtitle="副标题"
+  actions={<Button>主操作</Button>}
+/>
+```
+
+**禁止**：
+- 大面积蓝色渐变背景
+- 装饰性图标和插图
+- 超过 2 个主操作按钮
+
+### 4.2 风险页头（特殊）
+
+**适用**：仅限预警、异常、审查告警类页面
+
+```tsx
+<PageHeader
+  variant="risk"
+  title="风险预警"
+  subtitle="当前有 3 条高风险预警需处理"
+  actions={<Button>立即处理</Button>}
+/>
+```
+
+**允许**：
+- 黄色/红色背景提示风险
+- 更强的视觉警示
+
+---
+
+## 五、圆角规范
 
 | 组件类型 | 圆角 | Tailwind类 |
 |----------|------|------------|
 | 卡片/面板 | 16px | `rounded-2xl` |
 | 按钮 | 10px | `rounded-lg` |
-| 标签/徽章 | 8px | `rounded-lg` |
+| 标签/徽章 | 10px | `rounded-lg` |
 | 输入框 | 10px | `rounded-lg` |
-| 小标签 | 6px | `rounded-md` |
-| 进度条 | 全圆 | `rounded-full` |
-
-### 3.2 禁止混用
-
-❌ 错误示例：
-```jsx
-// 不同页面使用不同圆角
-<div className="rounded-xl">  // 12px
-<div className="rounded-3xl"> // 24px
-```
-
-✅ 正确示例：
-```jsx
-// 统一使用 rounded-2xl
-<div className="rounded-2xl shadow-lg shadow-gray-200/50">
-```
+| 小标签 | 8px | `rounded-md` |
 
 ---
 
-## 四、阴影规范
+## 六、阴影规范
 
-### 4.1 阴影层级
+### 6.1 阴影层级
 
-| 层级 | Tailwind类 | 使用场景 |
-|------|------------|----------|
-| 轻阴影 | `shadow-md shadow-gray-200/50` | 小卡片、指标卡片 |
-| 标准阴影 | `shadow-lg shadow-gray-200/50` | 主卡片、面板 |
-| 重阴影 | `shadow-xl shadow-gray-200/50` | 弹窗、下拉菜单 |
-| 悬浮阴影 | `shadow-lg shadow-blue-500/20` | 主按钮悬浮 |
+| 层级 | 使用场景 |
+|------|----------|
+| 无阴影 | 默认卡片，以边框分层 |
+| `shadow-sm` | 悬浮卡片 |
+| `shadow-md` | 弹窗、下拉菜单 |
 
-### 4.2 阴影颜色
+### 6.2 阴影颜色
 
-统一使用 `shadow-gray-200/50`（50%透明度），保持视觉轻盈。
-
----
-
-## 五、组件规范
-
-### 5.1 卡片组件
-
-**标准卡片**：
-```jsx
-<div className="rounded-2xl bg-white shadow-lg shadow-gray-200/50 p-6">
-  {/* 内容 */}
-</div>
-```
-
-**可悬浮卡片**：
-```jsx
-<div className="rounded-2xl bg-white shadow-md shadow-gray-200/50
-  hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-```
-
-### 5.2 按钮规范
-
-| 类型 | 样式 | 使用场景 |
-|------|------|----------|
-| 主按钮 | `bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow-md shadow-blue-500/20` | 主要操作 |
-| 次按钮 | `bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50` | 次要操作 |
-| 幽灵按钮 | `bg-transparent text-gray-600 rounded-lg hover:bg-gray-100` | 辅助操作 |
-
-**按钮尺寸**：
-```jsx
-// 标准按钮
-<button className="px-4 py-2 rounded-lg text-sm font-medium">
-
-// 大按钮
-<button className="px-6 py-3 rounded-lg text-base font-medium">
-
-// 小按钮
-<button className="px-3 py-1.5 rounded-lg text-xs font-medium">
-```
-
-### 5.3 标签/徽章规范
-
-**统一使用圆角矩形**（非胶囊）：
-
-```jsx
-// 标准标签
-<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700">
-
-// 带图标标签
-<span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium">
-  <Icon className="w-3 h-3" />
-  文字
-</span>
-```
-
-**语义色标签**：
-```jsx
-// 成功/低风险
-className="bg-[var(--risk-low-bg)] text-[var(--risk-low-text)]"
-
-// 警告/中风险
-className="bg-[var(--risk-medium-bg)] text-[var(--risk-medium-text)]"
-
-// 危险/高风险
-className="bg-[var(--risk-high-bg)] text-[var(--risk-high-text)]"
-
-// 信息/进行中
-className="bg-[var(--risk-info-bg)] text-[var(--risk-info-text)]"
-```
-
-### 5.4 图标规范
-
-**图标容器尺寸**：
-```jsx
-// 小图标容器
-<div className="w-8 h-8 rounded-lg flex items-center justify-center">
-
-// 中图标容器
-<div className="w-10 h-10 rounded-xl flex items-center justify-center">
-
-// 大图标容器
-<div className="w-14 h-14 rounded-2xl flex items-center justify-center">
-```
-
-**图标尺寸**：
-```jsx
-<Icon className="w-4 h-4" />  // 小图标（12px容器内）
-<Icon className="w-5 h-5" />  // 中图标（16px容器内）
-<Icon className="w-6 h-6" />  // 大图标（20px容器内）
-```
-
-### 5.5 区块标题规范
-
-**统一使用 SectionHeader 组件**：
-```jsx
-<SectionHeader
-  icon={IconComponent}
-  title="标题"
-  subtitle="副标题"
-/>
-```
-
-**禁止自定义标题样式**：
-❌ 错误：
-```jsx
-<div className="flex items-center gap-3 mb-4">
-  <GradientIcon ... />
-  <h3 className="text-lg font-bold">标题</h3>
-</div>
-```
-
-✅ 正确：
-```jsx
-<SectionHeader icon={Icon} title="标题" subtitle="副标题" />
-```
+统一使用 `shadow-gray-200/50` 或品牌色阴影 `shadow-blue-500/20`。
 
 ---
 
-## 六、布局规范
+## 七、响应式规范
 
-### 6.1 页面容器
+### 7.1 断点定义
 
-```jsx
-// 标准页面容器
-<div className="mx-auto max-w-[1200px] space-y-6 animate-fade-in-up">
-```
+| 断点 | 宽度 | 布局 |
+|------|------|------|
+| mobile | <768px | 单列 |
+| tablet | 768-1023px | 双列 |
+| desktop | ≥1024px | 2/3 + 1/3 或自适应 |
 
-### 6.2 栅格布局
+### 7.2 栅格布局
 
-```jsx
-// 三栏布局
-<div className="grid grid-cols-3 gap-6">
-  <div className="col-span-2">主内容</div>
-  <div>侧边栏</div>
-</div>
-
-// 四栏布局
+```tsx
+// ❌ 错误：无断点固定列数
 <div className="grid grid-cols-4 gap-6">
+
+// ✅ 正确：响应式栅格
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 ```
 
-### 6.3 间距规范
+### 7.3 固定高度
 
-| 场景 | 间距 | Tailwind类 |
-|------|------|------------|
-| 页面区块间 | 24px | `space-y-6` |
-| 卡片内边距 | 24px | `p-6` |
-| 元素间间距 | 16px | `gap-4` |
-| 紧凑间距 | 12px | `gap-3` |
+```tsx
+// ❌ 错误：固定高度
+<div className="h-[600px]">
 
----
-
-## 七、排版规范
-
-### 7.1 字号体系
-
-| 用途 | 字号 | Tailwind类 |
-|------|------|------------|
-| 页面大标题 | 20px | `text-xl font-bold` |
-| 卡片标题 | 18px | `text-lg font-semibold` |
-| 区块标题 | 16px | `text-base font-semibold` |
-| 正文 | 14px | `text-sm` |
-| 辅助文字 | 12px | `text-xs` |
-| 小标签 | 11px | `text-[11px]` |
-
-### 7.2 字重规范
-
-| 用途 | 字重 | Tailwind类 |
-|------|------|------------|
-| 标题 | 600 | `font-semibold` |
-| 强调 | 500 | `font-medium` |
-| 正文 | 400 | `font-normal` |
-
-### 7.3 行高规范
-
-```jsx
-// 标题
-<h3 className="leading-tight">
-
-// 正文
-<p className="leading-relaxed">
+// ✅ 正确：视口内弹性
+<div className="min-h-0 flex-1 overflow-auto">
 ```
 
 ---
 
-## 八、动画规范
+## 八、页面模板
 
-### 8.1 入场动画
+### 8.1 工具型页面
 
-统一使用 `animate-fade-in-up`：
-```jsx
-<div className="animate-fade-in-up">
+**特点**：表格、分组、步骤流优先
+
+```
+┌─────────────────────────────────────────┐
+│              PageHeader                 │
+├─────────────────────────────────────────┤
+│  筛选条  │  状态 Tabs  │  排序          │
+├─────────────────────────────────────────┤
+│                                         │
+│              表格/列表                  │
+│                                         │
+└─────────────────────────────────────────┘
 ```
 
-### 8.2 交互过渡
+### 8.2 分析型页面
 
-```jsx
-// 标准过渡
-className="transition-all duration-200"
+**特点**：结论、证据、动作优先
 
-// 悬浮效果
-className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+```
+┌─────────────────────────────────────────┐
+│              PageHeader + KPI           │
+├─────────────────────────────────────────┤
+│  ┌───────────────────┬───────────────┐  │
+│  │     主内容区       │    侧栏区     │  │
+│  │   (图谱/图表)      │  (详情/操作)  │  │
+│  │      2/3          │      1/3      │  │
+│  └───────────────────┴───────────────┘  │
+└─────────────────────────────────────────┘
 ```
 
-### 8.3 加载状态
+### 8.3 配置型页面
 
-```jsx
-// 旋转加载
-<Loader2 className="w-4 h-4 animate-spin" />
+**特点**：列表、筛选、状态优先
 
-// 脉冲动画
-<div className="animate-pulse" />
+```
+┌─────────────────────────────────────────┐
+│              PageHeader                 │
+├─────────────────────────────────────────┤
+│  顶部总览/统计                          │
+├─────────────────────────────────────────┤
+│  筛选条                                 │
+├─────────────────────────────────────────┤
+│  规则列表（表格化）                     │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## 九、现有问题清单
+## 九、交互状态规范
 
-### 9.1 色彩不一致
+### 9.1 必须补齐的状态
 
-| 问题 | 位置 | 修复方案 |
-|------|------|----------|
-| 使用 `purple-500` | 多处图标渐变 | 改用 `primary` 或语义色 |
-| 使用 `cyan-500` | 按钮渐变 | 改用 `from-blue-500 to-indigo-500` |
-| 使用 `teal-500` | 部分标签 | 改用 `green` 语义色 |
-| 硬编码颜色值 | 多处内联样式 | 使用 CSS 变量 |
+| 状态 | 说明 |
+|------|------|
+| loading | 加载中，显示骨架屏或 spinner |
+| empty | 空状态，显示引导文案和插图 |
+| error | 错误状态，显示错误信息和重试按钮 |
+| disabled | 禁用状态，降低透明度，禁用交互 |
+| hover | 悬浮状态，显示边框或背景变化 |
+| focus | 聚焦状态，显示焦点环 |
 
-### 9.2 圆角不一致
+### 9.2 假功能处理
 
-| 问题 | 位置 | 修复方案 |
-|------|------|----------|
-| `rounded-xl` (12px) | 部分卡片 | 统一为 `rounded-2xl` |
-| `rounded-3xl` (24px) | 部分面板 | 统一为 `rounded-2xl` |
-| 胶囊形状 `rounded-full` | 部分标签 | 改为 `rounded-lg` |
+**原则**：不做真实功能的入口不能伪装成可用功能。
 
-### 9.3 组件重复定义
+```tsx
+// ❌ 错误：假功能伪装成可用
+<Button>深色模式</Button>  // 实际未实现
 
-| 问题 | 位置 | 修复方案 |
-|------|------|----------|
-| StatCard 重复定义 | WarningDashboard | 使用 `src/components/ui/StatCard.tsx` |
-| 页面标题样式不统一 | 多个页面 | 使用 `SectionHeader` 或 `PageHeader` |
-| 图标容器样式不统一 | 多处内联 | 使用 `GradientIcon` 组件 |
+// ✅ 正确：降级展示
+<Button disabled title="功能开发中">
+  深色模式
+  <Badge variant="info">即将推出</Badge>
+</Button>
 
-### 9.4 阴影不一致
-
-| 问题 | 位置 | 修复方案 |
-|------|------|----------|
-| 缺少阴影透明度 | 部分卡片 | 添加 `shadow-gray-200/50` |
-| 阴影层级混乱 | 多处 | 按规范使用 `shadow-md/lg/xl` |
+// ✅ 正确：移除假功能
+// 直接不显示未实现的功能入口
+```
 
 ---
 
-## 十、修复优先级
+## 十、组件使用规范
 
-### P0 - 必须修复
+### 10.1 必须复用的组件
 
-1. 统一色彩为品牌蓝 + 3语义色
-2. 统一卡片圆角为 `rounded-2xl`
-3. 删除重复的组件定义
+| 组件 | 用途 | 文件 |
+|------|------|------|
+| PageHeader | 页面标题 | `src/components/ui/PageHeader.tsx` |
+| SectionHeader | 区块标题 | `src/components/ui/SectionHeader.tsx` |
+| StatCard | KPI 卡片 | `src/components/ui/StatCard.tsx` |
+| StatusBadge | 状态徽章 | `src/components/ui/StatusBadge.tsx` |
+| Card | 卡片容器 | `src/components/ui/Card.tsx` |
 
-### P1 - 建议修复
+### 10.2 禁止重复定义
 
-1. 统一阴影样式
-2. 统一按钮样式
-3. 统一标签样式
+❌ 页面内自定义：
+- 页面标题样式
+- KPI 卡片样式
+- 状态徽章样式
+- 图标容器样式
 
-### P2 - 优化项
+✅ 必须使用统一组件。
 
-1. 动画效果统一
-2. 间距微调
-3. 字号规范化
+---
+
+## 十一、验收清单
+
+### 视觉一致性
+
+- [ ] 所有页面使用品牌蓝作为主操作色
+- [ ] 无 `purple/pink/cyan` 业务装饰色
+- [ ] 卡片圆角统一 `rounded-2xl`
+- [ ] 按钮圆角统一 `rounded-lg`
+
+### 布局一致性
+
+- [ ] 页面使用 PageHeader 组件
+- [ ] 区块使用 SectionHeader 组件
+- [ ] KPI 使用 StatCard 组件
+- [ ] 分栏使用 SplitPane 或工具类
+
+### 响应式
+
+- [ ] 所有栅格有断点
+- [ ] 无固定 `h-[600px]`
+- [ ] 移动端可正常使用
+
+### 交互状态
+
+- [ ] 关键页面有 loading 状态
+- [ ] 列表页有 empty 状态
+- [ ] 表单有 error 状态
+- [ ] 按钮有 disabled 状态

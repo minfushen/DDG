@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { usePostLoanStore } from '../../../stores';
 import { checkStatusConfig, checkTypeConfig, checkConclusionConfig } from '../../../config/display';
-import { StatusBadge } from '../../../components/ui';
+import { PageHeader, SectionHeader, StatusBadge } from '../../../components/ui';
 import type { PostLoanCheck } from '../../../types';
 
 export function PostLoanCheckPage() {
@@ -24,144 +24,125 @@ export function PostLoanCheckPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-page p-8 space-y-8 animate-fade-in-up">
-      {/* 页面头部 */}
-      <div className="relative overflow-hidden rounded-2xl bg-[#1E40AF] p-8">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-30" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+    <div className="space-y-6 animate-fade-in-up">
+      {/* 页头 */}
+      <PageHeader
+        title="贷后检查管理"
+        subtitle="定期检查 · 风险监控 · 合规管理"
+        icon={ClipboardCheck}
+        kpis={[
+          { label: '逾期', value: postLoanChecks.filter((c) => c.status === 'overdue').length, variant: 'danger' },
+          { label: '待检查', value: pendingChecks.length },
+          { label: '进行中', value: inProgressChecks.length },
+          { label: '已完成', value: completedChecks.length, variant: 'success' },
+        ]}
+      />
 
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <ClipboardCheck className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold text-white mb-2">贷后检查管理</h1>
-              <p className="text-white/80 text-sm">定期检查 · 风险监控 · 合规管理</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-center px-6 py-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30">
-              <p className="text-3xl font-semibold text-white">{postLoanChecks.filter((c) => c.status === 'overdue').length}</p>
-              <p className="text-xs text-white/80 font-medium">逾期</p>
-            </div>
-            <div className="text-center px-6 py-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30">
-              <p className="text-3xl font-semibold text-white">{pendingChecks.length}</p>
-              <p className="text-xs text-white/80 font-medium">待检查</p>
-            </div>
-            <div className="text-center px-6 py-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30">
-              <p className="text-3xl font-semibold text-white">{inProgressChecks.length}</p>
-              <p className="text-xs text-white/80 font-medium">进行中</p>
-            </div>
-            <div className="text-center px-6 py-3 bg-white rounded-xl">
-              <p className="text-3xl font-semibold text-[#059669]">{completedChecks.length}</p>
-              <p className="text-xs text-[#6B7280] font-medium">已完成</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-8">
-        <div className="col-span-2 space-y-8">
+      {/* 主内容 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+        <div className="space-y-6">
+          {/* 逾期任务 */}
           {postLoanChecks.filter((c) => c.status === 'overdue').length > 0 && (
-            <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up">
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-danger-bg flex items-center justify-center">
-                    <AlertTriangle className="w-6 h-6 text-danger" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-[#1F2937]">逾期任务</h3>
-                    <p className="text-sm text-[#6B7280]">请尽快处理</p>
-                  </div>
+            <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+              <SectionHeader
+                icon={AlertTriangle}
+                title="逾期任务"
+                subtitle="请尽快处理"
+                className="px-5 pt-5"
+                variant="risk"
+              />
+              <div className="px-5 pb-5">
+                <div className="space-y-3">
+                  {postLoanChecks.filter((c) => c.status === 'overdue').map((check, index) => (
+                    <CheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
+                  ))}
                 </div>
               </div>
-              <div className="space-y-3">
-                {postLoanChecks.filter((c) => c.status === 'overdue').map((check, index) => (
-                  <CheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
-                ))}
-              </div>
-            </div>
+            </section>
           )}
 
-          <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-brand-bg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-brand" />
+          {/* 待检查任务 */}
+          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <SectionHeader
+              icon={Clock}
+              title="待检查任务"
+              subtitle={`${pendingChecks.length} 项待处理`}
+              className="px-5 pt-5"
+              actions={
+                <button className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors">
+                  <Plus className="w-3 h-3" />
+                  新建检查
+                </button>
+              }
+            />
+            <div className="px-5 pb-5">
+              {pendingChecks.filter((c) => c.status !== 'overdue').length > 0 ? (
+                <div className="space-y-3">
+                  {pendingChecks.filter((c) => c.status !== 'overdue').map((check, index) => (
+                    <CheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
+                  ))}
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#1F2937]">待检查任务</h3>
-                  <p className="text-sm text-[#6B7280]">{pendingChecks.length} 项待处理</p>
-                </div>
-              </div>
-              <button className="inline-flex items-center gap-1.5 rounded-xl bg-[#1E40AF] px-4 py-2.5 text-sm font-medium text-white transition-all">
-                <Plus className="w-4 h-4" />
-                新建检查
-              </button>
-            </div>
-            <div className="space-y-3">
-              {pendingChecks.filter((c) => c.status !== 'overdue').map((check, index) => (
-                <CheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
-              ))}
-              {pendingChecks.filter((c) => c.status !== 'overdue').length === 0 && (
-                <div className="p-6 bg-[#F9FAFB] rounded-xl text-center border border-border-default">
-                  <p className="text-[#6B7280]">暂无待检查任务</p>
+              ) : (
+                <div className="p-6 bg-gray-50 rounded-lg text-center">
+                  <p className="text-gray-500">暂无待检查任务</p>
                 </div>
               )}
             </div>
-          </div>
+          </section>
 
-          <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-xl bg-warning-bg flex items-center justify-center">
-                <Eye className="w-6 h-6 text-warning" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-[#1F2937]">检查中</h3>
-                <p className="text-sm text-[#6B7280]">{inProgressChecks.length} 项进行中</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {inProgressChecks.map((check, index) => (
-                <CheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
-              ))}
-              {inProgressChecks.length === 0 && (
-                <div className="p-6 bg-[#F9FAFB] rounded-xl text-center border border-border-default">
-                  <p className="text-[#6B7280]">暂无进行中的检查</p>
+          {/* 检查中 */}
+          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <SectionHeader
+              icon={Eye}
+              title="检查中"
+              subtitle={`${inProgressChecks.length} 项进行中`}
+              className="px-5 pt-5"
+            />
+            <div className="px-5 pb-5">
+              {inProgressChecks.length > 0 ? (
+                <div className="space-y-3">
+                  {inProgressChecks.map((check, index) => (
+                    <CheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 bg-gray-50 rounded-lg text-center">
+                  <p className="text-gray-500">暂无进行中的检查</p>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </div>
 
-        <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-12 h-12 rounded-xl bg-success-bg flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-success" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-[#1F2937]">已完成</h3>
-              <p className="text-sm text-[#6B7280]">最近检查记录</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {completedChecks.slice(0, 5).map((check, index) => (
-              <CompletedCheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
-            ))}
-            {completedChecks.length === 0 && (
-              <div className="p-6 bg-[#F9FAFB] rounded-xl text-center border border-border-default">
-                <p className="text-[#6B7280]">暂无已完成的检查</p>
+        {/* 已完成 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <SectionHeader
+            icon={CheckCircle2}
+            title="已完成"
+            subtitle="最近检查记录"
+            className="px-5 pt-5"
+            variant="success"
+          />
+          <div className="px-5 pb-5">
+            {completedChecks.length > 0 ? (
+              <div className="space-y-2">
+                {completedChecks.slice(0, 8).map((check, index) => (
+                  <CompletedCheckCard key={check.id} check={check} index={index} onClick={() => handleSelectCheck(check)} />
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 bg-gray-50 rounded-lg text-center">
+                <p className="text-gray-500">暂无已完成的检查</p>
               </div>
             )}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
 }
 
-function CheckCard({ check, index, onClick }: { check: PostLoanCheck; index: number; onClick: () => void }) {
+function CheckCard({ check, onClick }: { check: PostLoanCheck; index: number; onClick: () => void }) {
   const typeC = checkTypeConfig[check.type];
   const completedItems = check.items.filter((i) => i.result !== 'pending').length;
   const totalItems = check.items.length;
@@ -169,22 +150,19 @@ function CheckCard({ check, index, onClick }: { check: PostLoanCheck; index: num
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-4 rounded-xl border-2 border-border-default bg-[#F9FAFB] hover:border-[#93C5FD] transition-all animate-fade-in-up"
-      style={{ animationDelay: `${index * 50}ms` }}
+      className="w-full text-left p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-white transition-all"
     >
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center">
-          <ClipboardCheck className="w-5 h-5 text-brand" />
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+          <ClipboardCheck className="w-4 h-4 text-blue-600" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-3 py-1 rounded-lg text-xs font-medium bg-white text-[#374151] border border-border-default">
-              {typeC.label}
-            </span>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs text-gray-500">{typeC.label}</span>
             <StatusBadge status={check.status} config={checkStatusConfig} />
           </div>
-          <p className="font-medium text-[#1F2937] truncate">{check.enterpriseName}</p>
-          <div className="flex items-center gap-4 mt-2 text-sm text-[#6B7280]">
+          <p className="text-sm font-medium text-gray-900 truncate">{check.enterpriseName}</p>
+          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
             <div className="flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               <span>{check.scheduledDate}</span>
@@ -195,44 +173,45 @@ function CheckCard({ check, index, onClick }: { check: PostLoanCheck; index: num
             </div>
           </div>
           {check.status === 'in_progress' && (
-            <div className="mt-3">
-              <div className="flex items-center justify-between text-xs text-[#6B7280] mb-1">
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                 <span>检查进度</span>
                 <span>{completedItems}/{totalItems}</span>
               </div>
-              <div className="w-full h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
-                <div className="h-full bg-[#1E40AF] rounded-full transition-all duration-500"
-                  style={{ width: `${(completedItems / totalItems) * 100}%` }} />
+              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full"
+                  style={{ width: `${(completedItems / totalItems) * 100}%` }}
+                />
               </div>
             </div>
           )}
         </div>
-        <ChevronRight className="w-4 h-4 text-[#9CA3AF] flex-shrink-0" />
+        <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
       </div>
     </button>
   );
 }
 
-function CompletedCheckCard({ check, index, onClick }: { check: PostLoanCheck; index: number; onClick: () => void }) {
+function CompletedCheckCard({ check, onClick }: { check: PostLoanCheck; index: number; onClick: () => void }) {
   const typeC = checkTypeConfig[check.type];
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-4 rounded-xl bg-[#F9FAFB] border border-border-default hover:border-[#93C5FD] hover:shadow-md transition-all animate-fade-in-up"
-      style={{ animationDelay: `${index * 50}ms` }}
+      className="w-full text-left p-3 rounded-lg bg-gray-50 border border-gray-200 hover:border-blue-200 transition-all"
     >
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-[#1F2937] truncate">{check.enterpriseName}</p>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-sm font-medium text-gray-900 truncate">{check.enterpriseName}</p>
         {check.conclusion && (
-          <span className={`px-3 py-1 rounded-lg text-xs font-medium ${checkConclusionConfig[check.conclusion].bg} ${checkConclusionConfig[check.conclusion].text}`}>
+          <span className={`px-2 py-0.5 rounded text-xs font-medium ${checkConclusionConfig[check.conclusion].bg} ${checkConclusionConfig[check.conclusion].text}`}>
             {checkConclusionConfig[check.conclusion].label}
           </span>
         )}
       </div>
-      <div className="flex items-center gap-2 text-xs text-[#6B7280]">
+      <div className="flex items-center gap-2 text-xs text-gray-500">
         <span>{typeC.label}</span>
-        <span className="text-[#D1D5DB]">|</span>
+        <span className="text-gray-300">|</span>
         <span>{check.completedDate}</span>
       </div>
     </button>

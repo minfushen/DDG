@@ -11,7 +11,7 @@ export function EnterpriseHeader({ enterprise, children }: EnterpriseHeaderProps
     <div className="bg-white rounded-2xl shadow-gray-200/50 p-6">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center">
             <Building2 className="w-7 h-7 text-white" />
           </div>
           <div>

@@ -1,15 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Sparkles, Plus, BarChart3, Database,
-  Play, Eye, FileText, RefreshCw, ClipboardCheck, Inbox, CheckCircle2,
-  ChevronDown, TrendingUp, AlertTriangle, Clock,
+  Plus, Play, Eye, FileText, RefreshCw, ClipboardCheck, Inbox, CheckCircle2,
+  ChevronDown, Filter, ArrowUpDown,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useDueDiligenceStore, useDemoStore } from '../../stores';
 import { taskTypeConfig, taskStatusConfig, priorityConfig } from '../../config/display';
 import { getEnterpriseInitials, getIndustryAvatarClasses } from '../../config/industryAvatar';
-import { StatusBadge, EmptyState } from '../../components/ui';
+import { PageHeader, StatusBadge, EmptyState } from '../../components/ui';
 import type { DueDiligenceTask, TaskStatus } from '../../types';
 
 // ── 排序：5 级优先级组 ──────────────────────────────────
@@ -60,9 +59,11 @@ export function Dashboard() {
   const { tasks } = useDueDiligenceStore();
   const { startDemo } = useDemoStore();
   const [showCompleted, setShowCompleted] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // 合并计算：排序、分类、统计 — 单次遍历优化
-  const { activeTasks, completedTasks, urgentCount, attentionCount } = useMemo(() => {
+  // 合并计算：排序、分类、统计
+  const { activeTasks, completedTasks, urgentCount, attentionCount, filteredActiveTasks } = useMemo(() => {
     const sorted = sortTasks(tasks);
     let urgent = 0;
     let attention = 0;
@@ -79,8 +80,27 @@ export function Dashboard() {
       }
     }
 
-    return { activeTasks: active, completedTasks: completed, urgentCount: urgent, attentionCount: attention };
-  }, [tasks]);
+    // 应用筛选
+    let filtered = active;
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(t => t.type === typeFilter);
+    }
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'in_progress') {
+        filtered = filtered.filter(t => ['gathering', 'analyzing', 'report_ready'].includes(t.status));
+      } else if (statusFilter === 'pending') {
+        filtered = filtered.filter(t => t.status === 'created');
+      }
+    }
+
+    return {
+      activeTasks: active,
+      completedTasks: completed,
+      urgentCount: urgent,
+      attentionCount: attention,
+      filteredActiveTasks: filtered,
+    };
+  }, [tasks, typeFilter, statusFilter]);
 
   const handleTaskAction = (task: DueDiligenceTask, navigateTo: string) => {
     startDemo(task.enterprise.id, task.enterprise.name);
@@ -88,164 +108,116 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-page">
-      <div className="mx-auto max-w-[1400px] px-8 py-8 space-y-8">
+    <div className="space-y-6 animate-fade-in-up">
+      {/* 页头 */}
+      <PageHeader
+        title="工作台"
+        subtitle={attentionCount > 0 ? `当前 ${attentionCount} 个任务需关注` : '所有任务已处理完毕'}
+        primaryAction={
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            新建任务
+          </button>
+        }
+        kpis={[
+          { label: '待处理', value: activeTasks.length, variant: activeTasks.length > 0 ? 'warning' : 'default' },
+          { label: '高优先级', value: urgentCount, variant: urgentCount > 0 ? 'danger' : 'default' },
+          { label: '已完成', value: completedTasks.length, variant: 'success' },
+        ]}
+      />
 
-        {/* ── 顶部 Hero 区域 ── */}
-        <div className="relative overflow-hidden rounded-2xl bg-[#1E40AF] p-8">
-          {/* 装饰性背景 */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-30" />
-          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+      {/* 任务列表（核心区域） */}
+      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        {/* 筛选栏 */}
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-base font-medium text-gray-900">待办任务</h3>
+            <span className="text-sm text-gray-500">共 {filteredActiveTasks.length} 项</span>
+          </div>
 
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold text-white mb-1">尽调工作台</h1>
-                <p className="text-white/80 text-sm">
-                  当前 <span className="font-medium text-white text-lg">{attentionCount}</span> 个任务需关注
-                  {urgentCount > 0 && (
-                    <span className="ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/20 text-white text-[11px] font-medium">
-                      <AlertTriangle className="w-3 h-3" />
-                      {urgentCount} 个高优先级
-                    </span>
-                  )}
-                </p>
-              </div>
+          <div className="flex items-center gap-2">
+            {/* 类型筛选 */}
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-8 text-sm text-gray-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="all">全部类型</option>
+                <option value="initial_credit">首次授信</option>
+                <option value="annual_review">年审尽调</option>
+                <option value="post_loan_warning">贷后预警</option>
+              </select>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="group inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-medium text-[#1E40AF] hover:shadow-xl transition-all duration-300"
-              >
-                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-                新建任务
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/analytics')}
-                className="inline-flex items-center gap-2 rounded-xl bg-white/20 backdrop-blur-sm px-5 py-3 text-sm font-medium text-white border border-white/30 hover:bg-white/30 transition-all duration-300"
-              >
-                <BarChart3 className="w-5 h-5" />
-                查看月报
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-xl bg-white/20 backdrop-blur-sm px-5 py-3 text-sm font-medium text-white border border-white/30 hover:bg-white/30 transition-all duration-300"
-              >
-                <Database className="w-5 h-5" />
-                数据引擎
-              </button>
-            </div>
+            {/* 状态筛选 */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-8 text-sm text-gray-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="all">全部状态</option>
+              <option value="pending">待处理</option>
+              <option value="in_progress">进行中</option>
+            </select>
+
+            {/* 排序 */}
+            <button className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50">
+              <ArrowUpDown className="h-4 w-4" />
+              排序
+            </button>
           </div>
         </div>
 
-        {/* ── 统计卡片 ── */}
-        <div className="grid grid-cols-4 gap-6">
-          <StatCard
-            title="待办任务"
-            value={activeTasks.length}
-            icon={Clock}
-            gradient="blue"
-            trend={activeTasks.length > 5 ? 'up' : 'stable'}
-          />
-          <StatCard
-            title="高优先级"
-            value={urgentCount}
-            icon={AlertTriangle}
-            gradient="red"
-            trend={urgentCount > 0 ? 'up' : 'stable'}
-          />
-          <StatCard
-            title="已完成"
-            value={completedTasks.length}
-            icon={CheckCircle2}
-            gradient="green"
-            trend="up"
-          />
-          <StatCard
-            title="处理效率"
-            value={tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0}
-            icon={TrendingUp}
-            gradient="cyan"
-            suffix="%"
-            trend="stable"
-          />
+        {/* 表头行 */}
+        <div className="flex items-center gap-6 border-b border-gray-100 bg-gray-50 px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <div className="w-12 shrink-0" />
+          <div className="flex-1 min-w-0">企业信息</div>
+          <div className="w-[120px] shrink-0 text-center">状态</div>
+          <div className="w-[120px] shrink-0 text-center">操作</div>
         </div>
 
-        {/* ── 任务列表（核心区域） ── */}
-        <section className="bg-white rounded-2xl border border-border-default overflow-hidden">
-          {/* 列表表头 */}
-          <div className="flex items-center justify-between px-8 py-6 border-b border-border-default bg-gradient-to-r from-[#F9FAFB] to-white">
-            <div>
-              <h3 className="text-lg font-semibold text-[#1F2937]">待办任务</h3>
-              <p className="text-sm text-[#6B7280] mt-1">共 {tasks.length} 个任务</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <select className="rounded-xl bg-[#F3F4F6] border-2 border-border-default px-4 py-2.5 text-sm text-[#374151] font-medium outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 transition-all cursor-pointer">
-                <option>全部类型</option>
-                <option>首次授信</option>
-                <option>年审尽调</option>
-                <option>贷后预警</option>
-              </select>
-              <select className="rounded-xl bg-[#F3F4F6] border-2 border-border-default px-4 py-2.5 text-sm text-[#374151] font-medium outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 transition-all cursor-pointer">
-                <option>全部状态</option>
-                <option>进行中</option>
-                <option>待处理</option>
-                <option>已完成</option>
-              </select>
-            </div>
-          </div>
-
-          {/* 表头行 */}
-          <div className="flex items-center gap-6 border-b border-border-default bg-[#F9FAFB] px-8 py-3 text-xs font-medium text-[#6B7280] uppercase tracking-wider">
-            <div className="w-12 shrink-0" />
-            <div className="flex-1 min-w-0">企业信息</div>
-            <div className="w-[140px] shrink-0 text-center">状态</div>
-            <div className="w-[140px] shrink-0 text-center">操作</div>
-          </div>
-
-          {/* 活跃任务 */}
-          <div>
-            {activeTasks.length === 0 && completedTasks.length === 0 && (
-              <EmptyState
-                icon={FileText}
-                title="暂无待办任务"
-                description="所有尽调任务已处理完毕，新任务将自动出现在这里"
-              />
-            )}
-            {activeTasks.map((task, index) => (
-              <TaskRow key={task.id} task={task} index={index} onAction={handleTaskAction} />
-            ))}
-          </div>
-
-          {/* 已完成/已归档 — 折叠区 */}
-          {completedTasks.length > 0 && (
-            <div className="border-t border-border-default">
-              <button
-                type="button"
-                onClick={() => setShowCompleted((v) => !v)}
-                className="flex w-full items-center gap-3 px-8 py-4 text-sm font-medium text-[#6B7280] transition-colors hover:bg-[#F9FAFB] hover:text-[#1F2937]"
-              >
-                <ChevronDown
-                  className={`w-5 h-5 shrink-0 transition-transform duration-300 ${showCompleted ? '' : '-rotate-90'}`}
-                />
-                已完成 / 已归档（{completedTasks.length}）
-              </button>
-              {showCompleted && (
-                <div className="bg-[#F9FAFB]/50">
-                  {completedTasks.map((task, index) => (
-                    <TaskRow key={task.id} task={task} index={index} onAction={handleTaskAction} dimmed />
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* 任务列表 */}
+        <div className="divide-y divide-gray-100">
+          {filteredActiveTasks.length === 0 && completedTasks.length === 0 && (
+            <EmptyState
+              icon={FileText}
+              title="暂无待办任务"
+              description="所有尽调任务已处理完毕，新任务将自动出现在这里"
+            />
           )}
-        </section>
-      </div>
+          {filteredActiveTasks.map((task, index) => (
+            <TaskRow key={task.id} task={task} index={index} onAction={handleTaskAction} />
+          ))}
+        </div>
+
+        {/* 已完成/已归档 — 折叠区 */}
+        {completedTasks.length > 0 && (
+          <div className="border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setShowCompleted((v) => !v)}
+              className="flex w-full items-center gap-3 px-6 py-4 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+            >
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform duration-200 ${showCompleted ? '' : '-rotate-90'}`}
+              />
+              已完成 / 已归档（{completedTasks.length}）
+            </button>
+            {showCompleted && (
+              <div className="divide-y divide-gray-100 bg-gray-50/50">
+                {completedTasks.map((task, index) => (
+                  <TaskRow key={task.id} task={task} index={index} onAction={handleTaskAction} dimmed />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -271,116 +243,71 @@ function TaskRow({
 
   return (
     <div
-      className={`flex items-center gap-6 px-8 transition-all duration-300 border-b border-border-default last:border-0 group ${
-        dimmed ? 'opacity-50' : 'hover:bg-[#F9FAFB]'
+      className={`flex items-center gap-6 px-6 py-4 transition-colors group ${
+        dimmed ? 'opacity-50' : 'hover:bg-gray-50'
       }`}
-      style={{ minHeight: '80px', animationDelay: `${index * 30}ms` }}
+      style={{ animationDelay: `${index * 30}ms` }}
     >
       {/* 企业头像 */}
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-medium ${avatarCls}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-medium ${avatarCls}`}>
         {dimmed ? (
-          <CheckCircle2 className="w-6 h-6 text-[#059669]" />
+          <CheckCircle2 className="h-5 w-5 text-green-600" />
         ) : (
           initials
         )}
       </div>
 
       {/* 企业信息 */}
-      <div className="min-w-0 flex-1 py-5">
-        <div className="flex items-center gap-3 mb-1">
-          <h4 className="truncate text-base font-semibold text-[#1F2937] group-hover:text-[#1E40AF] transition-colors">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 mb-0.5">
+          <h4 className="truncate text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
             {task.enterprise.name}
           </h4>
-          <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium ${priorityC.bg} ${priorityC.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${task.priority === 'high' ? 'bg-[#DC2626]' : task.priority === 'medium' ? 'bg-[#D97706]' : 'bg-[#059669]'}`} />
+          <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${priorityC.bg} ${priorityC.text}`}>
             {priorityC.label}
           </span>
         </div>
-        <div className="flex items-center gap-3 text-sm text-[#6B7280]">
-          <span className="font-mono text-xs bg-[#F3F4F6] px-2 py-0.5 rounded">{task.enterprise.unifiedSocialCreditCode}</span>
-          <span className="text-[#D1D5DB]">•</span>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
+            {task.enterprise.unifiedSocialCreditCode}
+          </span>
+          <span className="text-gray-300">•</span>
           <span>{task.createdAt}</span>
           {task.assignee && (
             <>
-              <span className="text-[#D1D5DB]">•</span>
-              <span className="text-[#374151] font-medium">{task.assignee}</span>
+              <span className="text-gray-300">•</span>
+              <span className="text-gray-700">{task.assignee}</span>
             </>
           )}
           {typeC && (
             <>
-              <span className="text-[#D1D5DB]">•</span>
-              <span className="text-[#6B7280]">{typeC.label}</span>
+              <span className="text-gray-300">•</span>
+              <span>{typeC.label}</span>
             </>
           )}
         </div>
       </div>
 
       {/* 状态 */}
-      <div className="w-[140px] shrink-0 flex justify-center">
+      <div className="w-[120px] shrink-0 flex justify-center">
         <StatusBadge status={task.status} config={taskStatusConfig} />
       </div>
 
       {/* 操作按钮 */}
-      <div className="w-[140px] shrink-0 flex justify-center">
+      <div className="w-[120px] shrink-0 flex justify-center">
         <button
           type="button"
           onClick={() => onAction(task, action.navigateTo)}
           className={
             action.variant === 'primary'
-              ? 'flex h-10 items-center gap-2 rounded-xl bg-[#1E40AF] px-5 text-sm font-medium text-white transition-all duration-300'
-              : 'flex h-10 items-center gap-2 rounded-xl border-2 border-border-default bg-white px-5 text-sm font-medium text-[#374151] transition-all duration-300 hover:border-[#3B82F6] hover:text-[#1E40AF] hover:bg-[#DBEAFE]/50'
+              ? 'inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700'
+              : 'inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-blue-300 hover:text-blue-600'
           }
         >
-          <ActionIcon className="w-4 h-4" />
+          <ActionIcon className="h-3.5 w-3.5" />
           {action.label}
         </button>
       </div>
-    </div>
-  );
-}
-
-// ── 统计卡片 ───────────────────────────────────────────
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  gradient,
-  trend,
-  suffix = '',
-}: {
-  title: string;
-  value: number;
-  icon: LucideIcon;
-  gradient: 'blue' | 'red' | 'green' | 'cyan';
-  trend: 'up' | 'down' | 'stable';
-  suffix?: string;
-}) {
-  const iconBg = {
-    blue: 'bg-brand-bg text-brand',
-    red: 'bg-danger-bg text-danger',
-    green: 'bg-success-bg text-success',
-    cyan: 'bg-brand-bg text-brand',
-  };
-
-  return (
-    <div className="bg-white rounded-2xl border border-border-default p-6 transition-all duration-300 group">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`w-12 h-12 rounded-xl ${iconBg[gradient]} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className="w-6 h-6" />
-        </div>
-        {trend !== 'stable' && (
-          <div className={`flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md ${
-            trend === 'up' ? 'bg-[#FEE2E2] text-[#991B1B]' : 'bg-[#D1FAE5] text-[#065F46]'
-          }`}>
-            <TrendingUp className={`w-3 h-3 ${trend === 'down' ? 'rotate-180' : ''}`} />
-            {trend === 'up' ? '+' : '-'}
-          </div>
-        )}
-      </div>
-      <p className="text-3xl font-semibold text-[#1F2937] mb-1">
-        {value}{suffix}
-      </p>
-      <p className="text-sm text-[#6B7280] font-medium">{title}</p>
     </div>
   );
 }

@@ -46,13 +46,13 @@ export function CoTViewer({ steps, expanded, onToggleExpanded, onRun, onReset, r
   return (
     <div className="rounded-xl border border-border-default bg-white overflow-hidden">
       {/* 头部 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-border-default">
+      <div className="flex items-center justify-between px-4 py-3 bg-blue-50 border-b border-gray-200">
         <button
           type="button"
           onClick={onToggleExpanded}
           className="flex items-center gap-2"
         >
-          <Sparkles className="w-4 h-4 text-indigo-500" />
+          <Sparkles className="w-4 h-4 text-blue-600" />
           <span className="text-sm font-medium text-gray-800">AI 思维链 (Chain of Thought)</span>
           {allDone && (
             <span className="text-[10px] px-1.5 py-0.5 bg-[var(--risk-low-bg)] text-[var(--risk-low-text)] rounded-lg font-medium">

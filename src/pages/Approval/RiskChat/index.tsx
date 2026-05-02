@@ -9,18 +9,44 @@ import {
   User,
   Bot,
   ExternalLink,
-  ChevronRight,
+
   BookOpen,
+  Search,
+  FileSearch,
+  Shield,
+  TrendingUp,
+  AlertTriangle,
 } from 'lucide-react';
 import { useApprovalStore } from '../../../stores';
+import { PageHeader } from '../../../components/ui';
 import type { ChatMessage, DocumentReference } from '../../../types';
 
-const quickQuestions = [
-  '这笔贷款的第一还款来源是什么？',
-  '抵押物覆盖率够不够？',
-  '企业最近有什么风险变化？',
-  '担保人的代偿能力如何？',
-  '贷款用途是否合规？',
+// 快捷问题按业务主题分组
+const quickQuestionGroups = [
+  {
+    title: '还款能力',
+    icon: TrendingUp,
+    questions: [
+      '第一还款来源是什么？',
+      '现金流能否覆盖本息？',
+    ],
+  },
+  {
+    title: '担保分析',
+    icon: Shield,
+    questions: [
+      '抵押物覆盖率够不够？',
+      '担保人代偿能力如何？',
+    ],
+  },
+  {
+    title: '风险识别',
+    icon: AlertTriangle,
+    questions: [
+      '近期有什么风险变化？',
+      '是否存在关联交易？',
+    ],
+  },
 ];
 
 export function RiskChat() {
@@ -41,7 +67,6 @@ export function RiskChat() {
   const handleSend = () => {
     if (!input.trim()) return;
 
-    // 添加用户消息
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
@@ -51,7 +76,6 @@ export function RiskChat() {
     addChatMessage(userMessage);
     setInput('');
 
-    // 模拟 AI 回复
     setIsTyping(true);
     setTimeout(() => {
       const aiResponse = generateAIResponse(input);
@@ -65,130 +89,157 @@ export function RiskChat() {
   };
 
   return (
-    <div className="grid grid-cols-3 gap-6 h-[calc(100vh-180px)] animate-fade-in-up">
-      {/* 左侧：文档阅读器 */}
-      <div className="bg-white rounded-2xl shadow-gray-200/50 border border-border-default/50 overflow-hidden flex flex-col">
-        <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-border-default">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h3 className="font-medium text-gray-800">文档阅读器</h3>
-              <p className="text-xs text-gray-500">点击引用跳转原文</p>
+    <div className="space-y-6 animate-fade-in-up">
+      {/* 页头 */}
+      <PageHeader
+        title="风险分析助手"
+        subtitle="基于尽调报告、财务数据等文档进行智能问答"
+        icon={MessageSquare}
+        secondaryActions={
+          <button
+            onClick={() => navigate('/approval/dashboard')}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            返回审批工作台
+          </button>
+        }
+      />
+
+      {/* 主内容区：文档 + 对话 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 min-h-0">
+        {/* 左侧：证据面板 */}
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col">
+          {/* 面板头部 */}
+          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-blue-600" />
+              <h3 className="text-sm font-medium text-gray-900">证据文档</h3>
             </div>
           </div>
-        </div>
 
-        <div className="flex-1 overflow-auto p-6">
-          <div className="space-y-4">
-            <DocumentItem title="尽调报告" pages={32} />
-            <DocumentItem title="财务审计报告" pages={48} />
-            <DocumentItem title="银行流水分析" pages={12} />
-            <DocumentItem title="抵押物评估报告" pages={15} />
-            <DocumentItem title="企业征信报告" pages={8} />
-          </div>
-        </div>
-      </div>
-
-      {/* 右侧：对话区域 */}
-      <div className="col-span-2 bg-white rounded-2xl shadow-gray-200/50 border border-border-default/50 overflow-hidden flex flex-col">
-        {/* 头部 */}
-        <div className="px-6 py-4 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-border-default">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/approval/dashboard')}
-                className="w-8 h-8 rounded-lg bg-white hover:bg-gray-100 flex items-center justify-center transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4 text-gray-600" />
-              </button>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-purple-500/30">
-                <MessageSquare className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-800">风险分析助手</h3>
-                <p className="text-xs text-gray-500">Chat with Docs · 智能问答</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-lg border border-green-200">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-xs text-green-700 font-medium">在线</span>
+          {/* 文档列表 */}
+          <div className="flex-1 overflow-auto p-4">
+            <div className="space-y-2">
+              <DocumentItem title="尽调报告" pages={32} hits={5} active />
+              <DocumentItem title="财务审计报告" pages={48} hits={3} />
+              <DocumentItem title="银行流水分析" pages={12} hits={2} />
+              <DocumentItem title="抵押物评估报告" pages={15} hits={1} />
+              <DocumentItem title="企业征信报告" pages={8} hits={0} />
             </div>
           </div>
-        </div>
 
-        {/* 消息区域 */}
-        <div className="flex-1 overflow-auto p-6 space-y-6">
-          {chatMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-purple-500/30 mb-6">
-                <Sparkles className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">我是您的风险分析助手</h3>
-              <p className="text-sm text-gray-500 max-w-md mb-6">
-                您可以向我提问关于这笔贷款的任何问题，我会基于尽调报告、财务数据等文档进行分析。
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {quickQuestions.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleQuickQuestion(q)}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm text-gray-700 transition-colors"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              {chatMessages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
-              ))}
-              {isTyping && (
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="bg-gray-100 rounded-2xl rounded-tl-none px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </>
-          )}
-        </div>
-
-        {/* 输入区域 */}
-        <div className="px-6 py-4 border-t border-border-default bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 relative">
+          {/* 搜索入口 */}
+          <div className="px-4 py-3 border-t border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="输入您的问题，例如：抵押物覆盖率够不够？"
-                className="w-full px-4 py-3 bg-white border border-border-default rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
+                placeholder="搜索文档..."
+                className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 outline-none focus:border-blue-300"
               />
             </div>
-            <button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-                input.trim()
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/30'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              <Send className="w-5 h-5" />
-            </button>
+          </div>
+        </div>
+
+        {/* 右侧：对话区域 */}
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[500px] lg:min-h-0">
+          {/* 状态指示 */}
+          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <FileSearch className="h-4 w-4" />
+              <span>基于 5 份文档分析</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-lg">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-xs text-green-700 font-medium">AI 在线</span>
+            </div>
+          </div>
+
+          {/* 消息区域 */}
+          <div className="flex-1 overflow-auto p-6 space-y-4">
+            {chatMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center mb-4">
+                  <Sparkles className="h-6 w-6 text-blue-600" />
+                </div>
+                <h3 className="text-base font-medium text-gray-900 mb-2">我是您的风险分析助手</h3>
+                <p className="text-sm text-gray-500 max-w-md mb-6">
+                  您可以向我提问关于这笔贷款的任何问题，我会基于尽调报告、财务数据等文档进行分析。
+                </p>
+
+                {/* 分组快捷问题 */}
+                <div className="space-y-4 w-full max-w-lg">
+                  {quickQuestionGroups.map((group) => (
+                    <div key={group.title}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <group.icon className="h-4 w-4 text-gray-400" />
+                        <span className="text-xs font-medium text-gray-500">{group.title}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {group.questions.map((q, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleQuickQuestion(q)}
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-700 transition-colors"
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {chatMessages.map((msg) => (
+                  <MessageBubble key={msg.id} message={msg} />
+                ))}
+                {isTyping && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="bg-gray-100 rounded-lg rounded-tl-none px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </div>
+
+          {/* 输入区域 */}
+          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                  placeholder="输入您的问题..."
+                  className="w-full rounded-lg border border-gray-200 bg-white py-2.5 px-4 text-sm text-gray-700 placeholder:text-gray-400 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${
+                  input.trim()
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -197,18 +248,40 @@ export function RiskChat() {
 }
 
 // 文档项组件
-function DocumentItem({ title, pages }: { title: string; pages: number }) {
+function DocumentItem({
+  title,
+  pages,
+  hits,
+  active = false,
+}: {
+  title: string;
+  pages: number;
+  hits: number;
+  active?: boolean;
+}) {
   return (
-    <div className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer group">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-          <FileText className="w-5 h-5 text-blue-600" />
+    <div
+      className={`p-3 rounded-lg transition-colors cursor-pointer group ${
+        active ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 hover:bg-gray-100'
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+          active ? 'bg-blue-100' : 'bg-gray-200 group-hover:bg-gray-300'
+        }`}>
+          <FileText className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
         </div>
-        <div className="flex-1">
-          <p className="font-medium text-gray-800">{title}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{title}</p>
           <p className="text-xs text-gray-500">{pages} 页</p>
         </div>
-        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+        {hits > 0 && (
+          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+            active ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+          }`}>
+            {hits} 命中
+          </span>
+        )}
       </div>
     </div>
   );
@@ -221,20 +294,18 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-        isUser
-          ? 'bg-gradient-to-br from-blue-500 to-cyan-500'
-          : 'bg-gradient-to-br from-purple-500 to-pink-500'
+        isUser ? 'bg-gray-200' : 'bg-blue-100'
       }`}>
         {isUser ? (
-          <User className="w-4 h-4 text-white" />
+          <User className="h-4 w-4 text-gray-600" />
         ) : (
-          <Bot className="w-4 h-4 text-white" />
+          <Bot className="h-4 w-4 text-blue-600" />
         )}
       </div>
       <div className={`max-w-[70%] ${isUser ? 'text-right' : ''}`}>
-        <div className={`rounded-2xl px-4 py-3 ${
+        <div className={`rounded-lg px-4 py-3 ${
           isUser
-            ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-tr-none'
+            ? 'bg-blue-600 text-white rounded-tr-none'
             : 'bg-gray-100 text-gray-800 rounded-tl-none'
         }`}>
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -260,7 +331,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 // 引用来源组件
 function ReferenceChip({ reference }: { reference: DocumentReference }) {
   return (
-    <button className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-border-default rounded-lg text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors">
+    <button className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors">
       <ExternalLink className="w-3 h-3" />
       <span>{reference.documentName} P{reference.pageNumber}</span>
     </button>
@@ -296,10 +367,10 @@ function generateAIResponse(question: string): ChatMessage {
 3. 建议追加实控人个人资产作为补充担保`,
     '风险变化': `**近期风险变化汇总：**
 
-🔴 高风险：
+高风险：
 - 新增被执行人信息，涉案金额120万元
 
-🟡 中风险：
+中风险：
 - 财务总监离职
 - 应收账款周转天数延长
 
@@ -309,7 +380,6 @@ function generateAIResponse(question: string): ChatMessage {
 3. 加强贷后监控频率`,
   };
 
-  // 简单匹配
   let content = '我正在分析您的问题，请稍等...';
   for (const [key, value] of Object.entries(responses)) {
     if (question.includes(key)) {

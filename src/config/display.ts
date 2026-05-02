@@ -150,9 +150,9 @@ export const checkConclusionConfig = {
 export const fileTypeConfig = {
   pdf: { emoji: '📄', bg: 'bg-red-50', label: 'PDF' },
   excel: { emoji: '📊', bg: 'bg-green-50', label: 'Excel' },
-  image: { emoji: '🖼️', bg: 'bg-purple-50', label: '图片' },
+  image: { emoji: '🖼️', bg: 'bg-blue-50', label: '图片' },
   audio: { emoji: '🎵', bg: 'bg-blue-50', label: '音频' },
-  api: { emoji: '🔗', bg: 'bg-cyan-50', label: 'API' },
+  api: { emoji: '🔗', bg: 'bg-blue-50', label: 'API' },
 } as const;
 
 // --- 数据源连接状态（语义色点 + 文案，避免彩虹背景块）---
@@ -198,7 +198,7 @@ export const cotPhaseConfig = {
   ingest: { label: '文件接收', color: 'bg-gray-400' },
   classify: { label: '智能分类', color: 'bg-[var(--risk-info)]' },
   extract: { label: '信息提取', color: 'bg-blue-500' },
-  validate: { label: '钩稽校验', color: 'bg-indigo-500' },
+  validate: { label: '钩稽校验', color: 'bg-blue-600' },
   analyze: { label: '风险分析', color: 'bg-[var(--risk-medium)]' },
   conclude: { label: '生成结论', color: 'bg-[var(--risk-low)]' },
 } as const;

@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import { usePostLoanStore } from '../../../stores';
 import { formatAmount } from '../../../utils';
-import { warningLevelConfig, warningSourceConfig, warningStatusConfig } from '../../../config/display';
-import { StatusBadge } from '../../../components/ui';
+import { warningLevelConfig } from '../../../config/display';
+import { PageHeader, SectionHeader } from '../../../components/ui';
 import type { WarningStatus, RiskEventTimeline } from '../../../types';
 
 export function RiskTracking() {
@@ -38,221 +38,230 @@ export function RiskTracking() {
 
   if (!currentWarning) {
     return (
-      <div className="flex items-center justify-center h-[600px]">
-        <p className="text-gray-500">请选择预警信号查看详情</p>
+      <div className="rounded-2xl border border-gray-200 bg-white p-12">
+        <p className="text-center text-gray-500">请选择预警信号查看详情</p>
       </div>
     );
   }
 
   const levelC = warningLevelConfig[currentWarning.level];
-  const sourceC = warningSourceConfig[currentWarning.type];
 
   return (
-    <div className="min-h-screen bg-surface-page p-8 space-y-8 animate-fade-in-up">
-      {/* 页面头部 */}
-      <div className="relative overflow-hidden rounded-2xl bg-[#1E40AF] p-8">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-30" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+    <div className="space-y-6 animate-fade-in-up">
+      {/* 页头 */}
+      <PageHeader
+        title={currentWarning.title}
+        subtitle={currentWarning.enterpriseName}
+        icon={AlertTriangle}
+        secondaryActions={
+          <button
+            onClick={() => navigate('/post-loan/dashboard')}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            返回预警工作台
+          </button>
+        }
+        kpis={[
+          { label: levelC.label, value: '', variant: currentWarning.level === 'high' ? 'danger' : currentWarning.level === 'medium' ? 'warning' : 'success' },
+        ]}
+      />
 
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/post-loan/dashboard')}
-              className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-all">
-              <ArrowLeft className="w-6 h-6 text-white" />
-            </button>
-            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <AlertTriangle className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-semibold text-white">{currentWarning.title}</h2>
-              <p className="text-white/80 text-sm mt-1">{currentWarning.enterpriseName}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`px-4 py-2.5 rounded-xl text-sm font-medium ${levelC.bg} ${levelC.text}`}>
-              {levelC.label}
-            </span>
-            <span className="px-4 py-2.5 bg-white/20 backdrop-blur-sm rounded-xl text-sm font-medium text-white border border-white/30">
-              {sourceC.label}
-            </span>
-            <StatusBadge status={currentWarning.status} config={warningStatusConfig} className="px-4 py-2.5 rounded-xl text-sm font-medium bg-white text-[#1F2937]" />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-8">
-        <div className="space-y-8">
-          <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-xl bg-brand-bg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-brand" />
+      {/* 主内容 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_360px] gap-6">
+        {/* 预警详情 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <SectionHeader
+            icon={FileText}
+            title="预警详情"
+            subtitle="信号基本信息"
+            className="px-5 pt-5"
+          />
+          <div className="px-5 pb-5">
+            <div className="space-y-3">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">预警描述</p>
+                <p className="text-sm text-gray-900">{currentWarning.description}</p>
               </div>
-              <h3 className="text-lg font-semibold text-[#1F2937]">预警详情</h3>
-            </div>
-            <div className="space-y-4">
-              <div className="p-4 bg-[#F9FAFB] rounded-xl border border-border-default">
-                <p className="text-sm text-[#6B7280] mb-1 font-medium">预警描述</p>
-                <p className="text-sm text-[#1F2937]">{currentWarning.description}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-[#F9FAFB] rounded-xl border border-border-default">
-                  <p className="text-sm text-[#6B7280] mb-1 font-medium">数据来源</p>
-                  <p className="text-sm font-medium text-[#1F2937]">{currentWarning.source}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">数据来源</p>
+                  <p className="text-sm font-medium text-gray-900">{currentWarning.source}</p>
                 </div>
-                <div className="p-4 bg-[#F9FAFB] rounded-xl border border-border-default">
-                  <p className="text-sm text-[#6B7280] mb-1 font-medium">发现时间</p>
-                  <p className="text-sm font-medium text-[#1F2937]">{currentWarning.detectedAt}</p>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">发现时间</p>
+                  <p className="text-sm font-medium text-gray-900">{currentWarning.detectedAt}</p>
                 </div>
               </div>
-              <div className="p-4 bg-[#FEE2E2] rounded-xl border border-[#FECACA]">
-                <p className="text-sm text-[#6B7280] mb-1 font-medium">风险影响</p>
-                <p className="text-sm text-[#991B1B] font-medium">{currentWarning.impact}</p>
+              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-xs text-gray-500 mb-1">风险影响</p>
+                <p className="text-sm text-red-700 font-medium">{currentWarning.impact}</p>
               </div>
-              <div className="p-4 bg-[#D1FAE5] rounded-xl border border-[#A7F3D0]">
-                <p className="text-sm text-[#6B7280] mb-1 font-medium">处置建议</p>
-                <p className="text-sm text-[#065F46] font-medium">{currentWarning.suggestion}</p>
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-xs text-gray-500 mb-1">处置建议</p>
+                <p className="text-sm text-green-700 font-medium">{currentWarning.suggestion}</p>
               </div>
             </div>
           </div>
+        </section>
 
-          <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-xl bg-brand-bg flex items-center justify-center">
-                <Banknote className="w-6 h-6 text-brand" />
+        {/* 处置时间线 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <SectionHeader
+            icon={Clock}
+            title="处置时间线"
+            subtitle="处理记录"
+            className="px-5 pt-5"
+            actions={
+              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-200 transition-colors">
+                <Plus className="w-3 h-3" />
+                添加记录
+              </button>
+            }
+          />
+          <div className="px-5 pb-5">
+            {currentEvent?.timeline && currentEvent.timeline.length > 0 ? (
+              <div className="space-y-3">
+                {currentEvent.timeline.map((item, index) => (
+                  <TimelineItem key={item.id} item={item} index={index} />
+                ))}
               </div>
-              <h3 className="text-lg font-semibold text-[#1F2937]">关联贷款</h3>
-            </div>
-            <div className="p-4 bg-[#F9FAFB] rounded-xl border border-border-default">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-[#6B7280]" />
-                  <span className="text-sm font-medium text-[#1F2937]">{currentWarning.enterpriseName}</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#6B7280]">{currentWarning.relatedLoan.type}</span>
-                <span className="text-lg font-semibold text-[#1F2937]">{formatAmount(currentWarning.relatedLoan.amount / 10000)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-warning-bg flex items-center justify-center">
-                <Clock className="w-6 h-6 text-warning" />
-              </div>
-              <h3 className="text-lg font-semibold text-[#1F2937]">处置时间线</h3>
-            </div>
-            <button className="flex items-center gap-1.5 px-4 py-2 bg-[#DBEAFE] text-[#1E40AF] rounded-xl text-sm font-medium transition-all hover:bg-[#93C5FD]">
-              <Plus className="w-4 h-4" />
-              添加记录
-            </button>
-          </div>
-          <div className="space-y-4">
-            {currentEvent?.timeline.map((item, index) => (
-              <TimelineItem key={item.id} item={item} index={index} />
-            ))}
-            {(!currentEvent || currentEvent.timeline.length === 0) && (
-              <div className="p-6 bg-[#F9FAFB] rounded-xl text-center border border-border-default">
-                <p className="text-[#6B7280]">暂无处置记录</p>
+            ) : (
+              <div className="p-6 bg-gray-50 rounded-lg text-center">
+                <p className="text-gray-500">暂无处置记录</p>
               </div>
             )}
           </div>
-        </div>
+        </section>
 
-        <div className="space-y-8">
-          <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-xl bg-success-bg flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-success" />
+        {/* 右侧：状态变更 + 快捷操作 */}
+        <div className="space-y-6">
+          {/* 关联贷款 */}
+          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <SectionHeader
+              icon={Banknote}
+              title="关联贷款"
+              subtitle="相关授信信息"
+              className="px-5 pt-5"
+            />
+            <div className="px-5 pb-5">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-900">{currentWarning.enterpriseName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">{currentWarning.relatedLoan.type}</span>
+                  <span className="text-lg font-semibold text-gray-900">{formatAmount(currentWarning.relatedLoan.amount / 10000)}</span>
+                </div>
               </div>
-              <h3 className="text-lg font-semibold text-[#1F2937]">状态变更</h3>
             </div>
-            <div className="space-y-3">
-              <button onClick={() => handleStatusChange('processing')}
-                className={`w-full p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
-                  currentWarning.status === 'processing'
-                    ? 'border-[#3B82F6] bg-[#DBEAFE]'
-                    : 'border-border-default bg-[#F9FAFB] hover:border-[#93C5FD]'
-                }`}>
-                <Clock className="w-5 h-5 text-[#1E40AF]" />
-                <span className="font-medium text-[#1F2937]">标记为处理中</span>
-              </button>
-              <button onClick={() => handleStatusChange('resolved')}
-                className={`w-full p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
-                  currentWarning.status === 'resolved'
-                    ? 'border-[#10B981] bg-[#D1FAE5]'
-                    : 'border-border-default bg-[#F9FAFB] hover:border-[#6EE7B7]'
-                }`}>
-                <CheckCircle2 className="w-5 h-5 text-[#059669]" />
-                <span className="font-medium text-[#1F2937]">标记为已解决</span>
-              </button>
-              <button onClick={() => handleStatusChange('ignored')}
-                className={`w-full p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
-                  currentWarning.status === 'ignored'
-                    ? 'border-[#6B7280] bg-[#F3F4F6]'
-                    : 'border-border-default bg-[#F9FAFB] hover:border-border-default'
-                }`}>
-                <XCircle className="w-5 h-5 text-[#6B7280]" />
-                <span className="font-medium text-[#1F2937]">忽略预警</span>
-              </button>
-            </div>
-          </div>
+          </section>
 
-          <div className="bg-white rounded-2xl border border-border-default p-6 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-xl bg-brand-bg flex items-center justify-center">
-                <MessageSquare className="w-6 h-6 text-brand" />
+          {/* 状态变更 */}
+          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <SectionHeader
+              icon={CheckCircle2}
+              title="状态变更"
+              subtitle="更新预警状态"
+              className="px-5 pt-5"
+            />
+            <div className="px-5 pb-5">
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleStatusChange('processing')}
+                  className={`w-full p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
+                    currentWarning.status === 'processing'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-gray-50 hover:border-blue-200'
+                  }`}
+                >
+                  <Clock className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-900">标记为处理中</span>
+                </button>
+                <button
+                  onClick={() => handleStatusChange('resolved')}
+                  className={`w-full p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
+                    currentWarning.status === 'resolved'
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-gray-200 bg-gray-50 hover:border-green-200'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-gray-900">标记为已解决</span>
+                </button>
+                <button
+                  onClick={() => handleStatusChange('ignored')}
+                  className={`w-full p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
+                    currentWarning.status === 'ignored'
+                      ? 'border-gray-500 bg-gray-100'
+                      : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                  }`}
+                >
+                  <XCircle className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-900">忽略预警</span>
+                </button>
               </div>
-              <h3 className="text-lg font-semibold text-[#1F2937]">快捷操作</h3>
             </div>
-            <div className="space-y-3">
-              <button onClick={() => navigate(`/post-loan/check?enterprise=${currentWarning.enterpriseId}`)}
-                className="w-full p-4 bg-brand-bg rounded-xl border border-[#93C5FD] transition-all flex items-center justify-between group">
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-[#1E40AF]" />
-                  <span className="font-medium text-[#1F2937]">发起贷后检查</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#1F2937]" />
-              </button>
-              <button className="w-full p-4 bg-brand-bg rounded-xl border border-[#93C5FD] transition-all flex items-center justify-between group">
-                <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-[#1E40AF]" />
-                  <span className="font-medium text-[#1F2937]">约谈客户</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#1F2937]" />
-              </button>
-              <button className="w-full p-4 bg-warning-bg rounded-xl border border-[#FCD34D] transition-all flex items-center justify-between group">
-                <div className="flex items-center gap-3">
-                  <TrendingUp className="w-5 h-5 text-[#D97706]" />
-                  <span className="font-medium text-[#1F2937]">调整风险评级</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#1F2937]" />
-              </button>
+          </section>
+
+          {/* 快捷操作 */}
+          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <SectionHeader
+              icon={MessageSquare}
+              title="快捷操作"
+              subtitle="后续处理"
+              className="px-5 pt-5"
+            />
+            <div className="px-5 pb-5">
+              <div className="space-y-2">
+                <button
+                  onClick={() => navigate(`/post-loan/check?enterprise=${currentWarning.enterpriseId}`)}
+                  className="w-full p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center justify-between hover:bg-blue-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-gray-900">发起贷后检查</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+                <button className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">约谈客户</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+                <button className="w-full p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center justify-between hover:bg-amber-100 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-amber-600" />
+                    <span className="text-sm font-medium text-gray-900">调整风险评级</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>
   );
 }
 
-function TimelineItem({ item, index }: { item: RiskEventTimeline; index: number }) {
+function TimelineItem({ item }: { item: RiskEventTimeline; index: number }) {
   return (
-    <div className="flex items-start gap-4 animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
-      <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center">
-        <Clock className="w-5 h-5 text-brand" />
+    <div className="flex items-start gap-3">
+      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+        <Clock className="w-4 h-4 text-blue-600" />
       </div>
-      <div className="flex-1 p-4 bg-[#F9FAFB] rounded-xl border border-border-default">
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-medium text-[#1F2937]">{item.action}</p>
-          <p className="text-xs text-[#6B7280]">{item.timestamp}</p>
+      <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-sm font-medium text-gray-900">{item.action}</p>
+          <p className="text-xs text-gray-500">{item.timestamp}</p>
         </div>
-        <p className="text-sm text-[#4B5563]">操作人：{item.operator}</p>
+        <p className="text-xs text-gray-600">操作人：{item.operator}</p>
         {item.remark && (
-          <p className="text-sm text-[#6B7280] mt-2 bg-white p-3 rounded-xl border border-border-default">{item.remark}</p>
+          <p className="text-xs text-gray-500 mt-2 bg-white p-2 rounded">{item.remark}</p>
         )}
       </div>
     </div>

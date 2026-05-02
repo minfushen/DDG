@@ -1,12 +1,12 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Target, Gauge, Shield, AlertTriangle, Network, X, MapPin, User } from 'lucide-react';
+import { ArrowRight, Target, Shield, AlertTriangle, Network, X } from 'lucide-react';
 import { useState } from 'react';
 import { useDueDiligenceStore } from '../../stores';
 import { mockRelationshipData, mockRiskAssessment } from '../../services/mockData';
 import { RadarChart, KnowledgeGraph } from '../../components/charts';
+import { PageHeader, SectionHeader } from '../../components/ui';
 import { riskLevelConfig } from '../../config/display';
 
-// 知识图谱类别标签
 const CATEGORY_LABELS: Record<number, string> = {
   0: '目标企业',
   1: '自然人',
@@ -31,218 +31,195 @@ export function Analysis() {
   const getCategoryLabel = (category: number) => CATEGORY_LABELS[category] ?? '其他';
 
   return (
-    <div className="min-h-screen bg-surface-page">
-      <div className="p-8 space-y-8">
+    <div className="space-y-6 animate-fade-in-up">
+      {/* 页头 */}
+      <PageHeader
+        title="智能分析"
+        subtitle={currentEnterprise?.name || '企业风险分析'}
+        icon={Network}
+        primaryAction={
+          <button
+            onClick={handleNextStep}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            生成尽调报告
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        }
+        kpis={[
+          { label: '综合评分', value: assessment.overallScore },
+          { label: '风险等级', value: levelC.label, variant: assessment.riskLevel === 'high' ? 'danger' : assessment.riskLevel === 'medium' ? 'warning' : 'success' },
+        ]}
+      />
 
-        {/* 企业信息头部 */}
-        {currentEnterprise && (
-          <div className="relative overflow-hidden rounded-2xl bg-[#1E40AF] p-8">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-30" />
-            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-
-            <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <Network className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-semibold text-white mb-2">{currentEnterprise.name}</h1>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/80">
-                    <span className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-                      统一社会信用代码：{currentEnterprise.unifiedSocialCreditCode}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <User className="w-4 h-4" /> {currentEnterprise.legalPerson}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" /> {currentEnterprise.region}
-                    </span>
-                  </div>
-                </div>
+      {/* 结论与评级 */}
+      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* 风险等级 */}
+            <div className={`p-5 rounded-xl ${levelC.bg} border-2 ${levelC.border || 'border-transparent'}`}>
+              <p className="text-sm text-gray-600 mb-2">风险等级</p>
+              <div className="flex items-center justify-between">
+                <span className={`px-3 py-1 rounded-lg text-sm font-medium ${levelC.bg} ${levelC.text}`}>
+                  {levelC.label}
+                </span>
+                <span className="text-3xl font-semibold text-gray-900">{assessment.overallScore}</span>
               </div>
-              <button onClick={handleNextStep}
-                className="group inline-flex items-center gap-3 rounded-xl bg-white px-6 py-3.5 text-sm font-medium text-[#1E40AF] hover:shadow-xl transition-all duration-300">
-                生成尽调报告
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
+              <div className="mt-4 h-2 bg-white rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${levelC.gradientClass} rounded-full`}
+                  style={{ width: `${assessment.overallScore}%` }}
+                />
+              </div>
             </div>
-          </div>
-        )}
 
-        <div className="grid grid-cols-3 gap-8">
-          {/* 左侧：雷达图 + 风险评分 */}
-          <div className="space-y-8">
-            {/* 企业画像评分 */}
-            <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-              <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center">
-                  <Target className="w-5 h-5 text-brand" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-[#1F2937]">企业画像评分</h3>
-                  <p className="text-sm text-[#6B7280]">多维度综合评估</p>
+            {/* 分项评分 */}
+            {[
+              { label: '经营评分', value: assessment.businessScore },
+              { label: '财务评分', value: assessment.financialScore },
+              { label: '行业评分', value: assessment.industryScore },
+            ].map((item) => (
+              <div key={item.label} className="p-5 rounded-xl bg-gray-50 border border-gray-200">
+                <p className="text-sm text-gray-500 mb-2">{item.label}</p>
+                <p className="text-2xl font-semibold text-gray-900">{item.value}</p>
+                <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 rounded-full"
+                    style={{ width: `${item.value}%` }}
+                  />
                 </div>
               </div>
-              <div className="p-6">
-                <RadarChart data={[
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 图谱与详情 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+        {/* 知识图谱 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <SectionHeader
+            icon={Network}
+            title="股权与担保穿透网络"
+            subtitle="点击节点查看详情"
+            className="px-6 pt-6"
+            actions={
+              <div className="flex items-center gap-4 text-xs">
+                {[
+                  { color: '#1E40AF', label: '目标' },
+                  { color: '#059669', label: '自然人' },
+                  { color: '#D97706', label: '关联方' },
+                  { color: '#DC2626', label: '担保方' },
+                ].map((l) => (
+                  <div key={l.label} className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: l.color }} />
+                    <span className="text-gray-500">{l.label}</span>
+                  </div>
+                ))}
+              </div>
+            }
+          />
+          <div className="px-6 pb-6">
+            <KnowledgeGraph
+              nodes={mockRelationshipData.nodes}
+              links={mockRelationshipData.links}
+              onNodeClick={handleNodeClick}
+              height={380}
+            />
+          </div>
+        </section>
+
+        {/* 右侧：雷达图 + 详情 */}
+        <div className="space-y-6">
+          {/* 企业画像评分 */}
+          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <SectionHeader
+              icon={Target}
+              title="企业画像评分"
+              subtitle="多维度评估"
+              className="px-5 pt-5"
+            />
+            <div className="px-5 pb-5">
+              <RadarChart
+                data={[
                   { name: '经营能力', value: assessment.businessScore },
                   { name: '财务健康', value: assessment.financialScore },
                   { name: '行业前景', value: assessment.industryScore },
                   { name: '信用记录', value: 75 },
                   { name: '担保能力', value: 68 },
-                ]} />
-              </div>
+                ]}
+              />
             </div>
+          </section>
 
-            {/* 风险等级 */}
-            <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-              <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-warning-bg flex items-center justify-center">
-                  <Gauge className="w-5 h-5 text-warning" />
-                </div>
+          {/* 节点详情 */}
+          {selectedNode && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-[#1F2937]">风险等级</h3>
-                  <p className="text-sm text-[#6B7280]">综合风险评级</p>
-                </div>
-              </div>
-              <div className="p-6 space-y-6">
-                {/* 总评分 */}
-                <div className={`p-6 rounded-xl ${levelC.bg} border-2 ${levelC.border || 'border-transparent'}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className={`px-4 py-2 rounded-xl text-sm font-medium ${levelC.bg} ${levelC.text}`}>
-                      {levelC.label}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-900">{selectedNode.name}</span>
+                    <span className="text-xs font-medium text-blue-700 bg-white px-2 py-0.5 rounded">
+                      {getCategoryLabel(selectedNode.category)}
                     </span>
-                    <span className="text-4xl font-semibold text-[#1F2937]">{assessment.overallScore}</span>
                   </div>
-                  <div className="h-4 bg-white rounded-full overflow-hidden shadow-inner">
-                    <div className={`h-full ${levelC.gradientClass} rounded-full transition-all duration-500`}
-                      style={{ width: `${assessment.overallScore}%` }} />
-                  </div>
+                  {selectedNode.value && (
+                    <p className="text-xs text-gray-600">关联强度：{selectedNode.value}/100</p>
+                  )}
                 </div>
-
-                {/* 分项评分 */}
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { label: '经营评分', value: assessment.businessScore },
-                    { label: '财务评分', value: assessment.financialScore },
-                    { label: '行业评分', value: assessment.industryScore },
-                  ].map((item) => (
-                    <div key={item.label} className="p-4 bg-[#F9FAFB] rounded-xl border border-border-default text-center">
-                      <p className="text-xs text-[#6B7280] mb-2 font-medium">{item.label}</p>
-                      <p className="text-2xl font-semibold text-[#1F2937]">{item.value}</p>
-                      <div className="mt-3 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#1E40AF] rounded-full" style={{ width: `${item.value}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <button
+                  onClick={() => setSelectedNode(null)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             </div>
-          </div>
-
-          {/* 右侧：知识图谱 */}
-          <div className="col-span-2">
-            <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-              <div className="px-6 py-5 border-b border-border-default flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center">
-                    <Network className="w-5 h-5 text-brand" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-[#1F2937]">股权与担保穿透网络</h3>
-                    <p className="text-sm text-[#6B7280]">关系图谱可视化 — 点击节点查看详情</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  {[
-                    { color: '#1E40AF', label: '目标' },
-                    { color: '#059669', label: '自然人' },
-                    { color: '#D97706', label: '关联方' },
-                    { color: '#DC2626', label: '担保方' },
-                  ].map((l) => (
-                    <div key={l.label} className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: l.color }} />
-                      <span className="text-[#6B7280] text-xs font-medium">{l.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="p-6">
-                <KnowledgeGraph
-                  nodes={mockRelationshipData.nodes}
-                  links={mockRelationshipData.links}
-                  onNodeClick={handleNodeClick}
-                  height={420}
-                />
-                {selectedNode && (
-                  <div className="mt-6 p-5 bg-[#DBEAFE] rounded-xl border-2 border-[#93C5FD] flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center flex-shrink-0">
-                      <Network className="w-5 h-5 text-brand" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-[#1F2937]">{selectedNode.name}</span>
-                        <span className="text-xs font-medium text-[#1E40AF] bg-white px-2.5 py-1 rounded-lg">
-                          {getCategoryLabel(selectedNode.category)}
-                        </span>
-                      </div>
-                      {selectedNode.value && (
-                        <p className="text-sm text-[#6B7280]">关联强度：{selectedNode.value}/100</p>
-                      )}
-                    </div>
-                    <button onClick={() => setSelectedNode(null)} className="text-[#6B7280] hover:text-[#1F2937] transition-colors">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
+      </div>
 
-        {/* 风险分析 */}
-        <div className="grid grid-cols-2 gap-8">
-          <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-            <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-success-bg flex items-center justify-center">
-                <Shield className="w-5 h-5 text-success" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-[#1F2937]">智能风险短评</h3>
-                <p className="text-sm text-[#6B7280]">AI 生成的风险分析摘要</p>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="p-6 bg-gradient-to-br from-[#F9FAFB] to-[#F3F4F6] rounded-xl border-2 border-border-default">
-                <p className="text-[#374151] leading-relaxed">{assessment.riskSummary}</p>
-              </div>
+      {/* 风险摘要与风险因素 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 智能风险短评 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <SectionHeader
+            icon={Shield}
+            title="智能风险短评"
+            subtitle="AI 生成的风险分析摘要"
+            className="px-6 pt-6"
+            variant="success"
+          />
+          <div className="px-6 pb-6">
+            <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
+              <p className="text-gray-700 leading-relaxed text-sm">{assessment.riskSummary}</p>
             </div>
           </div>
+        </section>
 
-          <div className="bg-white rounded-2xl border border-border-default overflow-hidden">
-            <div className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-danger-bg flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-danger" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-[#1F2937]">主要风险因素</h3>
-                <p className="text-sm text-[#6B7280]">需重点关注的风险点</p>
-              </div>
-            </div>
-            <div className="p-6 space-y-4">
+        {/* 主要风险因素 */}
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <SectionHeader
+            icon={AlertTriangle}
+            title="主要风险因素"
+            subtitle="需重点关注的风险点"
+            className="px-6 pt-6"
+            variant="risk"
+          />
+          <div className="px-6 pb-6">
+            <div className="space-y-3">
               {assessment.riskFactors.map((factor, index) => (
-                <div key={index}
-                  className="flex items-start gap-4 p-5 bg-[#FEF3C7] rounded-xl border-2 border-[#FDE68A]"
-                  style={{ animationDelay: `${index * 50}ms` }}>
-                  <div className="w-8 h-8 rounded-lg bg-warning-bg flex items-center justify-center flex-shrink-0">
-                    <AlertTriangle className="w-4 h-4 text-warning" />
-                  </div>
-                  <span className="text-[#92400E] font-medium">{factor}</span>
+                <div
+                  key={index}
+                  className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200"
+                >
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <span className="text-sm text-amber-800 font-medium">{factor}</span>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

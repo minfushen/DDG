@@ -3,6 +3,7 @@ export { StatusBadge } from './StatusBadge';
 export { StatCard } from './StatCard';
 export { PageHeader } from './PageHeader';
 export { SectionHeader } from './SectionHeader';
+export { SplitPane } from './SplitPane';
 export { ProgressBar } from './ProgressBar';
 export { EmptyState } from './EmptyState';
 export { Card } from './Card';
