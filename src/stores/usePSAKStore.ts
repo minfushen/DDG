@@ -6,10 +6,10 @@ import type {
 import {
   psakStatements, crossValidationRules,
   checklistItems, cotSteps,
-} from '../data/indonesia-story';
+} from '../data/domestic-financial-story';
 
 interface PSAKState {
-  // PSAK 三表
+  // CAS 口径三表（演示）
   statements: FinancialStatement[];
   activeTab: StatementType;
   highlightedItemId: string | null;
@@ -17,6 +17,8 @@ interface PSAKState {
   // 校验
   validations: CrossValidationResult[];
   validationRunning: boolean;
+  /** ISO 时间戳，最近一次完整跑完钩稽校验的时间 */
+  lastValidationAt: string | null;
 
   // 清单
   checklist: ChecklistItem[];
@@ -46,6 +48,7 @@ export const usePSAKStore = create<PSAKState>((set, get) => ({
 
   validations: crossValidationRules.map((rule) => ({ ...rule, status: 'pending' as const })),
   validationRunning: false,
+  lastValidationAt: null,
 
   checklist: checklistItems,
   checklistFilter: null,
@@ -81,9 +84,12 @@ export const usePSAKStore = create<PSAKState>((set, get) => ({
           }),
         }));
 
-        // 最后一条完成后标记结束
+        // 最后一条完成后标记结束并记录时间
         if (index === validations.length - 1) {
-          setTimeout(() => set({ validationRunning: false }), 200);
+          setTimeout(() => set({
+            validationRunning: false,
+            lastValidationAt: new Date().toISOString(),
+          }), 200);
         }
       }, (index + 1) * 800);
     });
@@ -92,6 +98,7 @@ export const usePSAKStore = create<PSAKState>((set, get) => ({
   resetValidation: () => set({
     validations: crossValidationRules.map((rule) => ({ ...rule, status: 'pending' as const })),
     validationRunning: false,
+    lastValidationAt: null,
   }),
 
   runCoT: () => {

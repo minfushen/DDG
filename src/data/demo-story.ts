@@ -1,7 +1,28 @@
 // ========================================
 // 演示故事线数据 — 以"浙江华创科技"为中心的完整演示闭环
 // 贷前(尽调→报告) → 贷中(审批→合同) → 贷后(预警→追踪)
+// 财务口径与 demo-financial-canonical 绑定（勿在此处手写万元金额）
 // ========================================
+
+import {
+  DEMO_FINANCIALS,
+  fmtRatio1,
+  revenueCagr3yPercent,
+  IDX,
+} from './demo-financial-canonical';
+import {
+  reportSection2OperatingHtml,
+  reportSection2OperatingRefs,
+  reportSection3FinancialHtml,
+  reportSection3FinancialRefs,
+} from './demo-report-financial-sections';
+
+const AL_LATEST = DEMO_FINANCIALS.assetLiabilityRatio[IDX.latest];
+
+/** 报告内溯源高亮：仅包可核对证据的片段；定性句、清单条款、程序性文字保持正文 */
+function hl(ref: string, inner: string): string {
+  return `<span class="highlight" data-ref="${ref}">${inner}</span>`;
+}
 
 export const demoStory = {
   // === 企业信息 ===
@@ -21,21 +42,9 @@ export const demoStory = {
     employeeCount: 186,
     businessScope: '软件开发、信息系统集成服务、信息技术咨询服务、数据处理和存储服务',
 
-    // 财务数据（含3年对比）
-    financials: {
-      years: [2021, 2022, 2023],
-      revenue: [5860, 7250, 8965],          // 万元
-      netProfit: [520, 680, 895],           // 万元
-      totalAssets: [8920, 10850, 12568],     // 万元
-      totalLiabilities: [5350, 6740, 7540],  // 万元
-      netAssets: [3570, 4110, 5028],         // 万元
-      assetLiabilityRatio: [60.0, 62.1, 60.0], // %
-      currentRatio: [1.72, 1.78, 1.85],
-      quickRatio: [1.35, 1.38, 1.42],
-      roe: [14.6, 16.5, 17.8],               // %
-    },
-    revenueLatest: 8965,
-    netProfitLatest: 895,
+    financials: { ...DEMO_FINANCIALS },
+    revenueLatest: DEMO_FINANCIALS.revenue[IDX.latest],
+    netProfitLatest: DEMO_FINANCIALS.netProfit[IDX.latest],
 
     // 前5大客户
     topClients: [
@@ -59,9 +68,9 @@ export const demoStory = {
     ],
     riskLevel: 'medium' as const,
     riskSummary:
-      '该企业经营状况良好，近三年营收复合增长率达23.7%，财务结构相对稳健。但存在以下需要关注的风险点：1) 资产负债率60%，处于行业中上等水平；2) 前五大客户集中度45%，存在一定客户依赖风险；3) 作为软件企业，核心研发人员稳定性对持续经营影响较大。建议在落实风险缓释措施的前提下，适度给予授信支持。',
+      `该企业经营状况良好，近三年营收复合增长率达${fmtRatio1(revenueCagr3yPercent())}%，财务结构相对稳健。但存在以下需要关注的风险点：1) 资产负债率${fmtRatio1(AL_LATEST)}%，处于行业中上等水平；2) 前五大客户集中度45%，存在一定客户依赖风险；3) 作为软件企业，核心研发人员稳定性对持续经营影响较大。建议在落实风险缓释措施的前提下，适度给予授信支持。`,
     riskFactors: [
-      '资产负债率60%，接近行业警戒线（65%）',
+      `资产负债率${fmtRatio1(AL_LATEST)}%，接近行业警戒线（65%）`,
       '前五大客户销售额占比45%，存在客户集中度风险',
       '所属软件行业技术迭代快，需关注核心竞争力持续性',
       '应收账款周转率同比下降15%，回款周期延长',
@@ -105,6 +114,7 @@ export const demoStory = {
   },
 
   // === 报告内容（含溯源引用） ===
+  // 高亮仅用于：可点击跳转证据面板的「可核对事实」— 外源文件/系统摘录的数、表、文号；非高亮为定性论述、照面展示、风险条款列举等。
   reportSections: [
     {
       id: 'section-1',
@@ -131,56 +141,47 @@ export const demoStory = {
     {
       id: 'section-2',
       title: '二、经营状况分析',
-      content: `<h3>2.1 主营业务</h3>
-<p>公司主要从事企业级软件开发与信息系统集成服务，核心产品包括：</p>
-<ul>
-<li><strong>ERP系统</strong>：面向中小制造企业的资源规划管理平台</li>
-<li><strong>CRM系统</strong>：客户关系管理与销售自动化</li>
-<li><strong>供应链管理系统</strong>：采购、库存、物流一体化管理</li>
-</ul>
-
-<h3>2.2 经营规模</h3>
-<p>2023年度实现营业收入<span class="highlight" data-ref="ref-2">8,965万元</span>，同比增长23.5%，近三年复合增长率达23.7%。其中软件产品销售收入5,380万元（占比60%），系统集成服务收入3,585万元（占比40%）。</p>
-
-<h3>2.3 客户结构</h3>
-<p>公司主要服务制造业和金融行业客户。前五大客户销售额占比约<span class="highlight" data-ref="ref-3">45%</span>，其中第一大客户浙江恒远制造占比18%，需关注客户集中度风险。</p>`,
-      sourceReferences: [
-        { id: 'ref-2', type: 'excel' as const, fileName: '2023年度审计报告-利润表', pageNumber: '3', highlightText: '营业收入8,965万元' },
-        { id: 'ref-3', type: 'excel' as const, fileName: '客户销售明细表.xlsx', pageNumber: '1', highlightText: '前5大客户集中度45%' },
-      ],
+      content: reportSection2OperatingHtml(),
+      sourceReferences: reportSection2OperatingRefs(),
     },
     {
       id: 'section-3',
-      title: '三、财务状况分析',
-      content: `<h3>3.1 资产负债情况</h3>
-<p>截至2023年12月31日，公司总资产<span class="highlight" data-ref="ref-4">12,568万元</span>，总负债7,540万元，净资产5,028万元。资产负债率<span class="highlight" data-ref="ref-5">60.0%</span>，处于行业中上等水平。</p>
-
-<h3>3.2 盈利能力</h3>
-<p>2023年度实现净利润<span class="highlight" data-ref="ref-6">895万元</span>，净利率10.0%。净资产收益率（ROE）<span class="highlight" data-ref="ref-7">17.8%</span>，高于行业平均水平（12.5%），盈利能力良好。</p>
-
-<h3>3.3 偿债能力</h3>
-<p>流动比率<span class="highlight" data-ref="ref-8">1.85</span>，速动比率1.42，短期偿债能力良好。但应收账款周转天数从2022年的68天延长至2023年的<span class="highlight" data-ref="ref-9">82天</span>，回款效率有所下降。</p>`,
-      sourceReferences: [
-        { id: 'ref-4', type: 'pdf' as const, fileName: '2023年度审计报告.pdf', pageNumber: '12', highlightText: '总资产12,568万元' },
-        { id: 'ref-5', type: 'excel' as const, fileName: '财务分析底稿.xlsx', pageNumber: '2', highlightText: '资产负债率60.0%' },
-        { id: 'ref-6', type: 'pdf' as const, fileName: '2023年度审计报告.pdf', pageNumber: '13', highlightText: '净利润895万元' },
-        { id: 'ref-7', type: 'excel' as const, fileName: '财务分析底稿.xlsx', pageNumber: '3', highlightText: 'ROE 17.8%' },
-        { id: 'ref-8', type: 'excel' as const, fileName: '财务分析底稿.xlsx', pageNumber: '4', highlightText: '流动比率1.85' },
-        { id: 'ref-9', type: 'pdf' as const, fileName: '2023年度审计报告.pdf', pageNumber: '18', highlightText: '应收账款周转天数82天' },
-      ],
+      title: '三、财务状况与偿债能力评估',
+      content: reportSection3FinancialHtml(),
+      sourceReferences: reportSection3FinancialRefs(),
     },
     {
       id: 'section-4',
-      title: '四、风险分析与授信建议',
-      content: `<h3>4.1 主要风险点</h3>
+      title: '四、行业分析',
+      content: `<h3>4.1 行业界定与政策环境</h3>
+<p>企业主营业务归属于<strong>软件和信息技术服务业</strong>（国民经济行业分类 I65）。近年来国家持续推进数字经济与“信创”替代，政务及大中型企业的信息化投入保持了刚性需求；同时监管对数据安全、等保测评的要求趋严，客观上提高了行业准入与服务附加值。</p>
+
+<h3>4.2 市场规模与景气度</h3>
+<p>根据<span class="highlight" data-ref="ref-ind-1">《中国软件业统计公报》</span>，全国软件和信息技术服务业近年收入规模保持中高个位数增长；企业级应用软件与信息技术服务子领域增速优于行业整体。浙江省作为数字经济先行区，本地政企数字化预算相对稳定，但项目型收入占比高的企业更易受财政支出节奏影响。</p>
+
+<h3>4.3 竞争格局与企业定位</h3>
+<p>细分赛道（ERP/CRM/供应链）参与者众多，头部厂商与区域集成商并存，行业集中度逐步提升。目标企业聚焦中小企业制造与流通客户，产品标准化程度较高，与同业相比在<span class="highlight" data-ref="ref-ind-2">区域交付与客户粘性</span>上具备一定优势；短板在于品牌溢价弱于一线厂商，大单获取依赖渠道与客户关系。</p>
+
+<h3>4.4 行业评级与尽调结论摘要</h3>
+<p>结合宏观景气、细分赛道竞争强度及企业自身行业维度评分（本次模型输出<span class="highlight" data-ref="ref-ind-3">行业维度 73 分</span>，处于同业可比样本的中上区间），判断企业所处行业<strong>整体信用环境中性略偏正面</strong>，不存在系统性衰退风险，但需持续关注技术迭代与客户预算波动对收入的传导。</p>`,
+      sourceReferences: [
+        { id: 'ref-ind-1', type: 'pdf' as const, fileName: '工信部-软件和信息技术服务业统计公报.pdf', pageNumber: '6', highlightText: '行业收入增速与结构' },
+        { id: 'ref-ind-2', type: 'excel' as const, fileName: '同业对标-交付周期与客户续约率.xlsx', pageNumber: '2', highlightText: '区域交付与客户续约表现' },
+        { id: 'ref-ind-3', type: 'api' as const, fileName: '智能分析-多维评分接口', originalValue: 'industryScore=73', highlightText: '行业维度评分73分' },
+      ],
+    },
+    {
+      id: 'section-5',
+      title: '五、风险分析与授信建议',
+      content: `<h3>5.1 主要风险点</h3>
 <ol>
 <li><strong>客户集中度风险：</strong>前五大客户占比<span class="highlight" data-ref="ref-10">45%</span>，如主要客户流失将对营收产生较大影响。</li>
-<li><strong>资产负债率：</strong>负债率60%处于行业中上水平，需关注偿债压力。</li>
+<li><strong>资产负债率：</strong>负债率${hl('ref-5', `${fmtRatio1(AL_LATEST)}%`)}处于行业中上水平，需关注偿债压力。</li>
 <li><strong>行业竞争风险：</strong>软件行业技术迭代快，竞争对手众多，需持续投入研发。</li>
-<li><strong>关联担保风险：</strong>实际控制人对外担保余额约3,200万元，存在一定的或有负债风险。</li>
+<li><strong>关联担保风险：</strong>实际控制人对外担保余额约${hl('ref-fin-guar', '3,200万元')}，存在一定的或有负债风险。</li>
 </ol>
 
-<h3>4.2 风险缓释措施</h3>
+<h3>5.2 风险缓释措施</h3>
 <ol>
 <li>要求追加实际控制人张明华及其配偶连带责任保证担保</li>
 <li>设置分期放款安排，首次放款不超过授信额度的60%</li>
@@ -188,7 +189,7 @@ export const demoStory = {
 <li>贷款存续期内，企业资产负债率不得超过65%</li>
 </ol>
 
-<h3>4.3 授信建议</h3>
+<h3>5.3 授信建议</h3>
 <p>综合评估，建议给予该企业流动资金贷款授信额度<span class="highlight" data-ref="ref-11">2,000万元</span>，期限1年，利率按LPR+80BP执行。首次放款1,200万元，剩余额度根据经营指标达成情况分次提用。</p>`,
       sourceReferences: [
         { id: 'ref-10', type: 'excel' as const, fileName: '客户销售明细表.xlsx', pageNumber: '1', highlightText: '前5大客户集中度45%' },
@@ -250,7 +251,7 @@ export const demoStory = {
         category: 'financial' as const,
         condition: '资产负债率不超过65%',
         status: 'verified' as const,
-        content: '当前资产负债率为60.0%，未超过预警线。需在贷后持续监控。',
+        content: `当前资产负债率为${fmtRatio1(AL_LATEST)}%，未超过预警线。需在贷后持续监控。`,
         evidence: ['财务分析底稿.xlsx'],
         checkedAt: '2024-01-28',
         checker: '系统自动校验',
@@ -345,8 +346,9 @@ export const demoStory = {
 
   // === 贷后数据 ===
   postLoan: {
-    // 预警信号
+    // 预警信号（覆盖多家企业、多种风险类型、多种状态）
     warnings: [
+      // ---- 浙江华创科技 ----
       {
         id: 'warn-001',
         enterpriseId: 'ent-001',
@@ -354,7 +356,7 @@ export const demoStory = {
         title: '应收账款周转天数连续2月超85天',
         level: 'high' as const,
         type: 'financial' as const,
-        status: 'active' as const,
+        status: 'processing' as const,
         detectedAt: '2024-03-20 09:15:00',
         source: '行内流水智能分析',
         detail: '2024年1-2月，企业应收账款周转天数分别为87天和89天，超过预警阈值85天。主要原因为第一大客户浙江恒远制造回款延迟。',
@@ -369,7 +371,7 @@ export const demoStory = {
         title: '合同纠纷案件开庭公告',
         level: 'medium' as const,
         type: 'external' as const,
-        status: 'active' as const,
+        status: 'resolved' as const,
         detectedAt: '2024-03-15 14:30:00',
         source: '中国裁判文书网',
         detail: '杭州市滨江区人民法院公告：浙江华创科技有限公司作为被告的合同纠纷案件（案号：(2024)浙0108民初1234号）将于2024年4月10日开庭，涉案金额120万元。',
@@ -404,10 +406,129 @@ export const demoStory = {
         relatedLoan: { id: 'loan-001', type: '流动资金贷款', amount: 20000000 },
         suggestedAction: '了解新增担保背景，评估对担保能力的影响',
       },
+      // ---- 江苏恒远制造 ----
+      {
+        id: 'warn-005',
+        enterpriseId: 'ent-002',
+        enterpriseName: '江苏恒远制造有限公司',
+        title: '资产负债率突破65%警戒线',
+        level: 'high' as const,
+        type: 'financial' as const,
+        status: 'active' as const,
+        detectedAt: '2024-03-21 10:00:00',
+        source: '财务报表智能分析',
+        detail: '企业2024年Q1资产负债率达67.3%，较放款时（61.2%）上升6.1个百分点，突破65%警戒线。主要因新增设备贷款导致负债增加。',
+        relatedLoan: { id: 'loan-002', type: '设备购置贷款', amount: 15000000 },
+        suggestedAction: '要求企业提供最新财务报表，评估偿债能力变化',
+        aiAnalysis: '资产负债率持续上升，但企业主营业务收入同比增长12%，现金流尚可。建议关注其短期偿债压力，必要时追加担保措施。',
+      },
+      {
+        id: 'warn-006',
+        enterpriseId: 'ent-002',
+        enterpriseName: '江苏恒远制造有限公司',
+        title: '环保行政处罚公告',
+        level: 'medium' as const,
+        type: 'external' as const,
+        status: 'active' as const,
+        detectedAt: '2024-03-19 16:20:00',
+        source: '国家企业信用信息公示系统',
+        detail: '苏州市生态环境局对江苏恒远制造作出行政处罚决定（苏环罚字〔2024〕第023号），罚款金额25万元，原因为废水排放超标。',
+        relatedLoan: { id: 'loan-002', type: '设备购置贷款', amount: 15000000 },
+        suggestedAction: '核实环保整改情况，评估是否影响正常经营',
+      },
+      {
+        id: 'warn-007',
+        enterpriseId: 'ent-002',
+        enterpriseName: '江苏恒远制造有限公司',
+        title: '主要客户流失风险',
+        level: 'low' as const,
+        type: 'behavior' as const,
+        status: 'ignored' as const,
+        detectedAt: '2024-03-10 09:00:00',
+        source: '行业舆情监测',
+        detail: '行业媒体报道，江苏恒远制造第一大客户（占比22%）苏州精密机械可能转向其他供应商，双方合同将于2024年6月到期。',
+        relatedLoan: { id: 'loan-002', type: '设备购置贷款', amount: 15000000 },
+        suggestedAction: '关注客户续约情况，评估收入影响',
+      },
+      // ---- 宁波新材料科技 ----
+      {
+        id: 'warn-008',
+        enterpriseId: 'ent-003',
+        enterpriseName: '宁波新材料科技有限公司',
+        title: '存货周转率大幅下降',
+        level: 'high' as const,
+        type: 'financial' as const,
+        status: 'active' as const,
+        detectedAt: '2024-03-22 14:00:00',
+        source: '财务报表智能分析',
+        detail: '企业存货周转率由去年同期的4.2次下降至2.1次，降幅达50%。存货余额增至3,800万元，主要为原材料积压。',
+        relatedLoan: { id: 'loan-003', type: '流动资金贷款', amount: 10000000 },
+        suggestedAction: '现场核查存货状况，了解积压原因',
+        aiAnalysis: '存货周转恶化可能占用大量流动资金，影响还款能力。建议客户经理核实是否存在产品滞销或原材料采购过量问题。',
+      },
+      {
+        id: 'warn-009',
+        enterpriseId: 'ent-003',
+        enterpriseName: '宁波新材料科技有限公司',
+        title: '法定代表人变更',
+        level: 'medium' as const,
+        type: 'internal' as const,
+        status: 'resolved' as const,
+        detectedAt: '2024-03-12 11:30:00',
+        source: '工商数据同步',
+        detail: '企业法定代表人由李建国变更为王志强，同时注册资本由500万元增至800万元。变更原因为引入新股东。',
+        relatedLoan: { id: 'loan-003', type: '流动资金贷款', amount: 10000000 },
+        suggestedAction: '核实法人变更背景，评估对企业经营的影响',
+      },
+      {
+        id: 'warn-010',
+        enterpriseId: 'ent-003',
+        enterpriseName: '宁波新材料科技有限公司',
+        title: '关联交易异常增加',
+        level: 'medium' as const,
+        type: 'behavior' as const,
+        status: 'active' as const,
+        detectedAt: '2024-03-25 08:00:00',
+        source: '行内流水智能分析',
+        detail: '近30日内，企业向关联方宁波华鑫贸易转账累计420万元，较去年同期增长180%。关联方为实际控制人配偶持股企业。',
+        relatedLoan: { id: 'loan-003', type: '流动资金贷款', amount: 10000000 },
+        suggestedAction: '排查关联交易背景，核实是否存在资金挪用风险',
+      },
+      // ---- 杭州鼎盛贸易 ----
+      {
+        id: 'warn-011',
+        enterpriseId: 'ent-004',
+        enterpriseName: '杭州鼎盛贸易有限公司',
+        title: '经营现金流持续为负',
+        level: 'high' as const,
+        type: 'financial' as const,
+        status: 'active' as const,
+        detectedAt: '2024-03-23 10:30:00',
+        source: '财务报表智能分析',
+        detail: '企业连续3个月经营现金流为负，累计净流出680万元。主要原因是应收账款回收缓慢，同时预付账款大幅增加。',
+        relatedLoan: { id: 'loan-004', type: '流动资金贷款', amount: 8000000 },
+        suggestedAction: '立即启动专项贷后检查，核实资金流向',
+        aiAnalysis: '经营现金流持续为负是企业偿债能力下降的早期信号。当前贷款余额500万元，需重点关注其第一还款来源的稳定性。',
+      },
+      {
+        id: 'warn-012',
+        enterpriseId: 'ent-004',
+        enterpriseName: '杭州鼎盛贸易有限公司',
+        title: '实际控制人涉诉',
+        level: 'medium' as const,
+        type: 'external' as const,
+        status: 'processing' as const,
+        detectedAt: '2024-03-20 15:45:00',
+        source: '中国裁判文书网',
+        detail: '实际控制人陈志明作为被告涉及民间借贷纠纷（案号：(2024)浙0106民初5678号），涉案金额350万元。',
+        relatedLoan: { id: 'loan-004', type: '流动资金贷款', amount: 8000000 },
+        suggestedAction: '核实涉诉详情，评估对个人及企业信用的影响',
+      },
     ],
 
-    // 风险事件
+    // 风险事件（覆盖多种类型，含完整处置记录）
     riskEvents: [
+      // ---- 浙江华创科技 ----
       {
         id: 'event-001',
         warningId: 'warn-001',
@@ -430,10 +551,80 @@ export const demoStory = {
         verified: true,
         actions: ['已调取裁判文书全文', '已要求企业法务出具书面说明'],
       },
+      {
+        id: 'event-003',
+        warningId: 'warn-003',
+        enterpriseId: 'ent-001',
+        enterpriseName: '浙江华创科技有限公司',
+        type: '资金异常',
+        date: '2024-03-18',
+        description: '企业在他行贷款到期前5日收到3笔大额转账合计800万元，资金来源分散，疑似"过桥"资金归集。',
+        verified: false,
+        actions: ['已调取相关流水明细', '已要求企业说明资金用途'],
+      },
+      // ---- 江苏恒远制造 ----
+      {
+        id: 'event-004',
+        warningId: 'warn-005',
+        enterpriseId: 'ent-002',
+        enterpriseName: '江苏恒远制造有限公司',
+        type: '财务指标恶化',
+        date: '2024-03-21',
+        description: '资产负债率67.3%，突破65%警戒线。新增设备贷款1,200万元，导致负债大幅增加。',
+        verified: true,
+        actions: ['已获取最新财务报表', '已安排客户经理现场核实设备购置情况'],
+      },
+      {
+        id: 'event-005',
+        warningId: 'warn-006',
+        enterpriseId: 'ent-002',
+        enterpriseName: '江苏恒远制造有限公司',
+        type: '行政处罚',
+        date: '2024-03-19',
+        description: '苏州市生态环境局罚款25万元（废水排放超标）。企业已完成整改，正在申请复产验收。',
+        verified: true,
+        actions: ['已核实处罚详情', '已要求企业提供整改报告'],
+      },
+      // ---- 宁波新材料科技 ----
+      {
+        id: 'event-006',
+        warningId: 'warn-008',
+        enterpriseId: 'ent-003',
+        enterpriseName: '宁波新材料科技有限公司',
+        type: '存货积压',
+        date: '2024-03-22',
+        description: '存货周转率由4.2次降至2.1次，存货余额3,800万元。主要为原材料碳酸钙积压，市场需求下降导致。',
+        verified: false,
+        actions: ['已安排现场盘点存货'],
+      },
+      {
+        id: 'event-007',
+        warningId: 'warn-010',
+        enterpriseId: 'ent-003',
+        enterpriseName: '宁波新材料科技有限公司',
+        type: '关联交易异常',
+        date: '2024-03-25',
+        description: '近30日向关联方转账420万元，同比增长180%。关联方为实控人配偶持股企业，需核实交易真实性。',
+        verified: false,
+        actions: ['已要求企业提供关联交易合同及发票'],
+      },
+      // ---- 杭州鼎盛贸易 ----
+      {
+        id: 'event-008',
+        warningId: 'warn-011',
+        enterpriseId: 'ent-004',
+        enterpriseName: '杭州鼎盛贸易有限公司',
+        type: '现金流恶化',
+        date: '2024-03-23',
+        description: '连续3个月经营现金流为负，累计净流出680万元。应收账款回收缓慢，预付账款大幅增加。',
+        verified: true,
+        actions: ['已启动专项贷后检查', '已要求企业提供现金流预测'],
+      },
     ],
 
-    // 贷后检查
+    // 贷后检查（覆盖多家企业、多种类型和状态）
     checks: [
+      // ---- 浙江华创科技 ----
       {
         id: 'check-001',
         enterpriseId: 'ent-001',
@@ -456,14 +647,14 @@ export const demoStory = {
         id: 'check-002',
         enterpriseId: 'ent-001',
         enterpriseName: '浙江华创科技有限公司',
-        type: 'warning' as const,
+        type: 'triggered' as const,
         status: 'in_progress' as const,
         scheduledDate: '2024-04-01',
         reason: '应收账款预警触达，需核实回款情况',
         checker: '张经理',
         items: [
-          { name: '核查应收账款明细账', status: 'pending' as const },
-          { name: '与主要客户确认回款计划', status: 'pending' as const },
+          { name: '核查应收账款明细账', status: 'pass' as const },
+          { name: '与主要客户确认回款计划', status: 'in_progress' as const },
           { name: '评估对还款能力的影响', status: 'pending' as const },
         ],
       },
@@ -479,6 +670,88 @@ export const demoStory = {
           { name: '现场核实经营场所', status: 'pending' as const },
           { name: '检查财务报表', status: 'pending' as const },
           { name: '核查抵押物状态', status: 'pending' as const },
+        ],
+      },
+      // ---- 江苏恒远制造 ----
+      {
+        id: 'check-004',
+        enterpriseId: 'ent-002',
+        enterpriseName: '江苏恒远制造有限公司',
+        type: 'triggered' as const,
+        status: 'in_progress' as const,
+        scheduledDate: '2024-03-25',
+        reason: '资产负债率突破警戒线，需核实财务状况',
+        checker: '李经理',
+        items: [
+          { name: '核实最新财务报表', status: 'pass' as const },
+          { name: '核查设备购置凭证', status: 'in_progress' as const },
+          { name: '评估偿债能力变化', status: 'pending' as const },
+          { name: '检查环保整改进展', status: 'pending' as const },
+        ],
+      },
+      {
+        id: 'check-005',
+        enterpriseId: 'ent-002',
+        enterpriseName: '江苏恒远制造有限公司',
+        type: 'regular' as const,
+        status: 'completed' as const,
+        scheduledDate: '2024-02-15',
+        completedDate: '2024-02-16',
+        checker: '李经理',
+        result: '企业经营正常，新签订单同比增长8%。环保设施运行正常，未发现违规行为。',
+        items: [
+          { name: '现场核实经营场所', status: 'pass' as const },
+          { name: '检查财务报表', status: 'pass' as const },
+          { name: '核查环保设施运行', status: 'pass' as const },
+          { name: '访谈企业负责人', status: 'pass' as const },
+        ],
+      },
+      // ---- 宁波新材料科技 ----
+      {
+        id: 'check-006',
+        enterpriseId: 'ent-003',
+        enterpriseName: '宁波新材料科技有限公司',
+        type: 'triggered' as const,
+        status: 'pending' as const,
+        scheduledDate: '2024-04-05',
+        reason: '存货周转率大幅下降，需现场盘点',
+        checker: '王经理',
+        items: [
+          { name: '现场盘点存货', status: 'pending' as const },
+          { name: '核实存货积压原因', status: 'pending' as const },
+          { name: '评估变现能力', status: 'pending' as const },
+        ],
+      },
+      {
+        id: 'check-007',
+        enterpriseId: 'ent-003',
+        enterpriseName: '宁波新材料科技有限公司',
+        type: 'special' as const,
+        status: 'pending' as const,
+        scheduledDate: '2024-04-10',
+        reason: '关联交易异常增加，需核实交易真实性',
+        checker: '王经理',
+        items: [
+          { name: '调取关联交易合同', status: 'pending' as const },
+          { name: '核实发票及物流凭证', status: 'pending' as const },
+          { name: '评估定价公允性', status: 'pending' as const },
+        ],
+      },
+      // ---- 杭州鼎盛贸易 ----
+      {
+        id: 'check-008',
+        enterpriseId: 'ent-004',
+        enterpriseName: '杭州鼎盛贸易有限公司',
+        type: 'triggered' as const,
+        status: 'in_progress' as const,
+        scheduledDate: '2024-03-28',
+        reason: '经营现金流持续为负，需核实资金流向',
+        checker: '赵经理',
+        items: [
+          { name: '核查应收账款明细', status: 'pass' as const },
+          { name: '核实预付账款背景', status: 'in_progress' as const },
+          { name: '检查资金流向', status: 'pending' as const },
+          { name: '评估第一还款来源', status: 'pending' as const },
         ],
       },
     ],
@@ -537,32 +810,81 @@ export const demoStory = {
       },
     ],
 
-    // 预警统计
+    // 预警统计（与新增数据匹配）
     statistics: {
-      total: 24,
-      high: 3,
-      medium: 8,
-      low: 13,
-      active: 15,
-      processing: 5,
-      resolved: 3,
+      total: 12,
+      high: 4,
+      medium: 5,
+      low: 3,
+      active: 7,
+      processing: 3,
+      resolved: 2,
       ignored: 1,
     },
 
-    // 企业风险画像
-    riskProfile: {
-      overallScore: 68, // 较尽调时的72下降
-      trend: 'deteriorating' as const, // 恶化中
-      factors: [
-        { name: '应收账款质量', score: 55, trend: 'down' as const, weight: 0.25 },
-        { name: '经营稳定性', score: 72, trend: 'stable' as const, weight: 0.20 },
-        { name: '担保能力', score: 65, trend: 'down' as const, weight: 0.15 },
-        { name: '信用记录', score: 78, trend: 'stable' as const, weight: 0.20 },
-        { name: '行业环境', score: 70, trend: 'stable' as const, weight: 0.20 },
-      ],
-      lastUpdated: '2024-03-25 09:00:00',
-      updatedBy: 'AI预警引擎',
-    },
+    // 企业风险画像（覆盖多家企业）
+    riskProfiles: [
+      {
+        enterpriseId: 'ent-001',
+        enterpriseName: '浙江华创科技有限公司',
+        overallScore: 68, // 较尽调时的72下降
+        trend: 'deteriorating' as const,
+        factors: [
+          { name: '应收账款质量', score: 55, trend: 'down' as const, weight: 0.25 },
+          { name: '经营稳定性', score: 72, trend: 'stable' as const, weight: 0.20 },
+          { name: '担保能力', score: 65, trend: 'down' as const, weight: 0.15 },
+          { name: '信用记录', score: 78, trend: 'stable' as const, weight: 0.20 },
+          { name: '行业环境', score: 70, trend: 'stable' as const, weight: 0.20 },
+        ],
+        lastUpdated: '2024-03-25 09:00:00',
+        updatedBy: 'AI预警引擎',
+      },
+      {
+        enterpriseId: 'ent-002',
+        enterpriseName: '江苏恒远制造有限公司',
+        overallScore: 62,
+        trend: 'deteriorating' as const,
+        factors: [
+          { name: '偿债能力', score: 58, trend: 'down' as const, weight: 0.30 },
+          { name: '经营稳定性', score: 70, trend: 'stable' as const, weight: 0.20 },
+          { name: '合规经营', score: 55, trend: 'down' as const, weight: 0.20 },
+          { name: '信用记录', score: 72, trend: 'stable' as const, weight: 0.15 },
+          { name: '行业环境', score: 65, trend: 'stable' as const, weight: 0.15 },
+        ],
+        lastUpdated: '2024-03-21 10:30:00',
+        updatedBy: 'AI预警引擎',
+      },
+      {
+        enterpriseId: 'ent-003',
+        enterpriseName: '宁波新材料科技有限公司',
+        overallScore: 65,
+        trend: 'deteriorating' as const,
+        factors: [
+          { name: '存货管理', score: 45, trend: 'down' as const, weight: 0.25 },
+          { name: '关联交易风险', score: 50, trend: 'down' as const, weight: 0.20 },
+          { name: '经营稳定性', score: 72, trend: 'stable' as const, weight: 0.20 },
+          { name: '信用记录', score: 75, trend: 'stable' as const, weight: 0.20 },
+          { name: '行业环境', score: 68, trend: 'stable' as const, weight: 0.15 },
+        ],
+        lastUpdated: '2024-03-25 08:30:00',
+        updatedBy: 'AI预警引擎',
+      },
+      {
+        enterpriseId: 'ent-004',
+        enterpriseName: '杭州鼎盛贸易有限公司',
+        overallScore: 58,
+        trend: 'deteriorating' as const,
+        factors: [
+          { name: '现金流质量', score: 42, trend: 'down' as const, weight: 0.30 },
+          { name: '实控人风险', score: 55, trend: 'down' as const, weight: 0.20 },
+          { name: '经营稳定性', score: 65, trend: 'stable' as const, weight: 0.20 },
+          { name: '信用记录', score: 68, trend: 'stable' as const, weight: 0.15 },
+          { name: '行业环境', score: 60, trend: 'stable' as const, weight: 0.15 },
+        ],
+        lastUpdated: '2024-03-23 11:00:00',
+        updatedBy: 'AI预警引擎',
+      },
+    ],
   },
 
   // === 数据整合 ===

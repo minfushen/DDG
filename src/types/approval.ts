@@ -141,30 +141,3 @@ export interface Invoice {
   matchedTransaction?: string;
 }
 
-// 标签配置
-export const CONDITION_STATUS_LABELS: Record<ConditionStatus, string> = {
-  pending: '待核验',
-  verified: '已通过',
-  failed: '不合规',
-  waived: '已豁免',
-};
-
-export const DIFF_SEVERITY_COLORS: Record<DiffSeverity, { bg: string; text: string; border: string }> = {
-  critical: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
-  warning: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
-  info: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-};
-
-export const FUND_FLOW_RISK_COLORS: Record<FundFlowRisk, string> = {
-  normal: '#10b981',
-  suspicious: '#f59e0b',
-  violation: '#ef4444',
-};
-
-export const RISK_TYPE_LABELS: Record<RiskDelta['type'], string> = {
-  legal: '法律风险',
-  financial: '财务风险',
-  management: '管理风险',
-  operation: '经营风险',
-  market: '市场风险',
-};

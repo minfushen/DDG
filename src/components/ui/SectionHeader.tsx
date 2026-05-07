@@ -17,37 +17,37 @@ interface SectionHeaderProps {
 
 const variantStyles = {
   default: {
-    icon: 'text-blue-600',
-    title: 'text-gray-900',
-    subtitle: 'text-gray-500',
+    icon: 'text-[var(--color-primary-deep)]',
+    title: 'text-[var(--color-text-primary)]',
+    subtitle: 'text-[var(--color-text-tertiary)]',
   },
   risk: {
-    icon: 'text-red-600',
-    title: 'text-gray-900',
-    subtitle: 'text-gray-500',
+    icon: 'text-[var(--color-danger)]',
+    title: 'text-[var(--color-text-primary)]',
+    subtitle: 'text-[var(--color-text-tertiary)]',
   },
   success: {
-    icon: 'text-green-600',
-    title: 'text-gray-900',
-    subtitle: 'text-gray-500',
+    icon: 'text-[var(--color-success)]',
+    title: 'text-[var(--color-text-primary)]',
+    subtitle: 'text-[var(--color-text-tertiary)]',
   },
 } as const;
 
 const sizeStyles = {
   sm: {
-    icon: 'w-4 h-4',
-    title: 'text-base font-semibold',
+    icon: 'w-[14px] h-[14px]',
+    title: 'text-[13px] font-medium',
     gap: 'gap-2',
   },
   md: {
-    icon: 'w-5 h-5',
-    title: 'text-xl font-semibold',
-    gap: 'gap-3',
+    icon: 'w-[15px] h-[15px]',
+    title: 'text-[14px] font-medium',
+    gap: 'gap-2',
   },
   lg: {
-    icon: 'w-6 h-6',
-    title: 'text-2xl font-semibold',
-    gap: 'gap-3',
+    icon: 'w-4 h-4',
+    title: 'text-[15px] font-medium',
+    gap: 'gap-2',
   },
 } as const;
 
@@ -65,7 +65,7 @@ export function SectionHeader({
   const sizeStyle = sizeStyles[size];
 
   return (
-    <div className={`mb-8 flex items-start justify-between gap-5 ${className}`}>
+    <div className={`section-header ${className}`}>
       <div className={`flex min-w-0 items-start ${sizeStyle.gap}`}>
         <Icon
           className={`mt-0.5 shrink-0 ${sizeStyle.icon} ${variantStyle.icon}`}
@@ -73,13 +73,13 @@ export function SectionHeader({
         />
         <div>
           <div className="flex items-center gap-3">
-            <h3 className={`${sizeStyle.title} tracking-tight ${variantStyle.title}`}>
+            <h3 className={`${sizeStyle.title} ${variantStyle.title}`}>
               {title}
             </h3>
             {meta && <div className="shrink-0">{meta}</div>}
           </div>
           {subtitle && (
-            <p className={`mt-2 text-sm ${variantStyle.subtitle}`}>{subtitle}</p>
+            <p className={`mt-1 text-[12px] leading-5 ${variantStyle.subtitle}`}>{subtitle}</p>
           )}
         </div>
       </div>

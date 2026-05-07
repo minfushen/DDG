@@ -1,4 +1,9 @@
-import { useEffect, useRef } from 'react';
+import {
+  useEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import * as echarts from 'echarts';
 
 interface GraphNode {
@@ -14,28 +19,72 @@ interface GraphLink {
   relation: string;
 }
 
+const ZOOM_STEP = 1.12;
+
+export interface KnowledgeGraphRef {
+  zoomIn: () => void;
+  zoomOut: () => void;
+}
+
 interface KnowledgeGraphProps {
   nodes: GraphNode[];
   links: GraphLink[];
   categories?: { name: string; color: string }[];
   height?: number;
   onNodeClick?: (nodeId: string, category: number) => void;
+  /**
+   * 为 true 时与 ECharts 默认一致：滚轮缩放图谱（会拦截页面滚动）。
+   * 默认 false：仅 `roam: 'move'`，滚轮交给页面，缩放用工具栏或 ref。
+   */
+  allowWheelZoom?: boolean;
 }
 
-export function KnowledgeGraph({
-  nodes, links, categories, height = 420, onNodeClick,
-}: KnowledgeGraphProps) {
-  const chartRef = useRef<HTMLDivElement>(null);
+export const KnowledgeGraph = forwardRef<KnowledgeGraphRef, KnowledgeGraphProps>(function KnowledgeGraph(
+  { nodes, links, categories, height = 420, onNodeClick, allowWheelZoom = false },
+  ref,
+) {
+  const domRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<echarts.ECharts | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    zoomIn: () => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      const w = chart.getWidth();
+      const h = chart.getHeight();
+      chart.dispatchAction({
+        type: 'graphRoam',
+        seriesIndex: 0,
+        zoom: ZOOM_STEP,
+        originX: w / 2,
+        originY: h / 2,
+      });
+    },
+    zoomOut: () => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      const w = chart.getWidth();
+      const h = chart.getHeight();
+      chart.dispatchAction({
+        type: 'graphRoam',
+        seriesIndex: 0,
+        zoom: 1 / ZOOM_STEP,
+        originX: w / 2,
+        originY: h / 2,
+      });
+    },
+  }));
 
   useEffect(() => {
-    if (!chartRef.current) return;
-    const chart = echarts.init(chartRef.current);
+    if (!domRef.current) return;
+    const chart = echarts.init(domRef.current);
+    chartRef.current = chart;
 
     const echartsCategories = categories?.map((c) => ({
       name: c.name,
       itemStyle: { color: c.color },
     })) ?? [
-      { name: '目标企业', itemStyle: { color: '#3b82f6' } },
+      { name: '目标企业', itemStyle: { color: '#2563eb' } },
       { name: '自然人', itemStyle: { color: '#10b981' } },
       { name: '关联企业', itemStyle: { color: '#f59e0b' } },
       { name: '担保方', itemStyle: { color: '#ef4444' } },
@@ -48,7 +97,7 @@ export function KnowledgeGraph({
       symbolSize: node.value ? Math.max(28, node.value * 0.6) : 35,
       category: node.category,
       itemStyle: {
-        color: categoryColors[node.category] || '#3b82f6',
+        color: categoryColors[node.category] || '#2563eb',
         borderColor: '#fff',
         borderWidth: 2,
         shadowColor: 'rgba(0, 0, 0, 0.2)',
@@ -86,7 +135,8 @@ export function KnowledgeGraph({
         data: echartsNodes,
         links: echartsLinks,
         categories: echartsCategories,
-        roam: true,
+        roam: allowWheelZoom ? true : 'move',
+        scaleLimit: { min: 0.35, max: 4 },
         draggable: true,
         force: { repulsion: 250, edgeLength: [80, 180], gravity: 0.15 },
         emphasis: { focus: 'adjacency' },
@@ -111,9 +161,18 @@ export function KnowledgeGraph({
     window.addEventListener('resize', onResize);
     return () => {
       window.removeEventListener('resize', onResize);
+      chartRef.current = null;
       chart.dispose();
     };
-  }, [nodes, links, categories, height, onNodeClick]);
+  }, [nodes, links, categories, height, onNodeClick, allowWheelZoom]);
 
-  return <div ref={chartRef} style={{ width: '100%', height }} />;
-}
+  return (
+    <div
+      ref={domRef}
+      className="touch-pan-y"
+      style={{ width: '100%', height }}
+      role="img"
+      aria-label="股权与担保关系图谱，拖拽平移，滚轮滚动页面"
+    />
+  );
+});

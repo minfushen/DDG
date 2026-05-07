@@ -3,11 +3,11 @@ import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import type { GradientKey } from '../../theme/tokens';
 
 const ACCENT_DOT: Record<GradientKey, string> = {
-  primary: 'bg-[#2563EB]',
-  blue: 'bg-[#2563EB]',
-  green: 'bg-[#10B981]',
-  amber: 'bg-[#F59E0B]',
-  red: 'bg-[#EF4444]',
+  primary: 'bg-[var(--color-primary)]',
+  blue: 'bg-[var(--color-primary)]',
+  green: 'bg-[var(--color-success)]',
+  amber: 'bg-[var(--color-warning-light)]',
+  red: 'bg-[var(--color-danger-light)]',
 } as const;
 
 interface StatCardProps {
@@ -39,40 +39,34 @@ export function StatCard({
   compact = false,
   emphasized = false,
 }: StatCardProps) {
-  const dot = ACCENT_DOT[gradient] ?? 'bg-[#6B7280]';
+  const dot = ACCENT_DOT[gradient] ?? 'bg-slate-400';
 
   const emphasisStyles = emphasized && gradient === 'red'
-    ? 'ring-2 ring-red-200 bg-red-50 border-red-200'
+    ? 'border-[var(--color-error-border)]'
     : emphasized && gradient === 'amber'
-      ? 'ring-2 ring-amber-200 bg-amber-50 border-amber-200'
+      ? 'border-[var(--color-warning-border)]'
       : '';
 
   return (
-    <div className={`relative flex overflow-hidden rounded-xl bg-white border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)] transition-all duration-200 hover:shadow-[0_4px_6px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.03)] ${emphasisStyles} ${className}`}>
-      {emphasized && gradient === 'red' && (
-        <div className="absolute inset-y-0 left-0 w-1 bg-red-500 rounded-l-2xl" />
-      )}
-      {emphasized && gradient === 'amber' && (
-        <div className="absolute inset-y-0 left-0 w-1 bg-amber-500 rounded-l-2xl" />
-      )}
-      <div className={`min-w-0 flex-1 ${compact ? 'p-4' : 'p-5'} space-y-2`}>
-        <div className="flex items-center gap-2">
+    <div className={`kpi-stat-card relative overflow-hidden ${emphasisStyles} ${className}`}>
+      <div className={`min-w-0 ${compact ? 'h-12 px-3 py-2' : 'h-14 px-3.5 py-2'} space-y-0.5`}>
+        <div className="flex items-center gap-1.5">
           {Icon && (
-            <Icon className="w-4 h-4 text-slate-500" />
+            <Icon className="h-[14px] w-[14px] text-[var(--color-text-tertiary)]" />
           )}
-          <span className={`w-2 h-2 rounded-full ${dot}`} aria-hidden />
-          <p className="text-[12px] leading-4 font-medium tracking-[0.01em] text-slate-500">{label}</p>
+          <span className={`h-1.5 w-1.5 rounded-full ${dot} ${Icon ? 'hidden' : ''}`} aria-hidden />
+          <p className="kpi-stat-card__label">{label}</p>
         </div>
-        <div className="flex items-end gap-2">
-          <span className={`${compact ? 'text-2xl leading-8' : 'text-[24px] leading-8'} font-bold tracking-[-0.02em] tabular-nums text-slate-900`}>
+        <div className="flex items-end gap-1.5">
+          <span className={`${compact ? 'text-[18px]' : 'text-[20px]'} font-medium leading-tight tabular-nums text-slate-900`}>
             {value}
           </span>
-          {unit && <span className="mb-0.5 text-[12px] text-slate-500">{unit}</span>}
+          {unit && <span className="mb-0.5 text-[12px] text-[var(--color-text-tertiary)]">{unit}</span>}
         </div>
         {trend && (
           <div
             className={`flex items-center gap-1 text-[11px] leading-4 font-medium ${
-              trendUp ? 'text-emerald-600' : 'text-slate-400'
+              trendUp ? 'text-[var(--color-success)]' : 'text-[var(--color-text-quaternary)]'
             }`}
           >
             {trendUp ? (
@@ -82,7 +76,7 @@ export function StatCard({
             )}
             <span>{trend}</span>
             {description && (
-              <span className="font-normal text-gray-400">{description}</span>
+              <span className="font-normal text-[var(--color-text-quaternary)]">{description}</span>
             )}
           </div>
         )}

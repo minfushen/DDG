@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Database, Network, FileText,
   ChevronLeft, ChevronRight, ChevronDown, Sparkles,
   Scale, MessageSquare, Banknote, Bell, AlertTriangle, ClipboardCheck,
-  BarChart3, ClipboardList, Table,
+  BarChart3, Table,
 } from 'lucide-react';
 import { useDemoStore } from '../../stores';
 import type { GradientKey } from '../../theme/tokens';
@@ -30,14 +30,7 @@ const navGroups = [
       { path: '/data-integration', icon: Database, label: '数据整合', gradient: 'blue' as GradientKey },
       { path: '/analysis', icon: Network, label: '智能分析', gradient: 'blue' as GradientKey },
       { path: '/report', icon: FileText, label: '报告生成', gradient: 'blue' as GradientKey },
-    ],
-  },
-  {
-    title: '智能尽调',
-    defaultOpen: true,
-    items: [
-      { path: '/document-checklist', icon: ClipboardList, label: '物料清单', gradient: 'blue' as GradientKey },
-      { path: '/psak-validation', icon: Table, label: 'PSAK 校验', gradient: 'blue' as GradientKey },
+      { path: '/psak-validation', icon: Table, label: '财务报表 · 钩稽校验', gradient: 'blue' as GradientKey },
     ],
   },
   {

@@ -38,8 +38,8 @@ export function RiskTracking() {
 
   if (!currentWarning) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-12">
-        <p className="text-center text-gray-500">请选择预警信号查看详情</p>
+      <div className="section-shell rounded-[12px] p-12">
+        <p className="text-center text-[var(--color-text-tertiary)]">请选择预警信号查看详情</p>
       </div>
     );
   }
@@ -48,7 +48,7 @@ export function RiskTracking() {
 
   // 左侧面板：预警详情
   const leftPanel = (
-    <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+    <section className="section-shell rounded-[12px]">
       <SectionHeader
         icon={FileText}
         title="预警详情"
@@ -57,27 +57,27 @@ export function RiskTracking() {
       />
       <div className="px-5 pb-5">
         <div className="space-y-3">
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-500 mb-1">预警描述</p>
-            <p className="text-sm text-gray-900">{currentWarning.description}</p>
+          <div className="p-3 bg-[var(--color-bg-layout)] rounded-lg">
+            <p className="text-xs text-[var(--color-text-tertiary)] mb-1">预警描述</p>
+            <p className="text-sm text-[var(--color-text-primary)]">{currentWarning.description}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">数据来源</p>
-              <p className="text-sm font-medium text-gray-900">{currentWarning.source}</p>
+            <div className="p-3 bg-[var(--color-bg-layout)] rounded-lg">
+              <p className="text-xs text-[var(--color-text-tertiary)] mb-1">数据来源</p>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">{currentWarning.source}</p>
             </div>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">发现时间</p>
-              <p className="text-sm font-medium text-gray-900">{currentWarning.detectedAt}</p>
+            <div className="p-3 bg-[var(--color-bg-layout)] rounded-lg">
+              <p className="text-xs text-[var(--color-text-tertiary)] mb-1">发现时间</p>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">{currentWarning.detectedAt}</p>
             </div>
           </div>
-          <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-            <p className="text-xs text-gray-500 mb-1">风险影响</p>
-            <p className="text-sm text-red-700 font-medium">{currentWarning.impact}</p>
+          <div className="p-3 bg-[var(--color-error-bg)] rounded-lg border border-[var(--color-error-border)]">
+            <p className="text-xs text-[var(--color-text-tertiary)] mb-1">风险影响</p>
+            <p className="text-sm text-[var(--color-danger)] font-medium">{currentWarning.impact}</p>
           </div>
-          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-xs text-gray-500 mb-1">处置建议</p>
-            <p className="text-sm text-green-700 font-medium">{currentWarning.suggestion}</p>
+          <div className="p-3 bg-[var(--color-success-bg)] rounded-lg border border-[var(--color-success-border)]">
+            <p className="text-xs text-[var(--color-text-tertiary)] mb-1">处置建议</p>
+            <p className="text-sm text-[var(--color-success)] font-medium">{currentWarning.suggestion}</p>
           </div>
         </div>
       </div>
@@ -86,14 +86,14 @@ export function RiskTracking() {
 
   // 中间面板：处置时间线
   const centerPanel = (
-    <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+    <section className="section-shell rounded-[12px]">
       <SectionHeader
         icon={Clock}
         title="处置时间线"
         subtitle="处理记录"
         className="px-5 pt-5"
         actions={
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-200 transition-colors">
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-bg text-primary-deep rounded-lg text-xs font-medium hover:bg-[var(--color-primary-bg-hover)] transition-colors">
             <Plus className="w-3 h-3" />
             添加记录
           </button>
@@ -107,8 +107,8 @@ export function RiskTracking() {
             ))}
           </div>
         ) : (
-          <div className="p-6 bg-gray-50 rounded-lg text-center">
-            <p className="text-gray-500">暂无处置记录</p>
+          <div className="p-6 bg-[var(--color-bg-layout)] rounded-lg text-center">
+            <p className="text-[var(--color-text-tertiary)]">暂无处置记录</p>
           </div>
         )}
       </div>
@@ -119,7 +119,7 @@ export function RiskTracking() {
   const rightPanel = (
     <div className="space-y-6">
       {/* 关联贷款 */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <section className="section-shell rounded-[12px]">
         <SectionHeader
           icon={Banknote}
           title="关联贷款"
@@ -127,21 +127,21 @@ export function RiskTracking() {
           className="px-5 pt-5"
         />
         <div className="px-5 pb-5">
-          <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="p-3 bg-[var(--color-bg-layout)] rounded-lg">
             <div className="flex items-center gap-2 mb-2">
-              <Building2 className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-900">{currentWarning.enterpriseName}</span>
+              <Building2 className="w-4 h-4 text-[var(--color-text-tertiary)]" />
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">{currentWarning.enterpriseName}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">{currentWarning.relatedLoan.type}</span>
-              <span className="text-lg font-semibold text-gray-900">{formatAmount(currentWarning.relatedLoan.amount / 10000)}</span>
+              <span className="text-sm text-[var(--color-text-tertiary)]">{currentWarning.relatedLoan.type}</span>
+              <span className="text-lg font-semibold text-[var(--color-text-primary)]">{formatAmount(currentWarning.relatedLoan.amount / 10000)}</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* 状态变更 */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <section className="section-shell rounded-[12px]">
         <SectionHeader
           icon={CheckCircle2}
           title="状态变更"
@@ -154,41 +154,41 @@ export function RiskTracking() {
               onClick={() => handleStatusChange('processing')}
               className={`w-full p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
                 currentWarning.status === 'processing'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-blue-200'
+                  ? 'border-primary bg-primary-bg'
+                  : 'border-[var(--color-card-border)] bg-[var(--color-bg-layout)] hover:border-[var(--color-primary-border)]'
               }`}
             >
-              <Clock className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-gray-900">标记为处理中</span>
+              <Clock className="w-4 h-4 text-primary-deep" />
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">标记为处理中</span>
             </button>
             <button
               onClick={() => handleStatusChange('resolved')}
               className={`w-full p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
                 currentWarning.status === 'resolved'
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-green-200'
+                  ? 'border-[var(--color-success)] bg-[var(--color-success-bg)]'
+                  : 'border-[var(--color-card-border)] bg-[var(--color-bg-layout)] hover:border-[var(--color-success-border)]'
               }`}
             >
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-medium text-gray-900">标记为已解决</span>
+              <CheckCircle2 className="w-4 h-4 text-[var(--color-success)]" />
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">标记为已解决</span>
             </button>
             <button
               onClick={() => handleStatusChange('ignored')}
               className={`w-full p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
                 currentWarning.status === 'ignored'
-                  ? 'border-gray-500 bg-gray-100'
-                  : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                  ? 'border-[var(--color-text-tertiary)] bg-[var(--color-bg-interactive-hover)]'
+                  : 'border-[var(--color-card-border)] bg-[var(--color-bg-layout)] hover:border-[var(--color-border)]'
               }`}
             >
-              <XCircle className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-900">忽略预警</span>
+              <XCircle className="w-4 h-4 text-[var(--color-text-tertiary)]" />
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">忽略预警</span>
             </button>
           </div>
         </div>
       </section>
 
       {/* 快捷操作 */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <section className="section-shell rounded-[12px]">
         <SectionHeader
           icon={MessageSquare}
           title="快捷操作"
@@ -199,27 +199,27 @@ export function RiskTracking() {
           <div className="space-y-2">
             <button
               onClick={() => navigate(`/post-loan/check?enterprise=${currentWarning.enterpriseId}`)}
-              className="w-full p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center justify-between hover:bg-blue-100 transition-colors"
+              className="w-full p-3 bg-primary-bg rounded-lg border border-[var(--color-primary-border)] flex items-center justify-between hover:bg-primary-bg transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium text-gray-900">发起贷后检查</span>
+                <Calendar className="w-4 h-4 text-primary-deep" />
+                <span className="text-sm font-medium text-[var(--color-text-primary)]">发起贷后检查</span>
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <ChevronRight className="w-4 h-4 text-[var(--color-text-quaternary)]" />
             </button>
-            <button className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors">
+            <button className="w-full p-3 bg-[var(--color-bg-layout)] rounded-lg border border-[var(--color-card-border)] flex items-center justify-between hover:bg-[var(--color-bg-interactive-hover)] transition-colors">
               <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-900">约谈客户</span>
+                <User className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                <span className="text-sm font-medium text-[var(--color-text-primary)]">约谈客户</span>
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <ChevronRight className="w-4 h-4 text-[var(--color-text-quaternary)]" />
             </button>
-            <button className="w-full p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center justify-between hover:bg-amber-100 transition-colors">
+            <button className="w-full p-3 bg-[var(--color-warning-bg)] rounded-lg border border-[var(--color-warning-border)] flex items-center justify-between hover:bg-[var(--color-warning-bg-strong)] transition-colors">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-amber-600" />
-                <span className="text-sm font-medium text-gray-900">调整风险评级</span>
+                <TrendingUp className="w-4 h-4 text-[var(--color-warning)]" />
+                <span className="text-sm font-medium text-[var(--color-text-primary)]">调整风险评级</span>
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <ChevronRight className="w-4 h-4 text-[var(--color-text-quaternary)]" />
             </button>
           </div>
         </div>
@@ -228,7 +228,7 @@ export function RiskTracking() {
   );
 
   return (
-    <div className="space-y-8 animate-fade-in-up">
+    <div className="module-page-stack animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title={currentWarning.title}
@@ -237,7 +237,7 @@ export function RiskTracking() {
         secondaryActions={
           <button
             onClick={() => navigate('/post-loan/dashboard')}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-card-border)] bg-white px-3 py-2 text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-layout)]"
           >
             <ArrowLeft className="h-4 w-4" />
             返回预警工作台
@@ -262,17 +262,17 @@ export function RiskTracking() {
 function TimelineItem({ item }: { item: RiskEventTimeline; index: number }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-        <Clock className="w-4 h-4 text-blue-600" />
+      <div className="w-8 h-8 rounded-lg bg-primary-bg flex items-center justify-center shrink-0">
+        <Clock className="w-4 h-4 text-primary-deep" />
       </div>
-      <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+      <div className="flex-1 p-3 bg-[var(--color-bg-layout)] rounded-lg">
         <div className="flex items-center justify-between mb-1">
-          <p className="text-sm font-medium text-gray-900">{item.action}</p>
-          <p className="text-xs text-gray-500">{item.timestamp}</p>
+          <p className="text-sm font-medium text-[var(--color-text-primary)]">{item.action}</p>
+          <p className="text-xs text-[var(--color-text-tertiary)]">{item.timestamp}</p>
         </div>
-        <p className="text-xs text-gray-600">操作人：{item.operator}</p>
+        <p className="text-xs text-[var(--color-text-secondary)]">操作人：{item.operator}</p>
         {item.remark && (
-          <p className="text-xs text-gray-500 mt-2 bg-white p-2 rounded">{item.remark}</p>
+          <p className="text-xs text-[var(--color-text-tertiary)] mt-2 bg-white p-2 rounded">{item.remark}</p>
         )}
       </div>
     </div>

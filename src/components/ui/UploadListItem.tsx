@@ -10,15 +10,14 @@ interface UploadListItemProps {
   status: UploadItemStatus;
   fileIcon: LucideIcon;
   iconTone?: 'blue' | 'green' | 'amber' | 'red' | 'slate';
-  tags?: string[];
 }
 
 const toneMap = {
-  blue: 'bg-blue-50 text-blue-600',
-  green: 'bg-emerald-50 text-emerald-600',
-  amber: 'bg-amber-50 text-amber-600',
-  red: 'bg-red-50 text-red-600',
-  slate: 'bg-slate-100 text-slate-600',
+  blue: 'bg-[var(--color-primary-bg)] text-[var(--color-primary-deep)]',
+  green: 'bg-[var(--color-success-bg)] text-[var(--color-success)]',
+  amber: 'bg-[var(--color-warning-bg)] text-[var(--color-warning)]',
+  red: 'bg-[var(--color-error-bg)] text-[var(--color-danger)]',
+  slate: 'bg-[var(--color-bg-layout)] text-[var(--color-text-secondary)]',
 } as const;
 
 export function UploadListItem({
@@ -28,46 +27,43 @@ export function UploadListItem({
   status,
   fileIcon: FileIcon,
   iconTone = 'blue',
-  tags = [],
 }: UploadListItemProps) {
+  const pct = Math.max(0, Math.min(100, Math.round(progress)));
+  const showFill = status !== 'pending';
+  const fillClass =
+    status === 'completed'
+      ? 'bg-[var(--color-success)]'
+      : status === 'processing'
+        ? 'bg-[var(--color-primary)]'
+        : '';
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneMap[iconTone]}`}>
-          <FileIcon className="h-5 w-5" />
+    <div className="rounded-[12px] border border-[var(--color-card-border)] bg-white px-3.5 py-3">
+      <div className="flex items-center gap-2.5">
+        <div
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] ${toneMap[iconTone]}`}
+        >
+          <FileIcon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] leading-5 font-semibold text-slate-900">{fileName}</p>
-          <p className="text-[11px] leading-4 text-slate-500">{description}</p>
+          <p className="truncate text-[13px] leading-5 font-medium text-[var(--color-text-primary)]">{fileName}</p>
+          <p className="truncate text-[11px] leading-4 text-[var(--color-text-tertiary)]">{description}</p>
         </div>
-        {status === 'completed' && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-        {status === 'processing' && <Loader2 className="h-5 w-5 animate-spin text-blue-500" />}
-        {status === 'pending' && <Clock className="h-5 w-5 text-slate-400" />}
+        {status === 'completed' && <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--color-success)]" />}
+        {status === 'processing' && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--color-primary)]" />}
+        {status === 'pending' && <Clock className="h-4 w-4 shrink-0 text-[var(--color-text-quaternary)]" />}
       </div>
 
-      <div className="pl-[52px] pt-2">
-        <div className="flex items-center gap-2">
-          <div className="h-[6px] flex-1 overflow-hidden rounded-full bg-slate-100">
+      <div className="pt-2">
+        <div className="h-[5px] overflow-hidden rounded-full bg-[var(--gray-300)]">
+          {showFill && (
             <div
-              className="h-full rounded-full bg-[#2563EB] transition-all duration-300"
-              style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+              className={`h-full rounded-full transition-all duration-300 ${fillClass}`}
+              style={{ width: `${pct}%` }}
             />
-          </div>
-          <span className="w-9 text-right text-[11px] leading-4 text-[#1D4ED8]">
-            {Math.round(progress)}%
-          </span>
+          )}
         </div>
       </div>
-
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pl-[52px] pt-2">
-          {tags.map((tag) => (
-            <span key={tag} className="rounded px-2 py-0.5 text-[11px] leading-4 text-emerald-700 bg-emerald-50">
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

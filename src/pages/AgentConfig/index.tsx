@@ -15,29 +15,29 @@ const componentIcons: Record<string, LucideIcon> = {
 };
 
 const statusConfig = {
-  running: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
-  stopped: { bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-500' },
-  error: { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
+  running: { bg: 'bg-[var(--color-success-bg-strong)]', text: 'text-[var(--color-success)]', dot: 'bg-[var(--color-success)]' },
+  stopped: { bg: 'bg-[var(--color-bg-layout)]', text: 'text-[var(--color-text-secondary)]', dot: 'bg-[var(--color-text-tertiary)]' },
+  error: { bg: 'bg-[var(--color-error-bg-strong)]', text: 'text-[var(--color-danger)]', dot: 'bg-[var(--color-danger-light)]' },
 } as const;
 
 export function AgentConfig() {
   return (
-    <div className="space-y-8 animate-fade-in-up">
+    <div className="module-page-stack animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="智能体配置后台"
         subtitle="低代码拖拽配置尽调智能体工作流"
         icon={Settings}
         primaryAction={
-          <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+          <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-deep">
             <Play className="h-4 w-4" />
             部署配置
           </button>
         }
         secondaryActions={
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 rounded-lg border border-green-200">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-sm text-green-700 font-medium">运行环境正常</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-success-bg-strong)] rounded-lg border border-[var(--color-success-border)]">
+            <div className="w-2 h-2 bg-[var(--color-success)] rounded-full animate-pulse" />
+            <span className="text-sm text-[var(--color-success)] font-medium">运行环境正常</span>
           </div>
         }
       />
@@ -45,7 +45,7 @@ export function AgentConfig() {
       {/* 主内容：三栏布局 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* 可用组件 */}
-        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <section className="section-shell rounded-[12px]">
           <SectionHeader
             icon={Zap}
             title="可用组件"
@@ -60,15 +60,15 @@ export function AgentConfig() {
                 return (
                   <div
                     key={component.id}
-                    className="group p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 hover:bg-white cursor-pointer transition-all"
+                    className="group p-4 bg-[var(--color-bg-layout)] rounded-lg border border-[var(--color-card-border)] hover:border-[var(--color-primary-border)] hover:bg-white cursor-pointer transition-all"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                        <Icon className="w-4 h-4 text-blue-600" />
+                      <div className="w-8 h-8 rounded-lg bg-primary-bg flex items-center justify-center">
+                        <Icon className="w-4 h-4 text-primary-deep" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{component.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{component.description}</p>
+                        <p className="text-sm font-medium text-[var(--color-text-primary)]">{component.name}</p>
+                        <p className="text-xs text-[var(--color-text-tertiary)] truncate">{component.description}</p>
                       </div>
                     </div>
                   </div>
@@ -79,7 +79,7 @@ export function AgentConfig() {
         </section>
 
         {/* 工作流编排 */}
-        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <section className="section-shell rounded-[12px]">
           <SectionHeader
             icon={Activity}
             title="工作流编排"
@@ -87,19 +87,19 @@ export function AgentConfig() {
             className="px-6 pt-6"
           />
           <div className="px-6 pb-6">
-            <div className="bg-gray-50 rounded-xl p-6 min-h-[320px] border border-gray-200">
+            <div className="bg-[var(--color-bg-layout)] rounded-xl p-6 min-h-[320px] border border-[var(--color-card-border)]">
               <div className="flex flex-col items-center gap-3">
                 {COMPONENT_TEMPLATES.slice(0, 5).map((component, index) => {
                   const Icon = componentIcons[component.type] || Sparkles;
 
                   return (
                     <div key={component.id} className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center hover:scale-110 transition-transform cursor-pointer">
-                        <Icon className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 rounded-lg bg-primary-bg flex items-center justify-center hover:scale-110 transition-transform cursor-pointer">
+                        <Icon className="w-5 h-5 text-primary-deep" />
                       </div>
-                      <p className="text-xs text-gray-600 mt-1.5 font-medium">{component.name}</p>
+                      <p className="text-xs text-[var(--color-text-secondary)] mt-1.5 font-medium">{component.name}</p>
                       {index < 4 && (
-                        <ArrowRight className="w-4 h-4 text-gray-400 rotate-90 mt-1" />
+                        <ArrowRight className="w-4 h-4 text-[var(--color-text-quaternary)] rotate-90 mt-1" />
                       )}
                     </div>
                   );
@@ -107,8 +107,8 @@ export function AgentConfig() {
               </div>
             </div>
 
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-700 flex items-start gap-2">
+            <div className="mt-4 p-3 bg-primary-bg rounded-lg border border-[var(--color-primary-border)]">
+              <p className="text-sm text-primary-deep flex items-start gap-2">
                 <Sparkles className="h-4 w-4 mt-0.5 shrink-0" />
                 该尽调智能体由 5 个组件串联组成，依次执行：意图识别 → 知识库检索 → 外部数据调用 → 大模型生成 → 结果输出
               </p>
@@ -119,7 +119,7 @@ export function AgentConfig() {
         {/* 右侧：环境状态 + 运行指标 + Prompt */}
         <div className="space-y-8">
           {/* 信创环境状态 */}
-          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <section className="section-shell rounded-[12px]">
             <SectionHeader
               icon={Server}
               title="信创环境状态"
@@ -137,7 +137,7 @@ export function AgentConfig() {
           </section>
 
           {/* 运行指标 */}
-          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <section className="section-shell rounded-[12px]">
             <SectionHeader
               icon={Activity}
               title="运行指标"
@@ -155,7 +155,7 @@ export function AgentConfig() {
           </section>
 
           {/* Prompt 配置 */}
-          <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <section className="section-shell rounded-[12px]">
             <SectionHeader
               icon={Brain}
               title="Prompt 配置"
@@ -164,7 +164,7 @@ export function AgentConfig() {
             />
             <div className="px-6 pb-6">
               <textarea
-                className="w-full h-28 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs resize-none focus:outline-none focus:border-blue-300 font-mono text-gray-700"
+                className="w-full h-28 p-3 bg-[var(--color-bg-layout)] border border-[var(--color-card-border)] rounded-lg text-xs resize-none focus:outline-none focus:border-[var(--color-primary-border-strong)] font-mono text-[var(--color-text-secondary)]"
                 defaultValue={`你是一位专业的银行对公业务尽调分析师。
 请根据以下信息生成尽调报告：
 - 企业基本信息：{enterprise_info}
@@ -177,7 +177,7 @@ export function AgentConfig() {
 3. 识别潜在风险
 4. 给出授信建议`}
               />
-              <button className="mt-3 w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+              <button className="mt-3 w-full py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-deep transition-colors flex items-center justify-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />
                 保存配置
               </button>
@@ -198,11 +198,11 @@ function EnvironmentItem({ icon: Icon, name, status, detail }: {
   const config = statusConfig[status];
 
   return (
-    <div className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-lg">
-      <Icon className="h-4 w-4 text-gray-500" />
+    <div className="flex items-center gap-3 p-2.5 bg-[var(--color-bg-layout)] rounded-lg">
+      <Icon className="h-4 w-4 text-[var(--color-text-tertiary)]" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900">{name}</p>
-        <p className="text-xs text-gray-500">{detail}</p>
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">{name}</p>
+        <p className="text-xs text-[var(--color-text-tertiary)]">{detail}</p>
       </div>
       <div className="flex items-center gap-1.5">
         <div className={`w-1.5 h-1.5 ${config.dot} rounded-full ${status === 'running' ? 'animate-pulse' : ''}`} />
@@ -214,9 +214,9 @@ function EnvironmentItem({ icon: Icon, name, status, detail }: {
 
 function MetricItem({ value, label }: { value: string; label: string }) {
   return (
-    <div className="p-3 bg-gray-50 rounded-lg text-center">
-      <p className="text-lg font-semibold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+    <div className="p-3 bg-[var(--color-bg-layout)] rounded-lg text-center">
+      <p className="text-lg font-semibold text-[var(--color-text-primary)]">{value}</p>
+      <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">{label}</p>
     </div>
   );
 }

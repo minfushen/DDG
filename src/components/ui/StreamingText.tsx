@@ -98,14 +98,14 @@ export function StreamingText({
     if (!isStreaming || isComplete || cursorStyle === 'none') return null;
 
     const cursorClass = cursorStyle === 'block'
-      ? 'inline-block w-2 h-4 bg-blue-500 animate-pulse ml-0.5'
-      : 'inline-block w-0.5 h-4 bg-blue-500 animate-pulse ml-0.5';
+      ? 'inline-block w-2 h-4 bg-primary animate-pulse ml-0.5'
+      : 'inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5';
 
     return <span className={cursorClass} />;
   };
 
   return (
-    <div className={`text-sm text-gray-700 whitespace-pre-wrap ${className}`}>
+    <div className={`text-sm text-[var(--color-text-secondary)] whitespace-pre-wrap ${className}`}>
       {displayedContent}
       <Cursor />
     </div>
@@ -187,23 +187,23 @@ export function StreamingMarkdown({
         return <h3 key={i} className="font-medium text-gray-800 mt-4 mb-2">{line.slice(3)}</h3>;
       }
       if (line.startsWith('# ')) {
-        return <h2 key={i} className="font-medium text-gray-900 text-lg mt-4 mb-2">{line.slice(2)}</h2>;
+        return <h2 key={i} className="font-medium text-[var(--color-text-primary)] text-lg mt-4 mb-2">{line.slice(2)}</h2>;
       }
 
       // 列表
       if (line.startsWith('- ') || line.startsWith('* ')) {
-        return <li key={i} className="ml-4 text-gray-700">{line.slice(2)}</li>;
+        return <li key={i} className="ml-4 text-[var(--color-text-secondary)]">{line.slice(2)}</li>;
       }
 
       // 粗体
       const boldText = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       if (boldText !== line) {
-        return <p key={i} className="text-gray-700" dangerouslySetInnerHTML={{ __html: boldText }} />;
+        return <p key={i} className="text-[var(--color-text-secondary)]" dangerouslySetInnerHTML={{ __html: boldText }} />;
       }
 
       // 普通文本
       if (line.trim()) {
-        return <p key={i} className="text-gray-700">{line}</p>;
+        return <p key={i} className="text-[var(--color-text-secondary)]">{line}</p>;
       }
 
       return null;
@@ -214,7 +214,7 @@ export function StreamingMarkdown({
     <div className={`prose prose-sm max-w-none ${className}`}>
       {renderContent(displayedContent)}
       {isStreaming && cursorStyle !== 'none' && (
-        <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-0.5" />
+        <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5" />
       )}
     </div>
   );
@@ -297,17 +297,17 @@ export function StreamingCode({
           <span className="w-3 h-3 rounded-full bg-yellow-500" />
           <span className="w-3 h-3 rounded-full bg-green-500" />
         </div>
-        <span className="text-xs text-gray-400 font-mono">{language}</span>
+        <span className="text-xs text-[var(--color-text-quaternary)] font-mono">{language}</span>
       </div>
 
       {/* 代码区 */}
       <div className="p-4 overflow-x-auto">
         <pre className="text-sm font-mono">
-          <code className="text-gray-300">
+          <code className="text-[var(--color-text-placeholder)]">
             {lines.map((line, i) => (
               <div key={i} className="flex">
                 {showLineNumbers && (
-                  <span className="w-8 text-gray-500 select-none text-right pr-4">{i + 1}</span>
+                  <span className="w-8 text-[var(--color-text-tertiary)] select-none text-right pr-4">{i + 1}</span>
                 )}
                 <span>{line}</span>
               </div>

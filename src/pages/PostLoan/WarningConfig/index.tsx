@@ -24,14 +24,14 @@ export function WarningConfig() {
   const disabledCount = warningRules.filter((r) => !r.enabled).length;
 
   return (
-    <div className="space-y-8 animate-fade-in-up">
+    <div className="module-page-stack animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="预警规则配置"
         subtitle="智能预警 · 规则引擎 · 风险阈值"
         icon={Settings}
         primaryAction={
-          <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+          <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-deep transition-colors">
             <Plus className="h-4 w-4" />
             新建规则
           </button>
@@ -43,14 +43,14 @@ export function WarningConfig() {
       />
 
       {/* 筛选栏 */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-4">
+      <section className="section-shell rounded-[12px] section-body">
         <div className="flex items-center gap-3">
-          <Filter className="w-4 h-4 text-gray-400" />
+          <Filter className="w-4 h-4 text-[var(--color-text-quaternary)]" />
           <div className="flex items-center gap-2">
             <button
               onClick={() => setFilterCategory('all')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                filterCategory === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                filterCategory === 'all' ? 'bg-[var(--color-text-primary)] text-white' : 'bg-[var(--color-bg-layout)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-interactive-active)]'
               }`}
             >
               全部
@@ -60,7 +60,7 @@ export function WarningConfig() {
                 key={key}
                 onClick={() => setFilterCategory(key as WarningSourceType)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  filterCategory === key ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  filterCategory === key ? 'bg-[var(--color-text-primary)] text-white' : 'bg-[var(--color-bg-layout)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-interactive-active)]'
                 }`}
               >
                 {config.label}
@@ -76,9 +76,9 @@ export function WarningConfig() {
           <RuleCard key={rule.id} rule={rule} index={index} onToggle={() => toggleRule(rule.id)} />
         ))}
         {filteredRules.length === 0 && (
-          <div className="col-span-2 rounded-2xl border border-gray-200 bg-white p-12 text-center">
-            <Shield className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">暂无预警规则</p>
+          <div className="col-span-2 section-shell rounded-[12px] p-12 text-center">
+            <Shield className="w-10 h-10 text-[var(--color-text-placeholder)] mx-auto mb-3" />
+            <p className="text-[var(--color-text-tertiary)]">暂无预警规则</p>
           </div>
         )}
       </div>
@@ -90,24 +90,24 @@ function RuleCard({ rule, onToggle }: { rule: WarningRule; index: number; onTogg
   const sourceC = warningSourceConfig[rule.category];
 
   return (
-    <section className={`rounded-2xl border border-gray-200 bg-white overflow-hidden ${!rule.enabled ? 'opacity-75' : ''}`}>
-      <div className="px-5 py-4 border-b border-gray-200 bg-gray-50">
+    <section className={`section-shell rounded-[12px] overflow-hidden ${!rule.enabled ? 'opacity-75' : ''}`}>
+      <div className="px-5 py-4 border-b border-[var(--color-card-border)] bg-[var(--color-bg-layout)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-gray-500" />
+            <Shield className="w-4 h-4 text-[var(--color-text-tertiary)]" />
             <div>
-              <h3 className="text-sm font-medium text-gray-900">{rule.name}</h3>
-              <p className="text-xs text-gray-500">{sourceC.label}</p>
+              <h3 className="text-sm font-medium text-[var(--color-text-primary)]">{rule.name}</h3>
+              <p className="text-xs text-[var(--color-text-tertiary)]">{sourceC.label}</p>
             </div>
           </div>
           <button onClick={onToggle} className="flex items-center gap-1.5">
             {rule.enabled ? (
-              <div className="flex items-center gap-1 text-green-600">
+              <div className="flex items-center gap-1 text-[var(--color-success)]">
                 <ToggleRight className="w-5 h-5" />
                 <span className="text-xs font-medium">已启用</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1 text-gray-400">
+              <div className="flex items-center gap-1 text-[var(--color-text-quaternary)]">
                 <ToggleLeft className="w-5 h-5" />
                 <span className="text-xs font-medium">已禁用</span>
               </div>
@@ -117,16 +117,16 @@ function RuleCard({ rule, onToggle }: { rule: WarningRule; index: number; onTogg
       </div>
 
       <div className="p-5">
-        <p className="text-sm text-gray-600 mb-4">{rule.description}</p>
+        <p className="text-sm text-[var(--color-text-secondary)] mb-4">{rule.description}</p>
 
         <div className="space-y-2 mb-4">
-          <p className="text-xs text-gray-500 font-medium">触发条件</p>
+          <p className="text-xs text-[var(--color-text-tertiary)] font-medium">触发条件</p>
           {rule.conditions.map((condition) => (
-            <div key={condition.id} className="p-2.5 bg-gray-50 rounded-lg">
+            <div key={condition.id} className="p-2.5 bg-[var(--color-bg-layout)] rounded-lg">
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-600">{condition.field}</span>
-                <span className="text-gray-400">{condition.operator}</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-[var(--color-text-secondary)]">{condition.field}</span>
+                <span className="text-[var(--color-text-quaternary)]">{condition.operator}</span>
+                <span className="font-medium text-[var(--color-text-primary)]">
                   {condition.value}{condition.unit ? ` ${condition.unit}` : ''}
                 </span>
               </div>
@@ -134,14 +134,14 @@ function RuleCard({ rule, onToggle }: { rule: WarningRule; index: number; onTogg
           ))}
         </div>
 
-        <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+        <div className="flex items-center justify-between pt-3 border-t border-[var(--color-card-border)]">
           <StatusBadge status={rule.level} config={warningLevelConfig} />
           <div className="flex items-center gap-1">
-            <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <Edit2 className="w-4 h-4 text-gray-400" />
+            <button className="p-2 rounded-lg hover:bg-[var(--color-bg-interactive-hover)] transition-colors">
+              <Edit2 className="w-4 h-4 text-[var(--color-text-quaternary)]" />
             </button>
-            <button className="p-2 rounded-lg hover:bg-red-50 transition-colors">
-              <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+            <button className="p-2 rounded-lg hover:bg-[var(--color-error-bg)] transition-colors">
+              <Trash2 className="w-4 h-4 text-[var(--color-text-quaternary)] hover:text-red-500" />
             </button>
           </div>
         </div>

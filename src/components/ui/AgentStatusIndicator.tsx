@@ -156,26 +156,26 @@ export function AgentStatusIndicator({
           <div className={`relative ${config.animate ? 'animate-pulse' : ''}`}>
             <GradientIcon icon={Icon} gradient={config.gradient} size="sm" />
             {config.animate && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-ping" />
             )}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-800">{config.label}</span>
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">{config.label}</span>
               {activeTool && (
-                <span className="px-2 py-0.5 rounded-lg text-xs bg-blue-50 text-blue-600">
+                <span className="px-2 py-0.5 rounded-lg text-xs bg-primary-bg text-primary-deep">
                   {activeTool.name}
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-500">{agentMessage || config.description}</p>
+            <p className="text-xs text-[var(--color-text-tertiary)]">{agentMessage || config.description}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           {/* 进度条 */}
           {agentProgress > 0 && agentProgress < 100 && (
-            <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="w-24 h-1.5 bg-[var(--color-progress-trail)] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 bg-gradient-to-r ${getGradientClass(config.gradient)}`}
                 style={{ width: `${agentProgress}%` }}
@@ -185,11 +185,11 @@ export function AgentStatusIndicator({
 
           {/* 折叠按钮 */}
           {collapsible && (
-            <button className="p-1 rounded hover:bg-gray-100 transition-colors">
+            <button className="p-1 rounded hover:bg-[var(--color-bg-interactive-hover)] transition-colors">
               {expanded ? (
-                <ChevronUp className="w-4 h-4 text-gray-400" />
+                <ChevronUp className="w-4 h-4 text-[var(--color-text-quaternary)]" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-gray-400" />
+                <ChevronDown className="w-4 h-4 text-[var(--color-text-quaternary)]" />
               )}
             </button>
           )}
@@ -201,9 +201,9 @@ export function AgentStatusIndicator({
         <div className="border-t border-border-default px-4 py-3 space-y-3 animate-fade-in-up">
           {/* 当前工具 */}
           {activeTool && (
-            <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
-              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-              <span className="text-sm text-gray-700">
+            <div className="flex items-center gap-2 p-2 bg-primary-bg rounded-lg">
+              <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              <span className="text-sm text-[var(--color-text-secondary)]">
                 正在使用 <strong>{activeTool.name}</strong>
               </span>
             </div>
@@ -212,12 +212,12 @@ export function AgentStatusIndicator({
           {/* 最近工具调用 */}
           {recentToolCalls.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs text-gray-500 font-medium">最近操作</p>
+              <p className="text-xs text-[var(--color-text-tertiary)] font-medium">最近操作</p>
               {recentToolCalls.map((call, index) => (
                 <div
                   key={index}
                   className={`flex items-center gap-2 p-2 rounded-lg ${
-                    call.success ? 'bg-green-50' : call.success === false ? 'bg-red-50' : 'bg-gray-50'
+                    call.success ? 'bg-[var(--color-success-bg)]' : call.success === false ? 'bg-[var(--color-error-bg)]' : 'bg-[var(--color-bg-layout)]'
                   }`}
                 >
                   {call.success ? (
@@ -225,11 +225,11 @@ export function AgentStatusIndicator({
                   ) : call.success === false ? (
                     <XCircle className="w-4 h-4 text-red-500" />
                   ) : (
-                    <Clock className="w-4 h-4 text-gray-400" />
+                    <Clock className="w-4 h-4 text-[var(--color-text-quaternary)]" />
                   )}
-                  <span className="text-sm text-gray-700">{call.toolName}</span>
+                  <span className="text-sm text-[var(--color-text-secondary)]">{call.toolName}</span>
                   {call.duration && (
-                    <span className="text-xs text-gray-400 ml-auto">{call.duration}ms</span>
+                    <span className="text-xs text-[var(--color-text-quaternary)] ml-auto">{call.duration}ms</span>
                   )}
                 </div>
               ))}
@@ -238,8 +238,8 @@ export function AgentStatusIndicator({
 
           {/* AI 标识 */}
           <div className="flex items-center gap-2 pt-2 border-t border-border-default">
-            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-            <span className="text-xs text-gray-400">由 Claude 智能体驱动</span>
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs text-[var(--color-text-quaternary)]">由 Claude 智能体驱动</span>
           </div>
         </div>
       )}
@@ -259,13 +259,13 @@ export function AgentStatusMini() {
       <div className={`relative ${config.animate ? 'animate-pulse' : ''}`}>
         <Icon className={`w-4 h-4 ${getStatusTextClass(agentStatus)} ${config.animate ? 'animate-spin' : ''}`} />
         {config.animate && (
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary rounded-full" />
         )}
       </div>
       {agentProgress > 0 && agentProgress < 100 && (
-        <div className="w-12 h-1 bg-gray-200 rounded-full overflow-hidden">
+        <div className="w-12 h-1 bg-[var(--color-progress-trail)] rounded-full overflow-hidden">
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-300"
+            className="h-full bg-primary rounded-full transition-all duration-300"
             style={{ width: `${agentProgress}%` }}
           />
         </div>
@@ -292,7 +292,7 @@ function getStatusBgClass(status: AgentStatus): string {
     case 'waiting_input':
       return 'bg-[var(--risk-medium-bg)]';
     default:
-      return 'bg-gray-50';
+      return 'bg-[var(--color-bg-layout)]';
   }
 }
 
@@ -312,17 +312,17 @@ function getStatusTextClass(status: AgentStatus): string {
     case 'waiting_input':
       return 'text-[var(--risk-medium-text)]';
     default:
-      return 'text-gray-500';
+      return 'text-[var(--color-text-tertiary)]';
   }
 }
 
 function getGradientClass(gradient: GradientKey): string {
   const gradients: Record<GradientKey, string> = {
-    primary: 'from-blue-500 to-blue-600',
-    blue: 'from-blue-500 to-blue-600',
+    primary: 'from-primary to-primary-deep',
+    blue: 'from-primary to-primary-deep',
     green: 'from-emerald-500 to-teal-500',
     amber: 'from-amber-500 to-orange-500',
     red: 'from-[#D85A30] to-[#E87040]',
   };
-  return gradients[gradient] || 'from-blue-500 to-blue-600';
+  return gradients[gradient] || 'from-primary to-primary-deep';
 }

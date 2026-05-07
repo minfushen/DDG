@@ -80,11 +80,11 @@ const STATUS_CONFIG: Record<TaskStepStatus, {
   icon: LucideIcon;
   animate?: boolean;
 }> = {
-  pending:   { bg: 'bg-gray-50', text: 'text-gray-500', icon: Clock },
+  pending:   { bg: 'bg-[var(--color-bg-layout)]', text: 'text-[var(--color-text-tertiary)]', icon: Clock },
   running:   { bg: 'bg-[var(--risk-info-bg)]', text: 'text-[var(--risk-info-text)]', icon: Loader2, animate: true },
   completed: { bg: 'bg-[var(--risk-low-bg)]', text: 'text-[var(--risk-low-text)]', icon: CheckCircle2 },
   failed:    { bg: 'bg-[var(--risk-high-bg)]', text: 'text-[var(--risk-high-text)]', icon: XCircle },
-  skipped:   { bg: 'bg-gray-100', text: 'text-gray-400', icon: Clock },
+  skipped:   { bg: 'bg-[var(--color-bg-interactive-hover)]', text: 'text-[var(--color-text-quaternary)]', icon: Clock },
 };
 
 // ── 主组件 ─────────────────────────────────────────────
@@ -110,14 +110,14 @@ export function TaskTimeline({ steps, onStepClick, compact = false }: TaskTimeli
             {/* 阶段标题 */}
             <div className="flex items-center gap-2 mb-3">
               <GradientIcon icon={config.icon} gradient={config.color} size="sm" />
-              <span className="text-sm font-medium text-gray-800">{config.label}</span>
-              <span className="text-xs text-gray-400">({phaseSteps.length})</span>
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">{config.label}</span>
+              <span className="text-xs text-[var(--color-text-quaternary)]">({phaseSteps.length})</span>
             </div>
 
             {/* 步骤列表 */}
             <div className="space-y-2 ml-4 border-l-2 border-border-default pl-4">
               {phaseSteps.length === 0 ? (
-                <p className="text-xs text-gray-400 italic py-2">暂无步骤</p>
+                <p className="text-xs text-[var(--color-text-quaternary)] italic py-2">暂无步骤</p>
               ) : (
                 phaseSteps.map((step, index) => (
                   <TimelineStep
@@ -152,7 +152,7 @@ function TimelineStep({ step, index, isCompact, onClick }: TimelineStepProps) {
 
   const baseClass = `
     relative p-4 rounded-2xl border transition-all cursor-pointer
-    border-border-default hover:border-gray-300
+    border-border-default hover:border-[var(--color-border)]
     ${step.status === 'running' ? 'animate-pulse' : ''}
   `;
 
@@ -164,9 +164,9 @@ function TimelineStep({ step, index, isCompact, onClick }: TimelineStepProps) {
     >
       {/* 连接线指示点 */}
       <div className={`absolute -left-[22px] top-5 w-2 h-2 rounded-full ${
-        step.status === 'running' ? 'bg-blue-500 animate-pulse' :
+        step.status === 'running' ? 'bg-primary animate-pulse' :
         step.status === 'completed' ? 'bg-green-500' :
-        step.status === 'failed' ? 'bg-red-500' : 'bg-gray-300'
+        step.status === 'failed' ? 'bg-red-500' : 'bg-[var(--color-border)]'
       }`} />
 
       <div className="flex items-start gap-3">
@@ -178,9 +178,9 @@ function TimelineStep({ step, index, isCompact, onClick }: TimelineStepProps) {
         <div className="flex-1 min-w-0">
           {/* 标题行 */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-gray-800 text-sm truncate">{step.action}</span>
+            <span className="font-medium text-[var(--color-text-primary)] text-sm truncate">{step.action}</span>
             {step.toolUsed && (
-              <span className="px-2 py-0.5 rounded-lg text-xs bg-blue-50 text-blue-600">
+              <span className="px-2 py-0.5 rounded-lg text-xs bg-primary-bg text-primary-deep">
                 {step.toolUsed}
               </span>
             )}
@@ -188,19 +188,19 @@ function TimelineStep({ step, index, isCompact, onClick }: TimelineStepProps) {
 
           {/* 描述 */}
           {step.description && !isCompact && (
-            <p className="text-xs text-gray-500 mb-2">{step.description}</p>
+            <p className="text-xs text-[var(--color-text-tertiary)] mb-2">{step.description}</p>
           )}
 
           {/* 结果 */}
           {step.result && step.status === 'completed' && !isCompact && (
-            <div className="p-2 bg-green-50 rounded-lg text-xs text-green-700 mb-2">
+            <div className="p-2 bg-[var(--color-success-bg)] rounded-lg text-xs text-[var(--color-success)] mb-2">
               {step.result}
             </div>
           )}
 
           {/* 错误 */}
           {step.error && step.status === 'failed' && (
-            <div className="p-2 bg-red-50 rounded-lg text-xs text-red-700 mb-2">
+            <div className="p-2 bg-[var(--color-error-bg)] rounded-lg text-xs text-[var(--color-danger)] mb-2">
               ⚠️ {step.error}
             </div>
           )}
@@ -211,7 +211,7 @@ function TimelineStep({ step, index, isCompact, onClick }: TimelineStepProps) {
               {step.evidence.map((e, i) => (
                 <button
                   key={i}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-border-default rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-border-default rounded-lg text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-layout)]"
                 >
                   {e.type === 'document' && '📄'}
                   {e.type === 'link' && '🔗'}
@@ -223,7 +223,7 @@ function TimelineStep({ step, index, isCompact, onClick }: TimelineStepProps) {
           )}
 
           {/* 时间和耗时 */}
-          <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+          <div className="flex items-center gap-3 mt-2 text-xs text-[var(--color-text-quaternary)]">
             <span>{step.timestamp}</span>
             {step.duration && (
               <>
@@ -258,13 +258,13 @@ export function TaskTimelineCompact({ steps }: { steps: TaskStep[] }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <GradientIcon icon={Brain} gradient="blue" size="sm" />
-          <span className="text-sm font-medium text-gray-800">执行进度</span>
+          <span className="text-sm font-medium text-[var(--color-text-primary)]">执行进度</span>
         </div>
-        <span className="text-xs text-gray-500">{completedCount}/{steps.length} 完成</span>
+        <span className="text-xs text-[var(--color-text-tertiary)]">{completedCount}/{steps.length} 完成</span>
       </div>
 
       {/* 进度条 */}
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-4">
+      <div className="h-2 bg-[var(--color-progress-trail)] rounded-full overflow-hidden mb-4">
         <div
           className="h-full bg-brand rounded-full transition-all duration-500"
           style={{ width: `${(completedCount / steps.length) * 100}%` }}
@@ -277,7 +277,7 @@ export function TaskTimelineCompact({ steps }: { steps: TaskStep[] }) {
           <Loader2 className="w-4 h-4 text-[var(--risk-info)] animate-spin" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-[var(--risk-info-text)] truncate">{runningStep.action}</p>
-            <p className="text-xs text-gray-500">{PHASE_CONFIG[runningStep.phase].label}阶段</p>
+            <p className="text-xs text-[var(--color-text-tertiary)]">{PHASE_CONFIG[runningStep.phase].label}阶段</p>
           </div>
         </div>
       )}

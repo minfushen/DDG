@@ -14,12 +14,11 @@ import {
   FileCheck,
   FileX,
   Banknote,
-
 } from 'lucide-react';
 import { useApprovalStore } from '../../../stores';
 import { formatAmount } from '../../../utils';
-import { PageHeader, SectionHeader, SplitPane } from '../../../components/ui';
-import type { FundFlowNode, FundFlowNodeType, FundFlowRiskLevel } from '../../../types';
+import { PageHeader, SectionHeader, SplitPane, Button } from '../../../components/ui';
+import type { FundFlowNodeType, FundFlowRiskLevel } from '../../../types';
 
 const nodeTypeConfig: Record<FundFlowNodeType, { label: string; icon: React.ElementType }> = {
   borrower: { label: '借款企业', icon: Building2 },
@@ -31,32 +30,54 @@ const nodeTypeConfig: Record<FundFlowNodeType, { label: string; icon: React.Elem
   shell: { label: '空壳公司', icon: AlertCircle },
 };
 
-const riskColors: Record<FundFlowRiskLevel, string> = {
-  normal: '#10b981',
-  suspicious: '#f59e0b',
-  violation: '#ef4444',
-};
+// 从 CSS 变量获取风险色值（ECharts 需要实际色值）
+function getCSSVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function getRiskHexColors(): Record<FundFlowRiskLevel, string> {
+  return {
+    normal: getCSSVar('--palette-success-light') || '#22c55e',
+    suspicious: getCSSVar('--palette-warning-light') || '#ef9f27',
+    violation: getCSSVar('--palette-danger-light') || '#e24b4a',
+  };
+}
+
+const VIOLATION_CARD_STYLE = 'bg-[rgba(163,45,45,0.06)] rounded-lg border border-[var(--color-error-border)]';
+const SUSPICIOUS_CARD_STYLE = 'bg-[rgba(133,79,11,0.06)] rounded-lg border border-[var(--color-warning-border)]';
+const VIOLATION_TAG_STYLE = 'px-2 py-0.5 bg-[rgba(163,45,45,0.1)] text-[var(--color-danger)] rounded text-xs';
+const SUSPICIOUS_TAG_STYLE = 'px-2 py-0.5 bg-[rgba(133,79,11,0.1)] text-[var(--color-warning)] rounded text-xs';
 
 export function FundFlow() {
   const navigate = useNavigate();
-  const { fundFlowData, currentTask } = useApprovalStore();
+  const { fundFlowData, currentTask, loadApprovalData, tasks } = useApprovalStore();
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // 直接访问时兜底加载数据
+  useEffect(() => {
+    if (!fundFlowData) {
+      const taskId = tasks[0]?.id;
+      if (taskId) loadApprovalData(taskId);
+    }
+  }, [fundFlowData, tasks, loadApprovalData]);
 
   useEffect(() => {
     if (!chartRef.current || !fundFlowData) return;
 
     const chart = echarts.init(chartRef.current);
+    const riskHexColors = getRiskHexColors();
+    const primaryHex = getCSSVar('--palette-primary') || '#2563eb';
 
     const nodes = fundFlowData.nodes.map((node) => ({
       id: node.id,
       name: node.name,
-      symbolSize: Math.max(40, Math.min(80, node.amount / 1000000)),
+      symbolSize: Math.max(44, Math.min(80, Math.sqrt(node.amount / 100000) * 8)),
       category: node.type,
       itemStyle: {
-        color: riskColors[node.risk],
+        color: riskHexColors[node.risk],
         borderColor: '#fff',
         borderWidth: 3,
-        shadowColor: 'rgba(0, 0, 0, 0.2)',
+        shadowColor: 'rgba(31, 42, 48, 0.15)',
         shadowBlur: 8,
       },
       label: {
@@ -68,7 +89,7 @@ export function FundFlow() {
         },
         fontSize: 11,
         fontWeight: 500,
-        color: '#334155',
+        color: getCSSVar('--palette-text-secondary') || '#334155',
       },
     }));
 
@@ -77,15 +98,17 @@ export function FundFlow() {
       target: edge.target,
       value: edge.amount,
       lineStyle: {
-        color: edge.invoiceMatched ? '#10b981' : '#ef4444',
-        width: Math.max(2, Math.min(6, edge.amount / 10000000)),
+        color: edge.invoiceMatched
+          ? (getCSSVar('--palette-success-light') || '#22c55e')
+          : (getCSSVar('--palette-danger-light') || '#e24b4a'),
+        width: Math.max(1.5, Math.min(6, Math.sqrt(edge.amount / 500000) * 1.2)),
         curveness: 0.2,
       },
       label: {
         show: true,
         formatter: formatAmount(edge.amount / 10000),
         fontSize: 10,
-        color: '#64748b',
+        color: getCSSVar('--palette-text-tertiary') || '#64748b',
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         padding: [2, 4],
         borderRadius: 4,
@@ -96,23 +119,39 @@ export function FundFlow() {
       tooltip: {
         trigger: 'item',
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderColor: '#e2e8f0',
+        borderColor: getCSSVar('--palette-card-border') || '#e2e8f0',
         borderWidth: 1,
         padding: [12, 16],
-        textStyle: { color: '#1e293b', fontSize: 12 },
-        formatter: (params: { dataType: string; data: FundFlowNode & { name: string } }) => {
+        textStyle: { color: getCSSVar('--palette-text-primary') || '#0f172a', fontSize: 12 },
+        formatter: (params: { dataType: string; data: Record<string, unknown> }) => {
           if (params.dataType === 'node') {
             const node = fundFlowData.nodes.find((n) => n.id === params.data.id || n.name === params.data.name);
             if (!node) return '';
             const config = nodeTypeConfig[node.type] || nodeTypeConfig.third_party;
             return `
               <div style="font-weight: 600; margin-bottom: 8px;">${node.name}</div>
-              <div style="color: #64748b; font-size: 11px;">
-                <div>账户: ${node.account}</div>
+              <div style="color: ${getCSSVar('--palette-text-tertiary') || '#64748b'}; font-size: 11px; line-height: 1.8;">
+                <div>账户: ${node.account || '—'}</div>
+                <div>开户行: ${node.bank || '—'}</div>
                 <div>金额: ${formatAmount(node.amount / 10000)}</div>
                 <div>类型: ${config.label}</div>
-                <div style="color: ${riskColors[node.risk]}; margin-top: 4px;">
-                  ${node.riskLabels?.join('、') || '正常'}
+                ${node.riskLabels?.length ? `<div style="color: ${riskHexColors[node.risk]}; margin-top: 4px;">${node.riskLabels.join('、')}</div>` : ''}
+              </div>
+            `;
+          }
+          if (params.dataType === 'edge') {
+            const edge = fundFlowData.edges.find((e) => e.source === params.data.source && e.target === params.data.target);
+            if (!edge) return '';
+            const srcNode = fundFlowData.nodes.find((n) => n.id === edge.source);
+            const tgtNode = fundFlowData.nodes.find((n) => n.id === edge.target);
+            return `
+              <div style="font-weight: 600; margin-bottom: 6px;">${srcNode?.name || edge.source} → ${tgtNode?.name || edge.target}</div>
+              <div style="color: ${getCSSVar('--palette-text-tertiary') || '#64748b'}; font-size: 11px; line-height: 1.8;">
+                <div>金额: ${formatAmount(edge.amount / 10000)}</div>
+                <div>日期: ${edge.timestamp}</div>
+                <div>用途: ${edge.purpose || '—'}</div>
+                <div style="color: ${edge.invoiceMatched ? (getCSSVar('--palette-success-light') || '#22c55e') : (getCSSVar('--palette-danger-light') || '#e24b4a')}; margin-top: 4px;">
+                  ${edge.invoiceMatched ? `发票匹配: ${edge.invoiceNumber}` : '无发票匹配'}
                 </div>
               </div>
             `;
@@ -125,7 +164,7 @@ export function FundFlow() {
         bottom: 16,
         itemWidth: 12,
         itemHeight: 12,
-        textStyle: { fontSize: 11, color: '#64748b' },
+        textStyle: { fontSize: 11, color: getCSSVar('--palette-text-tertiary') || '#64748b' },
       },
       series: [
         {
@@ -143,7 +182,7 @@ export function FundFlow() {
           emphasis: {
             focus: 'adjacency',
             itemStyle: {
-              shadowColor: 'rgba(59, 130, 246, 0.3)',
+              shadowColor: `${primaryHex}4D`,
               shadowBlur: 20,
             },
             lineStyle: {
@@ -153,7 +192,7 @@ export function FundFlow() {
           categories: Object.entries(nodeTypeConfig).map(([key, config]) => ({
             name: config.label,
             itemStyle: {
-              color: riskColors[key === 'borrower' ? 'normal' : key === 'supplier' ? 'normal' : 'suspicious'],
+              color: riskHexColors[key === 'borrower' ? 'normal' : key === 'supplier' ? 'normal' : 'suspicious'],
             },
           })),
         },
@@ -173,8 +212,8 @@ export function FundFlow() {
 
   if (!fundFlowData) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-12">
-        <p className="text-center text-gray-500">暂无资金流向数据</p>
+      <div className="section-shell rounded-[12px] p-12">
+        <p className="text-center text-[var(--color-text-tertiary)]">暂无资金流向数据</p>
       </div>
     );
   }
@@ -185,105 +224,89 @@ export function FundFlow() {
 
   // 右侧异常面板
   const sidebarPanel = (
-    <div className="space-y-8">
+    <div className="space-y-[var(--section-gap)]">
       {/* 违规账户 */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <section className="section-shell rounded-[12px]">
         <SectionHeader
           icon={XCircle}
           title="违规账户"
           subtitle={`${violationNodes.length} 项违规`}
-          className="px-6 pt-6"
+          className="px-5 pt-5"
           variant="risk"
         />
-        <div className="px-6 pb-6">
+        <div className="px-5 pb-5">
           {violationNodes.length > 0 ? (
             <div className="space-y-2">
               {violationNodes.map((node) => (
-                <div
-                  key={node.id}
-                  className="p-3 bg-red-50 rounded-lg border border-red-200"
-                >
+                <div key={node.id} className={`p-3 ${VIOLATION_CARD_STYLE}`}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-medium text-gray-900">{node.name}</span>
-                    <span className="text-sm font-medium text-red-600">
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">{node.name}</span>
+                    <span className="text-sm font-medium text-[var(--color-danger)]">
                       {formatAmount(node.amount / 10000)}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {node.riskLabels?.map((label, i) => (
-                      <span
-                        key={i}
-                        className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs"
-                      >
-                        {label}
-                      </span>
+                      <span key={i} className={VIOLATION_TAG_STYLE}>{label}</span>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200 text-center">
-              <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto mb-1" />
-              <p className="text-sm text-green-700">无违规账户</p>
+            <div className="p-4 bg-[var(--color-success-bg)] rounded-lg border border-[var(--color-success-border)] text-center">
+              <CheckCircle2 className="h-5 w-5 text-[var(--color-success)] mx-auto mb-1" />
+              <p className="text-sm text-[var(--color-success)]">无违规账户</p>
             </div>
           )}
         </div>
       </section>
 
       {/* 可疑交易 */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <section className="section-shell rounded-[12px]">
         <SectionHeader
           icon={AlertTriangle}
           title="可疑交易"
           subtitle={`${suspiciousNodes.length} 项待核实`}
-          className="px-6 pt-6"
+          className="px-5 pt-5"
         />
-        <div className="px-6 pb-6">
+        <div className="px-5 pb-5">
           {suspiciousNodes.length > 0 ? (
             <div className="space-y-2">
               {suspiciousNodes.map((node) => (
-                <div
-                  key={node.id}
-                  className="p-3 bg-amber-50 rounded-lg border border-amber-200"
-                >
+                <div key={node.id} className={`p-3 ${SUSPICIOUS_CARD_STYLE}`}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-medium text-gray-900">{node.name}</span>
-                    <span className="text-sm font-medium text-amber-600">
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">{node.name}</span>
+                    <span className="text-sm font-medium text-[var(--color-warning)]">
                       {formatAmount(node.amount / 10000)}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {node.riskLabels?.map((label, i) => (
-                      <span
-                        key={i}
-                        className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs"
-                      >
-                        {label}
-                      </span>
+                      <span key={i} className={SUSPICIOUS_TAG_STYLE}>{label}</span>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200 text-center">
-              <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto mb-1" />
-              <p className="text-sm text-green-700">无可疑交易</p>
+            <div className="p-4 bg-[var(--color-success-bg)] rounded-lg border border-[var(--color-success-border)] text-center">
+              <CheckCircle2 className="h-5 w-5 text-[var(--color-success)] mx-auto mb-1" />
+              <p className="text-sm text-[var(--color-success)]">无可疑交易</p>
             </div>
           )}
         </div>
       </section>
 
       {/* 无票流向 */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <section className="section-shell rounded-[12px]">
         <SectionHeader
           icon={FileX}
           title="无票流向"
           subtitle={`${unmatchedEdges.length} 笔待补发票`}
-          className="px-6 pt-6"
+          className="px-5 pt-5"
         />
-        <div className="px-6 pb-6">
+        <div className="px-5 pb-5">
           {unmatchedEdges.length > 0 ? (
             <div className="space-y-2">
               {unmatchedEdges.slice(0, 5).map((edge) => {
@@ -292,52 +315,52 @@ export function FundFlow() {
                 return (
                   <div
                     key={edge.id}
-                    className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg border border-gray-200"
+                    className="flex items-center justify-between p-2.5 bg-[var(--color-bg-layout)] rounded-lg border border-[var(--color-card-border)]"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <FileX className="h-4 w-4 text-red-500 shrink-0" />
-                      <span className="text-xs text-gray-600 truncate">
+                      <FileX className="h-4 w-4 text-[var(--color-danger-light)] shrink-0" />
+                      <span className="text-xs text-[var(--color-text-secondary)] truncate">
                         {sourceNode?.name} → {targetNode?.name}
                       </span>
                     </div>
-                    <span className="text-xs font-medium text-gray-900 shrink-0">
+                    <span className="text-xs font-medium text-[var(--color-text-primary)] shrink-0">
                       {formatAmount(edge.amount / 10000)}
                     </span>
                   </div>
                 );
               })}
               {unmatchedEdges.length > 5 && (
-                <p className="text-xs text-gray-500 text-center pt-1">
+                <p className="text-xs text-[var(--color-text-tertiary)] text-center pt-1">
                   还有 {unmatchedEdges.length - 5} 笔...
                 </p>
               )}
             </div>
           ) : (
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200 text-center">
-              <FileCheck className="h-5 w-5 text-green-600 mx-auto mb-1" />
-              <p className="text-sm text-green-700">全部发票匹配</p>
+            <div className="p-4 bg-[var(--color-success-bg)] rounded-lg border border-[var(--color-success-border)] text-center">
+              <FileCheck className="h-5 w-5 text-[var(--color-success)] mx-auto mb-1" />
+              <p className="text-sm text-[var(--color-success)]">全部发票匹配</p>
             </div>
           )}
         </div>
       </section>
 
       {/* 违规金额汇总 */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-6">
+      <section className="section-shell rounded-[12px] section-body">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-gray-600">违规金额占比</span>
-          <span className="text-lg font-semibold text-red-600">
+          <span className="text-sm text-[var(--color-text-secondary)]">违规金额占比</span>
+          <span className="text-lg font-semibold text-[var(--color-danger)]">
             {((fundFlowData.violationAmount / fundFlowData.totalAmount) * 100).toFixed(1)}%
           </span>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[var(--color-bg-layout)] rounded-full overflow-hidden">
           <div
-            className="h-full bg-red-500 rounded-full"
+            className="h-full bg-[var(--color-danger)] rounded-full"
             style={{
               width: `${(fundFlowData.violationAmount / fundFlowData.totalAmount) * 100}%`,
             }}
           />
         </div>
-        <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+        <div className="flex items-center justify-between mt-3 text-xs text-[var(--color-text-tertiary)]">
           <span>合规: {formatAmount((fundFlowData.totalAmount - fundFlowData.violationAmount) / 10000)}</span>
           <span>违规: {formatAmount(fundFlowData.violationAmount / 10000)}</span>
         </div>
@@ -347,56 +370,57 @@ export function FundFlow() {
 
   // 图谱主区域
   const mainPanel = (
-    <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-[500px] lg:min-h-0">
+    <section className="section-shell rounded-[12px] flex flex-col" style={{ minHeight: '600px' }}>
       {/* 图例 */}
-      <div className="px-5 py-3 border-b border-gray-200 bg-gray-50">
+      <div className="px-5 py-3 border-b border-[var(--color-card-border)] bg-[var(--color-bg-layout)]">
         <div className="flex items-center gap-4 text-xs">
-          <span className="text-gray-500">节点状态：</span>
+          <span className="text-[var(--color-text-tertiary)]">节点状态：</span>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="text-gray-600">正常</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-success)]" />
+            <span className="text-[var(--color-text-secondary)]">正常</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span className="text-gray-600">可疑</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-warning-light)]" />
+            <span className="text-[var(--color-text-secondary)]">可疑</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-            <span className="text-gray-600">违规</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-danger-light)]" />
+            <span className="text-[var(--color-text-secondary)]">违规</span>
           </div>
-          <span className="text-gray-400 mx-2">|</span>
-          <span className="text-gray-500">流向线：</span>
+          <span className="text-[var(--color-text-quaternary)] mx-2">|</span>
+          <span className="text-[var(--color-text-tertiary)]">流向线：</span>
           <div className="flex items-center gap-1.5">
-            <span className="w-5 h-0.5 bg-emerald-500 rounded" />
-            <span className="text-gray-600">发票匹配</span>
+            <span className="w-5 h-0.5 bg-[var(--color-success)] rounded" />
+            <span className="text-[var(--color-text-secondary)]">发票匹配</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-5 h-0.5 bg-red-500 rounded" />
-            <span className="text-gray-600">无发票</span>
+            <span className="w-5 h-0.5 bg-[var(--color-danger-light)] rounded" />
+            <span className="text-[var(--color-text-secondary)]">无发票</span>
           </div>
         </div>
       </div>
 
       {/* 图表 */}
-      <div ref={chartRef} className="flex-1 min-h-0" />
+      <div ref={chartRef} className="flex-1" style={{ minHeight: '500px' }} />
     </section>
   );
 
   return (
-    <div className="space-y-8 animate-fade-in-up">
+    <div className="module-page-stack animate-fade-in-up">
       {/* 页头 */}
       <PageHeader
         title="资金流向穿透图谱"
         subtitle={`${currentTask?.enterpriseName || '浙江华创科技有限公司'} · 受托支付合规监控`}
         icon={Banknote}
         secondaryActions={
-          <button
+          <Button
+            variant="secondary"
+            size="md"
+            leftIcon={<ArrowLeft className="h-4 w-4" />}
             onClick={() => navigate('/approval/dashboard')}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50"
           >
-            <ArrowLeft className="h-4 w-4" />
             返回审批工作台
-          </button>
+          </Button>
         }
         kpis={[
           { label: '发放总额', value: formatAmount(fundFlowData.totalAmount / 10000) },

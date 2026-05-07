@@ -35,7 +35,7 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
     <div className="space-y-5">
       {/* 统计概览 */}
       <div className="grid grid-cols-5 gap-3">
-        <StatBlock label="总完成率" value={`${completionRate}%`} color="text-gray-900" />
+        <StatBlock label="总完成率" value={`${completionRate}%`} color="text-[var(--color-text-primary)]" />
         <StatBlock label="已收取" value={received.toString()} color="text-[var(--risk-low-text)]" />
         <StatBlock label="待收取" value={pending.toString()} color="text-[var(--risk-medium-text)]" />
         <StatBlock label="逾期" value={overdue.toString()} color="text-[var(--risk-high-text)]" />
@@ -46,7 +46,7 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
       <div className="overflow-hidden rounded-xl border border-border-default">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 text-[11px] text-gray-500 uppercase">
+            <tr className="bg-[var(--color-bg-layout)] text-[11px] text-[var(--color-text-tertiary)] uppercase">
               <th className="text-left px-4 py-2.5 font-medium">分类</th>
               {STATUS_ORDER.map((s) => {
                 const cfg = checklistStatusConfig[s];
@@ -68,14 +68,14 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
               return (
                 <tr
                   key={cat}
-                  className={`border-b border-gray-50 cursor-pointer transition-colors ${
-                    isActive ? 'bg-[var(--risk-info-bg)]' : 'hover:bg-gray-50'
+                  className={`border-b border-[var(--color-bg-layout)] cursor-pointer transition-colors ${
+                    isActive ? 'bg-[var(--risk-info-bg)]' : 'hover:bg-[var(--color-bg-layout)]'
                   }`}
                   onClick={() => onSetFilter(isActive ? null : cat)}
                 >
                   <td className="px-4 py-3">
                     <span className="font-medium text-gray-800">{CHECKLIST_CATEGORY_LABELS[cat].zh}</span>
-                    <span className="text-[10px] text-gray-400 ml-1.5">{CHECKLIST_CATEGORY_LABELS[cat].id}</span>
+                    <span className="text-[10px] text-[var(--color-text-quaternary)] ml-1.5">{CHECKLIST_CATEGORY_LABELS[cat].id}</span>
                   </td>
                   {STATUS_ORDER.map((status) => {
                     const count = catItems.filter((i) => i.status === status).length;
@@ -87,20 +87,20 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
                             {count}
                           </span>
                         ) : (
-                          <span className="text-gray-200">—</span>
+                          <span className="text-[var(--color-text-placeholder)]">—</span>
                         )}
                       </td>
                     );
                   })}
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="flex-1 h-1.5 bg-[var(--color-progress-trail)] rounded-full overflow-hidden">
                         <div
                           className="h-full bg-brand rounded-full transition-all duration-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="text-[11px] text-gray-500 tabular-nums w-8 text-right">{pct}%</span>
+                      <span className="text-[11px] text-[var(--color-text-tertiary)] tabular-nums w-8 text-right">{pct}%</span>
                     </div>
                   </td>
                 </tr>
@@ -114,13 +114,13 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
       {filter && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-gray-800">
+            <h4 className="text-sm font-medium text-[var(--color-text-primary)]">
               {CHECKLIST_CATEGORY_LABELS[filter as ChecklistCategory]?.zh} — 清单明细
             </h4>
             <button
               type="button"
               onClick={() => onSetFilter(null)}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-xs text-[var(--color-text-quaternary)] hover:text-[var(--color-text-secondary)]"
             >
               取消筛选
             </button>
@@ -134,17 +134,17 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
                 <button
                   type="button"
                   onClick={() => setExpandedItem(isExpanded ? null : item.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--color-bg-layout)] transition-colors"
                 >
                   <span className={`w-2 h-2 rounded-full shrink-0 ${
                     item.status === 'received' ? 'bg-[var(--risk-low)]' :
                     item.status === 'pending' ? 'bg-[var(--risk-medium)]' :
                     item.status === 'overdue' ? 'bg-[var(--risk-high)]' :
-                    'bg-gray-300'
+                    'bg-[var(--color-border)]'
                   }`} />
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-gray-800">{item.documentName}</span>
-                    <span className="text-[10px] text-gray-400 ml-2">{item.documentNameId}</span>
+                    <span className="text-sm font-medium text-[var(--color-text-primary)]">{item.documentName}</span>
+                    <span className="text-[10px] text-[var(--color-text-quaternary)] ml-2">{item.documentNameId}</span>
                   </div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-lg font-medium ${statusCfg.bg} ${statusCfg.text}`}>
                     {statusCfg.label}
@@ -152,20 +152,20 @@ export function ChecklistMatrix({ items, filter, onSetFilter }: ChecklistMatrixP
                   {item.source === 'ai_extracted' && (
                     <Sparkles className="w-3.5 h-3.5 text-[var(--risk-info)]" />
                   )}
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                  <ChevronDown className={`w-4 h-4 text-[var(--color-text-quaternary)] transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                 </button>
                 {isExpanded && item.extractedData && (
-                  <div className="px-4 py-3 bg-gray-50 border-t border-border-default text-sm">
-                    <p className="text-gray-700 mb-2">{item.extractedData}</p>
-                    <div className="flex items-center gap-4 text-[11px] text-gray-400">
+                  <div className="px-4 py-3 bg-[var(--color-bg-layout)] border-t border-border-default text-sm">
+                    <p className="text-[var(--color-text-secondary)] mb-2">{item.extractedData}</p>
+                    <div className="flex items-center gap-4 text-[11px] text-[var(--color-text-quaternary)]">
                       {item.aiConfidence !== undefined && (
-                        <span>置信度: <strong className="text-gray-600">{item.aiConfidence}%</strong></span>
+                        <span>置信度: <strong className="text-[var(--color-text-secondary)]">{item.aiConfidence}%</strong></span>
                       )}
                       {item.pageNumber && (
-                        <span>来源页码: <strong className="text-gray-600">P{item.pageNumber}</strong></span>
+                        <span>来源页码: <strong className="text-[var(--color-text-secondary)]">P{item.pageNumber}</strong></span>
                       )}
                       {item.fileName && (
-                        <span>文件: <strong className="text-gray-600">{item.fileName}</strong></span>
+                        <span>文件: <strong className="text-[var(--color-text-secondary)]">{item.fileName}</strong></span>
                       )}
                     </div>
                   </div>
@@ -183,7 +183,7 @@ function StatBlock({ label, value, color }: { label: string; value: string; colo
   return (
     <div className="rounded-xl bg-white border border-border-default px-3 py-3 text-center">
       <p className={`text-lg font-medium tabular-nums ${color}`}>{value}</p>
-      <p className="text-[11px] text-gray-400 mt-0.5">{label}</p>
+      <p className="text-[11px] text-[var(--color-text-quaternary)] mt-0.5">{label}</p>
     </div>
   );
 }

@@ -13,17 +13,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-[#2563EB] text-white hover:bg-[#1D4ED8] focus:ring-2 focus:ring-blue-200 focus:ring-offset-1',
-  secondary: 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 focus:ring-2 focus:ring-slate-200',
+  primary:
+    'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-deep)] focus:ring-2 focus:ring-[var(--color-primary-focus-ring)] focus:ring-offset-1',
+  secondary:
+    'border border-[var(--color-border-soft)] bg-white text-[var(--color-text-primary)] hover:bg-[var(--color-bg-interactive-hover)] focus:ring-2 focus:ring-[var(--color-border-light)]',
   danger: 'bg-[#EF4444] text-white hover:bg-[#DC2626] focus:ring-2 focus:ring-red-200 focus:ring-offset-1',
   success: 'bg-[#10B981] text-white hover:bg-[#059669] focus:ring-2 focus:ring-emerald-200 focus:ring-offset-1',
   ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-2 focus:ring-slate-200',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'px-2.5 py-1 text-[12px] leading-4 gap-1',
-  md: 'px-3 py-2 text-[13px] leading-5 gap-1.5',
-  lg: 'px-4 py-2.5 text-[14px] leading-5 gap-2',
+  sm: 'h-8 px-3 text-[12px] leading-4 gap-1',
+  md: 'h-10 px-4 text-[13px] leading-5 gap-1.5',
+  lg: 'h-11 px-[18px] text-[14px] leading-5 gap-2',
 };
 
 const iconSizes: Record<ButtonSize, string> = {
@@ -50,7 +52,7 @@ export function Button({
       disabled={isDisabled}
       className={`
         inline-flex items-center justify-center
-        font-medium rounded-[6px]
+        font-medium rounded-[var(--radius-md)] whitespace-nowrap
         transition-all duration-150
         disabled:opacity-50 disabled:cursor-not-allowed
         ${variantStyles[variant]}

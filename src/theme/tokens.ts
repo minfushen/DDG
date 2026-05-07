@@ -1,85 +1,70 @@
-// ========================================
-// 信贷智能体平台 Design Tokens（Figma 对齐）
-// ========================================
+// 金融产品：冷蓝主色渐变 + 语义色；success 仍为森林绿（正向指标）
+const BRAND_GRADIENT = 'from-[#2563eb] to-[#3b82f6]';
 
-// Primary
-const BRAND_PRIMARY_GRADIENT = 'from-[#2563EB] to-[#3B82F6]';
-
-// 渐变类名（Tailwind）
-// 收敛为品牌蓝 + 语义状态色
 export const gradients = {
-  primary: BRAND_PRIMARY_GRADIENT,            // 品牌主渐变 — 主操作
-  blue: BRAND_PRIMARY_GRADIENT,               // 别名
-  green: 'from-[#10B981] to-[#34D399]',       // 成功系
-  amber: 'from-[#F59E0B] to-[#FBBF24]',       // 警告系
-  red: 'from-[#EF4444] to-[#F87171]',         // 危险系
+  primary: BRAND_GRADIENT,
+  blue: BRAND_GRADIENT,
+  green: 'from-[#15803d] to-[#22c55e]',
+  amber: 'from-[#854f0b] to-[#ef9f27]',
+  red: 'from-[#a32d2d] to-[#e24b4a]',
 } as const;
 
 export type GradientKey = keyof typeof gradients;
 
-// 语义化严重程度 — 风险等级专用
 export const severity = {
-  critical: { bg: 'bg-[#FEF2F2]', text: 'text-[#B91C1C]', border: 'border-[#FECACA]', gradient: 'red' as GradientKey },
-  high:     { bg: 'bg-[#FEF2F2]', text: 'text-[#B91C1C]', border: 'border-[#FECACA]', gradient: 'red' as GradientKey },
-  medium:   { bg: 'bg-[#FFFBEB]', text: 'text-[#B45309]', border: 'border-[#FDE68A]', gradient: 'amber' as GradientKey },
-  low:      { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]', border: 'border-[#A7F3D0]', gradient: 'green' as GradientKey },
-  info:     { bg: 'bg-[#EFF6FF]', text: 'text-[#1D4ED8]', border: 'border-[#BFDBFE]', gradient: 'blue' as GradientKey },
+  critical: { bg: 'bg-[rgba(163,45,45,0.08)]', text: 'text-[#a32d2d]', border: 'border-[rgba(226,75,74,0.35)]', gradient: 'red' as GradientKey },
+  high:     { bg: 'bg-[rgba(163,45,45,0.08)]', text: 'text-[#a32d2d]', border: 'border-[rgba(226,75,74,0.35)]', gradient: 'red' as GradientKey },
+  medium:   { bg: 'bg-[rgba(133,79,11,0.08)]', text: 'text-[#854f0b]', border: 'border-[rgba(239,159,39,0.35)]', gradient: 'amber' as GradientKey },
+  low:      { bg: 'bg-[rgba(21,128,61,0.08)]', text: 'text-[#15803d]', border: 'border-[rgba(34,197,94,0.35)]', gradient: 'green' as GradientKey },
+  info:     { bg: 'bg-[rgba(37,99,235,0.08)]', text: 'text-[#1e40af]', border: 'border-[var(--color-primary-border)]', gradient: 'blue' as GradientKey },
 } as const;
 
-// 通用任务/审批状态
 export const statusToken = {
-  // 基础状态
-  pending:     { bg: 'bg-[#F8FAFC]', text: 'text-[#475569]', border: 'border-[#E2E8F0]' },
-  in_progress: { bg: 'bg-[#EFF6FF]', text: 'text-[#1D4ED8]', border: 'border-[#BFDBFE]' },
-  completed:   { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]', border: 'border-[#A7F3D0]' },
-  rejected:    { bg: 'bg-[#FEF2F2]', text: 'text-[#B91C1C]', border: 'border-[#FECACA]' },
-  overdue:     { bg: 'bg-[#FEF2F2]', text: 'text-[#B91C1C]', border: 'border-[#FECACA]' },
+  pending:     { bg: 'bg-[var(--color-table-footer-surface)]', text: 'text-[var(--color-text-secondary)]', border: 'border-[var(--color-border-light)]' },
+  in_progress: { bg: 'bg-[rgba(37,99,235,0.08)]', text: 'text-[var(--color-primary-deep)]', border: 'border-[var(--color-primary-border)]' },
+  completed:   { bg: 'bg-[rgba(21,128,61,0.08)]', text: 'text-[#15803d]', border: 'border-[rgba(34,197,94,0.28)]' },
+  rejected:    { bg: 'bg-[rgba(163,45,45,0.08)]', text: 'text-[#a32d2d]', border: 'border-[rgba(226,75,74,0.35)]' },
+  overdue:     { bg: 'bg-[rgba(163,45,45,0.08)]', text: 'text-[#a32d2d]', border: 'border-[rgba(226,75,74,0.35)]' },
 
-  // 尽调任务 8 态生命周期
-  created:      { bg: 'bg-[#F8FAFC]', text: 'text-[#64748B]', border: 'border-[#E2E8F0]' },
-  gathering:    { bg: 'bg-[#EFF6FF]', text: 'text-[#1D4ED8]', border: 'border-[#BFDBFE]' },
-  analyzing:    { bg: 'bg-[#EFF6FF]', text: 'text-[#1D4ED8]', border: 'border-[#BFDBFE]' },
-  report_ready: { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]', border: 'border-[#A7F3D0]' },
-  under_review: { bg: 'bg-[#FFFBEB]', text: 'text-[#B45309]', border: 'border-[#FDE68A]' },
-  approved:     { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]', border: 'border-[#A7F3D0]' },
-  archived:     { bg: 'bg-[#F8FAFC]', text: 'text-[#94A3B8]', border: 'border-[#E2E8F0]' },
+  created:      { bg: 'bg-[var(--color-table-footer-surface)]', text: 'text-[var(--color-text-tertiary)]', border: 'border-[var(--color-border-light)]' },
+  gathering:    { bg: 'bg-[rgba(37,99,235,0.08)]', text: 'text-[var(--color-primary-deep)]', border: 'border-[var(--color-primary-border)]' },
+  analyzing:    { bg: 'bg-[rgba(37,99,235,0.08)]', text: 'text-[var(--color-primary-deep)]', border: 'border-[var(--color-primary-border)]' },
+  report_ready: { bg: 'bg-[rgba(21,128,61,0.08)]', text: 'text-[#15803d]', border: 'border-[rgba(34,197,94,0.28)]' },
+  under_review: { bg: 'bg-[rgba(133,79,11,0.08)]', text: 'text-[#854f0b]', border: 'border-[rgba(239,159,39,0.35)]' },
+  approved:     { bg: 'bg-[rgba(21,128,61,0.08)]', text: 'text-[#15803d]', border: 'border-[rgba(34,197,94,0.28)]' },
+  archived:     { bg: 'bg-[var(--color-table-footer-surface)]', text: 'text-[var(--color-text-quaternary)]', border: 'border-[var(--color-border-light)]' },
 } as const;
 
-// 图标尺寸映射
 export const iconSize = {
   sm: 'w-8 h-8 rounded-lg',
   md: 'w-10 h-10 rounded-xl',
   lg: 'w-12 h-12 rounded-xl',
 } as const;
 
-// 卡片样式预设 — 边框分层为主，弱阴影
 export const cardStyles = {
-  default: 'bg-white rounded-xl border border-[#E2E8F0]',
-  elevated: 'bg-white rounded-xl border border-[#E2E8F0] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)]',
-  interactive: 'bg-white rounded-xl border border-[#E2E8F0] hover:shadow-[0_4px_6px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.03)] transition-all duration-200',
+  default: 'bg-white rounded-[var(--radius-lg)] border border-[var(--color-card-border)]',
+  elevated: 'bg-white rounded-[var(--radius-lg)] border border-[var(--color-card-border)] shadow-[var(--shadow-card)]',
+  interactive: 'bg-white rounded-[var(--radius-lg)] border border-[var(--color-card-border)] shadow-[var(--shadow-card)] transition-all hover:shadow-[var(--shadow-card-hover)]',
 } as const;
 
-// 按钮样式预设
 export const buttonStyles = {
-  primary: 'bg-[#2563EB] text-white font-medium hover:bg-[#1D4ED8] transition-colors duration-200',
-  secondary: 'bg-white border border-[#E2E8F0] text-[#334155] font-medium hover:border-[#BFDBFE] hover:bg-[#F8FAFC] transition-colors duration-200',
-  danger: 'bg-[#EF4444] text-white font-medium hover:bg-[#DC2626] transition-colors duration-200',
-  success: 'bg-[#10B981] text-white font-medium hover:bg-[#059669] transition-colors duration-200',
-  ghost: 'text-[#64748B] font-medium hover:bg-[#F1F5F9] hover:text-[#334155] transition-colors duration-200',
+  primary: 'bg-[var(--color-primary)] text-white font-medium hover:bg-[var(--color-primary-deep)] transition-colors duration-200',
+  secondary: 'bg-white border border-[var(--color-border-soft)] text-[var(--color-text-primary)] font-medium hover:bg-[var(--color-bg-interactive-hover)] transition-colors duration-200',
+  danger: 'bg-[var(--color-danger)] text-white font-medium hover:opacity-90 transition-colors duration-200',
+  success: 'bg-[var(--color-success)] text-white font-medium hover:opacity-90 transition-colors duration-200',
+  ghost: 'text-[var(--color-text-secondary)] font-medium hover:bg-[var(--color-bg-interactive-hover)] hover:text-[var(--color-text-primary)] transition-colors duration-200',
 } as const;
 
-// 布局 Token
 export const layoutToken = {
-  pageMaxWidth: 'max-w-[1440px]',
-  sidebarWidth: 'w-[240px]',
-  sidebarCollapsedWidth: 'w-[72px]',
-  headerHeight: 'h-16',
-  sectionGap: 'space-y-6',
-  cardPadding: 'p-5',
-  cardPaddingSm: 'p-4',
+  pageMaxWidth: 'max-w-[min(100%,var(--content-max-width))]',
+  sidebarWidth: 'w-[var(--sider-width)]',
+  sidebarCollapsedWidth: 'w-[var(--sider-collapsed-width)]',
+  headerHeight: 'h-[var(--header-height)]',
+  sectionGap: 'space-y-[var(--section-gap)]',
+  cardPadding: 'p-[var(--spacing-md)]',
+  cardPaddingSm: 'p-[var(--spacing-sm)]',
 } as const;
 
-// 响应式断点
 export const breakpoints = {
   sm: '640px',
   md: '768px',
@@ -88,9 +73,6 @@ export const breakpoints = {
   '2xl': '1440px',
 } as const;
 
-// ========================================
-// 字体体系（Figma 1.2）
-// ========================================
 export const typography = {
   'display-l': 'text-[36px] leading-10 font-bold tracking-[-0.02em]',
   'display-m': 'text-[24px] leading-8 font-bold tracking-[-0.02em]',
@@ -104,9 +86,6 @@ export const typography = {
 
 export type TypographyKey = keyof typeof typography;
 
-// ========================================
-// 间距系统 — 8px Grid（Figma 1.3）
-// ========================================
 export const spacing = {
   1: '4px',
   2: '8px',

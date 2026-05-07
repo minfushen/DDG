@@ -1,2 +1,2 @@
 export { RadarChart } from './RadarChart';
-export { KnowledgeGraph } from './KnowledgeGraph';
+export { KnowledgeGraph, type KnowledgeGraphRef } from './KnowledgeGraph';

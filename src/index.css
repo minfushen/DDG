@@ -1,136 +1,91 @@
+@import "./styles/ref-tokens.css";
+@import "./styles/report-editor.css";
+@import "./styles/ref-bridge.css";
 @import "tailwindcss";
+@import "./styles/ref-shell.css";
 
-/* ========================================
-   金融工作台设计系统 v3.0
-   统一设计语言、统一布局骨架、统一交互语义
-   ======================================== */
-:root {
-  /* Figma 色彩 Token */
-  --brand-primary: #2563EB;
-  --brand-primary-light: #3B82F6;
-  --brand-primary-lighter: #93C5FD;
-  --brand-primary-bg: #EFF6FF;
-  --brand-primary-bg-dark: #DBEAFE;
+/**
+ * Tailwind @theme — 对齐参考项目 test003/frontend/src/styles/tailwind.css
+ */
+@theme {
+  --color-app-bg: var(--palette-bg-layout);
+  --color-app-bg-start: var(--palette-bg-layout);
+  --color-app-bg-end: var(--palette-bg-layout);
 
-  /* 语义状态色 — 仅用于状态，不作装饰 */
-  --success: #10B981;
-  --success-light: #34D399;
-  --success-bg: #ECFDF5;
-  --success-text: #047857;
+  --color-primary: var(--palette-primary);
+  --color-primary-deep: var(--palette-primary-deep);
+  --color-primary-light: var(--palette-primary-light);
+  --color-primary-bg: #eff6ff;
 
-  --warning: #F59E0B;
-  --warning-light: #FBBF24;
-  --warning-bg: #FFFBEB;
-  --warning-text: #B45309;
+  --color-accent-success: var(--palette-success);
+  --color-accent-warning: var(--palette-warning-light);
+  --color-accent-danger: var(--palette-danger-light);
 
-  --danger: #EF4444;
-  --danger-light: #F87171;
-  --danger-bg: #FEF2F2;
-  --danger-text: #B91C1C;
+  --color-text-primary: var(--palette-text-primary);
+  --color-text-secondary: var(--palette-text-secondary);
+  --color-text-muted: var(--palette-text-tertiary);
+  --color-text-weak: var(--palette-text-quaternary);
+  --color-text-quaternary: var(--palette-text-quaternary);
 
-  --info: #2563EB;
-  --info-bg: #EFF6FF;
-  --info-text: #1D4ED8;
+  --color-border-soft: var(--palette-border-soft);
+  --color-border-glass: var(--palette-border-glass);
 
-  /* 风险等级 — 语义状态别名 */
-  --risk-high: #DC2626;
-  --risk-high-bg: #FEE2E2;
-  --risk-high-text: #991B1B;
-  --risk-high-border: #FECACA;
-  --risk-high-glow: rgba(220, 38, 38, 0.25);
+  --color-glass: var(--palette-glass);
+  --color-glass-strong: var(--palette-bg-container);
+  --color-glass-hover: var(--palette-bg-container);
 
-  --risk-medium: #D97706;
-  --risk-medium-bg: #FEF3C7;
-  --risk-medium-text: #92400E;
-  --risk-medium-border: #FDE68A;
+  --shadow-glass: var(--shadow-surface);
+  --shadow-glass-sm: var(--shadow-sm);
+  --shadow-glass-lg: var(--shadow-lg);
+  --shadow-glow: var(--palette-shadow-glow);
 
-  --risk-low: #059669;
-  --risk-low-bg: #D1FAE5;
-  --risk-low-text: #065F46;
-  --risk-low-border: #A7F3D0;
+  --radius-glass: var(--radius-lg);
+  --radius-card: var(--radius-lg);
+  --radius-control: var(--radius-sm);
+  --radius-pill: var(--radius-full);
 
-  --risk-info: #1E40AF;
-  --risk-info-bg: #DBEAFE;
-  --risk-info-text: #1E40AF;
-  --risk-info-border: #93C5FD;
+  --blur-glass: var(--blur-topbar);
+  --blur-glass-strong: var(--blur-topbar);
 
-  /* 中性色 */
-  --gray-25: #FCFCFD;
-  --gray-50: #F8FAFC;
-  --gray-100: #F1F5F9;
-  --gray-200: #E2E8F0;
-  --gray-300: #CBD5E1;
-  --gray-400: #94A3B8;
-  --gray-500: #64748B;
-  --gray-600: #475569;
-  --gray-700: #334155;
-  --gray-800: #1E293B;
-  --gray-900: #0F172A;
-
-  /* 布局 Token */
-  --page-max-width: 1440px;
-  --sidebar-width: 240px;
-  --sidebar-collapsed-width: 64px;
-  --header-height: 56px;
-  --section-gap: 24px;
-  --card-padding: 20px;
-  --card-padding-sm: 16px;
-
-  /* 圆角 — 统一体系 */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-
-  /* 阴影 — 弱化，以边框分层为主 */
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
-  --shadow-elevated: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.03);
-  --shadow-modal: 0 10px 15px rgba(0,0,0,0.08), 0 4px 6px rgba(0,0,0,0.04);
-
-  /* 过渡 */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --color-success: var(--palette-success);
+  --color-warning: var(--palette-warning);
+  --color-danger: var(--palette-danger);
 }
 
-/* ========================================
-   Tailwind v4 语义色彩注册
-   ======================================== */
-@theme {
-  /* 品牌 */
-  --color-brand: #2563EB;
-  --color-brand-light: #3B82F6;
-  --color-brand-dark: #1D4ED8;
-  --color-brand-bg: #EFF6FF;
-  --color-brand-text: #1D4ED8;
+/* 本地保留：风险工具类 / TipTap / 骨架屏仍引用 */
+:root {
+  --card-padding: var(--spacing-lg);
+  --card-padding-sm: var(--spacing-md);
+  --section-gap: var(--spacing-md);
 
-  /* 表面层级 */
-  --color-surface-page: #F8FAFC;
-  --color-surface-card: #FFFFFF;
-  --color-surface-hover: #F1F5F9;
-  --color-surface-active: #EFF6FF;
+  --risk-high: var(--palette-danger-light);
+  --risk-high-bg: var(--color-error-bg);
+  --risk-high-text: var(--palette-danger);
+  --risk-high-border: var(--color-error-border);
+  --risk-high-glow: rgba(163, 45, 45, 0.22);
 
-  /* 中性文字 */
-  --color-text-primary: #0F172A;
-  --color-text-body: #334155;
-  --color-text-secondary: #475569;
-  --color-text-muted: #64748B;
+  --risk-medium: var(--palette-warning);
+  --risk-medium-bg: var(--color-warning-bg);
+  --risk-medium-text: var(--palette-warning);
+  --risk-medium-border: var(--color-warning-border);
 
-  /* 边框 */
-  --color-border-default: #E2E8F0;
-  --color-border-hover: #BFDBFE;
-  --color-border-strong: #CBD5E1;
+  --risk-low: var(--palette-success);
+  --risk-low-bg: var(--color-success-bg);
+  --risk-low-text: var(--palette-success);
+  --risk-low-border: var(--color-success-border);
 
-  /* 语义状态 */
-  --color-success: #10B981;
-  --color-success-bg: #ECFDF5;
-  --color-success-text: #047857;
-  --color-warning: #F59E0B;
-  --color-warning-bg: #FFFBEB;
-  --color-warning-text: #B45309;
-  --color-danger: #EF4444;
-  --color-danger-bg: #FEF2F2;
-  --color-danger-text: #B91C1C;
+  --risk-info: var(--palette-info);
+  --risk-info-bg: var(--color-info-bg);
+  --risk-info-text: var(--palette-info);
+  --risk-info-border: var(--color-info-border);
+
+  --gray-25: #fcfcfd;
+  --gray-50: #f8fafc;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
 }
 
 /* ========================================
@@ -148,9 +103,9 @@ html, body, #root {
 }
 
 body {
-  font-family: Inter, 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--gray-50);
-  color: var(--gray-800);
+  font-family: var(--font-family);
+  background: var(--color-bg-layout);
+  color: var(--color-text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -164,7 +119,7 @@ body {
 .page-container {
   height: 100%;
   overflow-y: auto;
-  background: var(--gray-50);
+  background: var(--surface-page);
 }
 
 /* 内容最大宽度容器 */

@@ -10,7 +10,7 @@ export function ScoreGauge({
   score,
   label = '综合评分',
   size = 180,
-  strokeWidth = 12,
+  strokeWidth = 8,
   className = '',
 }: ScoreGaugeProps) {
   const normalized = Math.max(0, Math.min(100, score));
@@ -26,7 +26,7 @@ export function ScoreGauge({
           cx={center}
           cy={center}
           r={radius}
-          stroke="#F1F5F9"
+          stroke="var(--color-score-ring-track)"
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -34,7 +34,7 @@ export function ScoreGauge({
           cx={center}
           cy={center}
           r={radius}
-          stroke="#2563EB"
+          stroke="var(--color-primary)"
           strokeWidth={strokeWidth}
           fill="none"
           strokeLinecap="round"
@@ -44,8 +44,8 @@ export function ScoreGauge({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[36px] leading-10 font-bold tracking-[-0.02em] text-slate-900">{normalized}</span>
-        <span className="text-[12px] leading-4 font-medium tracking-[0.01em] text-slate-500">{label}</span>
+        <span className="text-4xl font-bold tracking-[-0.02em] text-slate-900">{normalized}</span>
+        <span className="mt-0.5 text-xs font-medium tracking-[0.01em] text-slate-500">{label}</span>
       </div>
     </div>
   );

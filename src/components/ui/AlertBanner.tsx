@@ -21,10 +21,10 @@ const variantConfig: Record<InternalVariant, {
   icon: typeof Info;
 }> = {
   info: {
-    bg: 'bg-[#EFF6FF]',
-    border: 'border-[#BFDBFE]',
-    iconColor: 'text-[#1D4ED8]',
-    textColor: 'text-[#1D4ED8]',
+    bg: 'bg-[rgba(37,99,235,0.08)]',
+    border: 'border-[var(--color-primary-border)]',
+    iconColor: 'text-[var(--color-primary-deep)]',
+    textColor: 'text-[var(--color-primary-deep)]',
     icon: Info,
   },
   warning: {

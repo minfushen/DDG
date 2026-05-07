@@ -27,13 +27,13 @@ export function DataTable<T>({
   className = '',
 }: DataTableProps<T>) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden ${className}`}>
+    <div className={`overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-white ${className}`}>
       {/* Header */}
-      <div className="flex items-center gap-4 bg-slate-50 border-b border-slate-200 px-4 h-11">
+      <div className="flex h-10 items-center gap-4 border-b border-[var(--color-border-light)] bg-[var(--color-bg-layout)] px-4">
         {columns.map((col) => (
           <span
             key={col.key}
-            className="text-[12px] leading-4 font-medium text-slate-500 uppercase tracking-[0.05em]"
+            className="text-[12px] leading-4 font-medium uppercase tracking-[0.05em] text-[var(--color-text-secondary)]"
             style={col.width ? { width: col.width, flexShrink: 0 } : { flex: 1, minWidth: 0 }}
           >
             {col.header}
@@ -50,11 +50,11 @@ export function DataTable<T>({
           return (
             <div
               key={key}
-              className={`flex items-center gap-4 px-4 h-16 border-b border-slate-100 transition-colors duration-150 cursor-default
+              className={`flex h-14 cursor-default items-center gap-4 border-b border-[var(--color-border-light)] px-4 transition-colors duration-150
                 ${onRowClick ? 'cursor-pointer' : ''}
                 ${isSelected
-                  ? 'bg-[#EFF6FF] border-l-2 border-l-[#2563EB]'
-                  : 'bg-white hover:bg-slate-50'}
+                  ? 'border-l-2 border-l-[var(--color-primary)] bg-[var(--color-primary-bg)]'
+                  : 'bg-white hover:bg-[var(--color-bg-layout)]'}
               `}
               onClick={() => onRowClick?.(row)}
             >
@@ -73,7 +73,7 @@ export function DataTable<T>({
 
       {/* Footer */}
       {footer && (
-        <div className="bg-slate-50 border-t border-slate-200 px-4 py-3">
+        <div className="border-t border-[var(--color-border-light)] bg-[var(--color-bg-layout)] px-4 py-3">
           {footer}
         </div>
       )}

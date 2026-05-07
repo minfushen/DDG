@@ -13,7 +13,7 @@ import {
 import { useApprovalStore, useAgentSessionStore } from '../../../stores';
 import { GradientIcon, Card, TaskTimeline, StreamingText, AgentStatusIndicator } from '../../../components/ui';
 import type { ChatMessage } from '../../../types';
-import { copilotCommands, copilotResponses } from '../../../data/indonesia-story';
+import { copilotCommands, copilotResponses } from '../../../data/domestic-financial-story';
 import type { TaskStep } from '../../../components/ui/TaskTimeline';
 
 const quickQuestions = [
@@ -22,7 +22,7 @@ const quickQuestions = [
   '企业最近有什么风险变化？',
   '担保人的代偿能力如何？',
   '贷款用途是否合规？',
-  '对比 PSAK 三表数据',
+  '对比财务报表三表数据',
   '生成风险摘要',
 ];
 
@@ -499,7 +499,7 @@ function generateAIResponse(question: string, commandPrefix?: string, commandBod
     };
   }
 
-  if (question.includes('三表') || question.includes('PSAK')) {
+  if (question.includes('三表') || question.includes('财务报表')) {
     return {
       id: `msg-${Date.now()}`,
       role: 'assistant',

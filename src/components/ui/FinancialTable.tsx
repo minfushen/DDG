@@ -3,6 +3,20 @@ import {
 } from 'lucide-react';
 import type { FinancialStatement, StatementType, FinancialLineItem } from '../../types/psak';
 
+/**
+ * PSAK 表格视觉冻结 token（2026-05）
+ * 仅用于该页高密度财务表，锚定行高/字号/icon，避免后续逐处漂移。
+ */
+const PSAK_TABLE_VISUAL_TOKENS = {
+  tableMinWidth: 'min-w-[760px]',
+  rowPadding: 'py-2',
+  valueText: 'text-sm',
+  changeText: 'text-[11px]',
+  casText: 'text-[9px]',
+  casTone: 'text-slate-300/90',
+  turnaroundText: 'text-[10px]',
+} as const;
+
 interface FinancialTableProps {
   statements: FinancialStatement[];
   activeTab: StatementType;
@@ -11,9 +25,10 @@ interface FinancialTableProps {
   onHighlightItem: (id: string | null) => void;
 }
 
-function formatIDR(value: number): string {
+/** 万元 · 人民币 */
+function formatWanYuan(value: number): string {
   const abs = Math.abs(value);
-  const formatted = abs.toLocaleString('id-ID');
+  const formatted = abs.toLocaleString('zh-CN');
   return value < 0 ? `(${formatted})` : formatted;
 }
 
@@ -47,7 +62,7 @@ export function FinancialTable({
   return (
     <div>
       {/* Tab 切换 */}
-      <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
+      <div className="flex gap-1 mb-4 bg-[var(--color-bg-interactive-hover)] rounded-lg p-1">
         {statements.map((stmt) => (
           <button
             key={stmt.type}
@@ -55,24 +70,24 @@ export function FinancialTable({
             onClick={() => onTabChange(stmt.type)}
             className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
               activeTab === stmt.type
-                ? 'bg-white text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-white text-[var(--color-text-primary)]'
+                : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
             }`}
           >
             <div>{stmt.titleZh}</div>
-            <div className="text-[10px] text-gray-400 mt-0.5">{stmt.title}</div>
+            <div className="text-[10px] text-[var(--color-text-quaternary)] mt-0.5">{stmt.title}</div>
           </button>
         ))}
       </div>
 
       {/* 表格 */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className={`w-full ${PSAK_TABLE_VISUAL_TOKENS.tableMinWidth} text-sm`}>
           <thead>
-            <tr className="border-b border-border-default text-[11px] text-gray-500 uppercase">
-              <th className="text-left py-2 pr-3 font-medium">科目 / Akun</th>
-              <th className="text-right py-2 px-3 font-medium w-[100px]">当期</th>
-              <th className="text-right py-2 px-3 font-medium w-[100px]">上期</th>
+            <tr className="border-b border-border-default text-[11px] text-[var(--color-text-tertiary)] uppercase">
+              <th className="text-left py-2 pr-3 font-medium">科目</th>
+              <th className="text-right py-2 px-3 font-medium w-[100px]">当期（万元）</th>
+              <th className="text-right py-2 px-3 font-medium w-[100px]">上期（万元）</th>
               <th className="text-right py-2 pl-3 font-medium w-[70px]">变动</th>
             </tr>
           </thead>
@@ -89,9 +104,8 @@ export function FinancialTable({
         </table>
       </div>
 
-      {/* PSAK 条款说明 */}
-      <div className="mt-3 pt-3 border-t border-border-default text-[11px] text-gray-400">
-        基于 PSAK (Pernyataan Standar Akuntansi Keuangan) 印尼会计准则编制
+      <div className="mt-3 pt-3 border-t border-border-default text-[11px] text-[var(--color-text-quaternary)]">
+        金额单位为人民币万元；列报口径参考《企业会计准则》及财政部现行应用指南（演示数据）。
       </div>
     </div>
   );
@@ -107,44 +121,78 @@ function FinancialRow({
   const rate = changeRate(item.currentYear, item.priorYear);
   const isNegative = item.currentYear < 0;
   const indent = item.indent ?? 0;
+  const anomaly = rate !== null && (Math.abs(rate) > 50 || rate < -20);
+  const totalRow = !!item.isTotal;
+
+  const rateVisual = (() => {
+    if (rate === null) return null;
+    if (Math.abs(rate) < 0.05) return { cls: 'text-slate-400', Icon: Minus };
+    if (rate < 0) return { cls: 'text-[var(--color-danger)]', Icon: TrendingDown };
+    if (Math.abs(rate) > 50) return { cls: 'text-[var(--color-warning)]', Icon: TrendingUp };
+    return { cls: 'text-emerald-600', Icon: TrendingUp };
+  })();
+
+  const casTooltip = item.label?.trim() || undefined;
+  const casNumber = item.psakCode.match(/\d+/)?.[0];
+  const turnaround = item.priorYear < 0 && item.currentYear > 0;
+  const RateIcon = rateVisual?.Icon;
 
   return (
     <tr
-      className={`border-b border-gray-50 cursor-pointer transition-colors ${
-        highlighted ? 'bg-[var(--risk-info-bg)]' : 'hover:bg-gray-50'
-      } ${item.isTotal ? 'font-medium bg-gray-50/80' : ''}`}
+      title={casTooltip}
+      className={`border-b border-gray-100 cursor-pointer transition-colors ${
+        highlighted ? 'bg-[var(--risk-info-bg)]' : ''
+      } ${!highlighted && anomaly ? 'bg-[var(--color-warning-bg)]/70' : ''} ${
+        !highlighted && !anomaly ? 'hover:bg-slate-50/90' : ''
+      } ${totalRow ? 'border-t-2 border-t-slate-200 bg-slate-50' : ''}`}
       onClick={() => onHighlight(highlighted ? null : item.id)}
     >
-      <td className="py-2 pr-3">
-        <div style={{ paddingLeft: `${indent * 16}px` }}>
-          <div className={`text-gray-800 ${item.isTotal ? 'font-medium' : ''}`}>
+      <td className={`${PSAK_TABLE_VISUAL_TOKENS.rowPadding} pr-2 align-middle`}>
+        <div
+          style={{ paddingLeft: `${indent * 14}px` }}
+          className="flex items-baseline gap-1 min-w-0"
+        >
+          <span
+            className={`min-w-0 ${
+              totalRow ? 'font-semibold text-[var(--color-text-primary)]' :
+              indent >= 1 ? 'font-normal text-gray-800' :
+              'font-normal text-[var(--color-text-primary)]'
+            } whitespace-nowrap`}
+          >
             {item.labelZh}
-            {item.linkedItems && item.linkedItems.length > 0 && (
-              <Link2 className="w-3 h-3 text-[var(--risk-info)] inline ml-1" />
-            )}
-          </div>
-          <div className="text-[10px] text-gray-400">{item.label}</div>
+          </span>
+          {item.psakCode && item.psakCode !== '—' && (
+            <span className={`${PSAK_TABLE_VISUAL_TOKENS.casText} ${PSAK_TABLE_VISUAL_TOKENS.casTone} tabular-nums shrink-0`} aria-hidden>
+              {casNumber ?? item.psakCode}
+            </span>
+          )}
+          {item.linkedItems && item.linkedItems.length > 0 && (
+            <Link2 className="w-3 h-3 text-[var(--risk-info)] shrink-0" aria-label="联动科目" />
+          )}
         </div>
       </td>
-      <td className={`text-right py-2 px-3 tabular-nums ${isNegative ? 'text-[var(--risk-high-text)]' : 'text-gray-900'}`}>
-        {formatIDR(item.currentYear)}
+      <td className={`text-right ${PSAK_TABLE_VISUAL_TOKENS.rowPadding} px-2 tabular-nums ${PSAK_TABLE_VISUAL_TOKENS.valueText} ${isNegative ? 'text-[var(--color-danger)] font-medium' : 'text-[var(--color-text-primary)]'}`}>
+        {formatWanYuan(item.currentYear)}
       </td>
-      <td className="text-right py-2 px-3 text-gray-500 tabular-nums">
-        {formatIDR(item.priorYear)}
+      <td className={`text-right ${PSAK_TABLE_VISUAL_TOKENS.rowPadding} px-2 text-slate-600 tabular-nums ${PSAK_TABLE_VISUAL_TOKENS.valueText}`}>
+        {formatWanYuan(item.priorYear)}
       </td>
-      <td className="text-right py-2 pl-3">
-        {rate !== null && (
-          <span className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums ${
-            rate > 5 ? 'text-[var(--risk-low-text)]' :
-            rate < -5 ? 'text-[var(--risk-high-text)]' :
-            'text-gray-400'
-          }`}>
-            {rate > 5 ? <TrendingUp className="w-3 h-3" /> :
-             rate < -5 ? <TrendingDown className="w-3 h-3" /> :
-             <Minus className="w-3 h-3" />}
-            {rate > 0 ? '+' : ''}{rate.toFixed(1)}%
-          </span>
-        )}
+      <td className={`text-right ${PSAK_TABLE_VISUAL_TOKENS.rowPadding} pl-2 align-middle`}>
+        <div className="inline-flex w-full items-center justify-end gap-1">
+          {rate !== null && rateVisual && RateIcon ? (
+            <span className={`inline-flex items-center gap-0.5 ${PSAK_TABLE_VISUAL_TOKENS.changeText} tabular-nums font-medium ${rateVisual.cls}`}>
+              <RateIcon className="w-3 h-3 shrink-0" strokeWidth={2.5} />
+              {rate > 0 ? '+' : ''}{rate.toFixed(1)}%
+            </span>
+          ) : (
+            <span className={`${PSAK_TABLE_VISUAL_TOKENS.changeText} text-[var(--color-text-placeholder)] tabular-nums`}>—</span>
+          )}
+          {turnaround && (
+            <span className={`inline-flex rounded px-1.5 py-0.5 ${PSAK_TABLE_VISUAL_TOKENS.turnaroundText} font-medium text-amber-700 bg-[var(--color-warning-bg)] border border-amber-100`}>
+              扭亏
+            </span>
+          )}
+        </div>
       </td>
     </tr>
   );

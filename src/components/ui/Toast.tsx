@@ -2,10 +2,10 @@ import { X, CheckCircle2, Info, AlertTriangle, XCircle } from 'lucide-react';
 import { useDemoStore } from '../../stores';
 
 const typeConfig = {
-  success: { bg: 'bg-green-50 border-green-200', text: 'text-green-700', icon: CheckCircle2 },
-  info: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: Info },
+  success: { bg: 'bg-[var(--color-success-bg)] border-green-200', text: 'text-green-700', icon: CheckCircle2 },
+  info: { bg: 'bg-primary-bg border-[var(--color-primary-border)]', text: 'text-primary-deep', icon: Info },
   warning: { bg: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-700', icon: AlertTriangle },
-  error: { bg: 'bg-red-50 border-red-200', text: 'text-red-700', icon: XCircle },
+  error: { bg: 'bg-[var(--color-error-bg)] border-red-200', text: 'text-red-700', icon: XCircle },
 };
 
 export function ToastContainer() {

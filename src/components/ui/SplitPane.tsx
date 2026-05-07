@@ -36,13 +36,13 @@ export function SplitPane({
   // 文档对比模式 (30/40/30)
   if (mode === 'compare' && left && center && right) {
     return (
-      <div className={`grid gap-4 ${className}`}>
-        <div className="hidden xl:grid grid-cols-[3fr_4fr_3fr] gap-4">
+      <div className={`grid gap-[var(--section-gap)] ${className}`}>
+        <div className="hidden xl:grid grid-cols-[3fr_4fr_3fr] gap-[var(--section-gap)]">
           <div className="min-w-0">{left}</div>
           <div className="min-w-0">{center}</div>
           <div className="min-w-0">{right}</div>
         </div>
-        <div className="xl:hidden grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="xl:hidden grid grid-cols-1 gap-[var(--section-gap)] lg:grid-cols-2">
           <div className="min-w-0">{left}</div>
           <div className="min-w-0">{center}</div>
           <div className="min-w-0 lg:col-span-2">{right}</div>
@@ -51,17 +51,17 @@ export function SplitPane({
     );
   }
 
-  // 主内容 + 侧栏模式 (2/3 + 1/3)
+  // 主内容 + 侧栏：主区自适应 + 侧栏宽度 clamp 360–400px（masterplan 侧栏区间）
   if (mode === 'main-sidebar' && main && right) {
     return (
-      <div className={`grid gap-8 ${className}`}>
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
+      <div className={`grid gap-[var(--section-gap)] ${className}`}>
+        <div className="grid grid-cols-1 gap-[var(--section-gap)] lg:grid-cols-[minmax(0,1fr)_minmax(360px,400px)]">
           <div className="min-w-0">{main}</div>
-          <div className="min-w-0">
+          <div className="min-w-0 w-full max-lg:max-w-none">
             {collapsible && (
               <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="mb-2 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+                className="mb-2 flex items-center gap-1 text-xs text-[var(--color-text-quaternary)] hover:text-[var(--color-text-secondary)]"
               >
                 {collapsed ? (
                   <>
@@ -83,16 +83,16 @@ export function SplitPane({
     );
   }
 
-  // 侧栏 + 主内容模式 (1/3 + 2/3)
+  // 侧栏 + 主内容：左侧栏宽度 clamp 360–400px
   if (mode === 'sidebar-main' && left && main) {
     return (
-      <div className={`grid gap-8 ${className}`}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-8">
-          <div className="min-w-0">
+      <div className={`grid gap-[var(--section-gap)] ${className}`}>
+        <div className="grid grid-cols-1 gap-[var(--section-gap)] lg:grid-cols-[minmax(360px,400px)_minmax(0,1fr)]">
+          <div className="min-w-0 w-full max-lg:max-w-none">
             {collapsible && (
               <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="mb-2 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+                className="mb-2 flex items-center gap-1 text-xs text-[var(--color-text-quaternary)] hover:text-[var(--color-text-secondary)]"
               >
                 {collapsed ? (
                   <>
@@ -118,8 +118,8 @@ export function SplitPane({
   // 等宽双栏模式 (1/2 + 1/2)
   if (mode === 'equal' && left && right) {
     return (
-      <div className={`grid gap-8 ${className}`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className={`grid gap-[var(--section-gap)] ${className}`}>
+        <div className="grid grid-cols-1 gap-[var(--section-gap)] md:grid-cols-2">
           <div className="min-w-0">{left}</div>
           <div className="min-w-0">{right}</div>
         </div>

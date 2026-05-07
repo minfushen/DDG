@@ -87,9 +87,24 @@ src/
 
 ## 相关文档
 
+### SDD 规范驱动开发（必读）
+
+> 项目已从 Vibe Coding 切换到 SDD（Spec-Driven Development）。任何代码改动必须能在以下文档找到依据。
+
+- [`docs/sdd/README.md`](./docs/sdd/README.md)：SDD 文档体系索引（**先读这个**）
+- [`docs/sdd/constitution.md`](./docs/sdd/constitution.md)：项目宪法 — 永恒原则与技术红线
+- [`docs/sdd/prd.md`](./docs/sdd/prd.md)：产品需求 — 用户画像、用户故事、RICE、版本路线
+- [`docs/sdd/spec.md`](./docs/sdd/spec.md)：产品规范 — WHAT / WHY，业务用例契约
+- [`docs/sdd/plan.md`](./docs/sdd/plan.md)：⭐ **技术实施方案** — 架构、模块边界、数据流、迭代路线、ADR
+- [`docs/sdd/test.md`](./docs/sdd/test.md)：测试策略 — 金字塔、工具链、覆盖率、E2E 主旅程
+- [`docs/sdd/tasks.md`](./docs/sdd/tasks.md)：当前迭代任务清单
+
+### 业务与设计文档（被 SDD 引用）
+
 - `docs/BUSINESS-DESIGN.md`：业务状态机与指标语义
 - `docs/UI_DESIGN_SPEC.md`：统一 UI 设计规范
-- `docs/UI_REFACTOR_TASK_LIST.md`：UI 重构任务清单
+- `docs/UNIFIED_VISUAL_MASTERPLAN.md`：统一视觉总规范
+- `docs/UI_REFACTOR_TASK_LIST.md`：UI 重构任务清单（已被 tasks.md 收编）
 
 ## 核心特性
 

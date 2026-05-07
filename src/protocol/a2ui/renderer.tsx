@@ -133,7 +133,7 @@ registerA2UIComponent('Text', {
     const { content, className, size } = props as { content?: string; className?: string; size?: 'sm' | 'md' | 'lg' };
     const sizeClass = size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-lg' : 'text-base';
     return (
-      <p className={`${sizeClass} text-gray-700 ${className ?? ''}`}>
+      <p className={`${sizeClass} text-[var(--color-text-secondary)] ${className ?? ''}`}>
         {content ?? ''}
       </p>
     );
@@ -147,7 +147,7 @@ registerA2UIComponent('Markdown', {
     const { content } = props as { content?: string };
     // 简化的 Markdown 渲染（实际应使用 react-markdown）
     return (
-      <div className="prose prose-sm max-w-none text-gray-700">
+      <div className="prose prose-sm max-w-none text-[var(--color-text-secondary)]">
         {content?.split('\n').map((line, i) => (
           <p key={i}>{line}</p>
         )) ?? null}
@@ -179,8 +179,8 @@ registerA2UIComponent('Button', {
     const sizeClass = size === 'sm' ? 'h-8 px-3 text-sm' : size === 'lg' ? 'h-12 px-6 text-base' : 'h-10 px-4 text-sm';
 
     const variantClasses = {
-      primary: 'bg-blue-600 text-white shadow-md shadow-blue-500/20 hover:bg-blue-700',
-      secondary: 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+      primary: 'bg-primary text-white shadow-md shadow-primary/25 hover:bg-primary-deep',
+      secondary: 'border border-[var(--color-card-border)] bg-white text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-layout)]',
       danger: 'bg-red-600 text-white shadow-md shadow-red-500/20 hover:bg-red-700',
     };
 
@@ -241,7 +241,7 @@ registerA2UIComponent('StatusBadge', {
     const safeStatus = validateStatus(status, Object.keys(config));
 
     if (!safeStatus) {
-      return <span className="px-2 py-0.5 rounded-lg text-xs bg-gray-100 text-gray-600">{label ?? status}</span>;
+      return <span className="px-2 py-0.5 rounded-lg text-xs bg-[var(--color-bg-interactive-hover)] text-[var(--color-text-secondary)]">{label ?? status}</span>;
     }
 
     return <StatusBadge status={safeStatus} config={config} />;
@@ -266,23 +266,23 @@ registerA2UIComponent('FormField', {
 
     return (
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">
+        <label className="text-sm font-medium text-[var(--color-text-secondary)]">
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
         {fieldType === 'select' ? (
-          <select className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20">
+          <select className="w-full rounded-lg border border-[var(--color-card-border)] px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20">
             {options?.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
         ) : fieldType === 'checkbox' ? (
-          <input type="checkbox" className="rounded border-gray-200" />
+          <input type="checkbox" className="rounded border-[var(--color-card-border)]" />
         ) : (
           <input
             type={fieldType ?? 'text'}
             placeholder={placeholder}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-[var(--color-card-border)] px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20"
           />
         )}
       </div>

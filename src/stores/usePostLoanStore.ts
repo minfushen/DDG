@@ -13,7 +13,7 @@ import {
   mockPostLoanChecks,
   mockWarningRules,
   mockWarningStatistics,
-  mockEnterpriseRiskProfile,
+  mockEnterpriseRiskProfiles,
 } from '../services/mockPostLoanData';
 
 interface PostLoanState {
@@ -209,7 +209,7 @@ export const usePostLoanStore = create<PostLoanState>((set) => ({
 
   // 企业风险画像
   loadRiskProfiles: () => {
-    set({ riskProfiles: [mockEnterpriseRiskProfile] });
+    set({ riskProfiles: mockEnterpriseRiskProfiles });
   },
 
   selectProfile: (id: string) => {

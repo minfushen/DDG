@@ -1,0 +1,329 @@
+/**
+ * 设计令牌 — 金融产品：冷中性画布 + 高对比文字 + 冷蓝主交互；灰绿/Sage 仅作点缀或沿用 success 语义。
+ */
+
+:root {
+  /**
+   * 原子调色板：hex / 固定 rgba 只写在本节。
+   * --color-* 与 tailwind.css 的 @theme 均只引用 var(--palette-*)，避免两套色值漂移。
+   */
+  /** 主交互：偏冷蓝（crisp，偏金融产品气质） */
+  --palette-primary-deep: #1e40af;
+  --palette-primary: #2563eb;
+  --palette-primary-light: #93c5fd;
+  /** 原灰绿主色：收窄为装饰/图表点缀，不作为大面积主色 */
+  --palette-decorative-sage: #6f8f95;
+  --palette-decorative-sage-muted: #a8c0c3;
+  --palette-danger: #a32d2d;
+  --palette-danger-light: #e24b4a;
+  --palette-warning: #854f0b;
+  --palette-warning-light: #ef9f27;
+  --palette-success: #15803d;
+  --palette-success-light: #22c55e;
+  --palette-info: #1d4ed8;
+  --palette-info-light: #3b82f6;
+  --palette-purple: #3c3489;
+  --palette-text-primary: #0f172a;
+  --palette-text-secondary: #334155;
+  --palette-text-tertiary: #64748b;
+  --palette-text-quaternary: #94a3b8;
+  --palette-text-placeholder: #cbd5e1;
+  --palette-bg-layout: #f8fafc;
+  --palette-bg-container: #ffffff;
+  --palette-card-border: #e2e8f0;
+  /** 探照灯 / 佐证区暖色面（仅此处落 hex，组件用 --color-searchlight-*） */
+  --palette-searchlight-surface: #faf8f4;
+  --palette-searchlight-border: #ebe6dc;
+  --palette-searchlight-border-strong: #e0d8cc;
+  --palette-searchlight-border-tile: #e8e0d4;
+  --palette-progress-trail: #f0f0f0;
+  --palette-table-footer-surface: #fafbfc;
+  --palette-skeleton-shimmer-a: #f0f0f0;
+  --palette-skeleton-shimmer-b: #f8f8f8;
+  --palette-bg-disabled: #f3f5f6;
+  --palette-border-soft: rgba(31, 42, 48, 0.08);
+  --palette-border-glass: rgba(255, 255, 255, 0.8);
+  --palette-glass: rgba(255, 255, 255, 0.88);
+  --palette-shadow-glow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+
+  /* ========== 主色彩系统 ========== */
+  --color-primary-deep: var(--palette-primary-deep);
+  --color-primary: var(--palette-primary);
+  --color-primary-light: var(--palette-primary-light);
+  --color-primary-bg: #eff6ff;
+  --color-primary-bg-hover: rgba(37, 99, 235, 0.08);
+  --color-primary-border: rgba(37, 99, 235, 0.22);
+  --color-primary-border-strong: rgba(37, 99, 235, 0.38);
+  --color-primary-focus-ring: rgba(37, 99, 235, 0.22);
+  --color-primary-dark: var(--color-primary-deep);
+
+  /* ========== 风险状态语义色 ========== */
+  --color-danger: var(--palette-danger);
+  --color-danger-light: var(--palette-danger-light);
+  --color-warning: var(--palette-warning);
+  --color-warning-light: var(--palette-warning-light);
+  --color-success: var(--palette-success);
+  --color-success-light: var(--palette-success-light);
+  --color-info: var(--palette-info);
+  --color-purple: var(--palette-purple);
+
+  /* 兼容旧名（映射到设计语义色） */
+  --color-error: var(--color-danger);
+  --color-error-light: var(--color-danger-light);
+  --color-error-bg: rgba(163, 45, 45, 0.08);
+  --color-error-bg-strong: rgba(163, 45, 45, 0.14);
+  --color-error-border: rgba(163, 45, 45, 0.28);
+
+  --color-warning-bg: rgba(133, 79, 11, 0.08);
+  --color-warning-bg-strong: rgba(133, 79, 11, 0.14);
+  --color-warning-border: rgba(239, 159, 39, 0.35);
+
+  --color-success-bg: rgba(21, 128, 61, 0.08);
+  --color-success-bg-strong: rgba(21, 128, 61, 0.14);
+  --color-success-border: rgba(34, 197, 94, 0.28);
+
+  --color-info-light: var(--palette-info-light);
+  --color-info-bg: rgba(37, 99, 235, 0.08);
+  --color-info-border: rgba(37, 99, 235, 0.22);
+
+  /* ========== 中性面与边框 ========== */
+  --color-bg-layout: var(--palette-bg-layout);
+  --color-bg-interactive-hover: rgba(15, 23, 42, 0.045);
+  --color-bg-interactive-active: rgba(15, 23, 42, 0.075);
+  --color-bg-container: var(--palette-bg-container);
+  --color-bg-elevated: var(--palette-bg-container);
+  --color-bg-mask: rgba(0, 0, 0, 0.45);
+
+  --color-card-border: var(--palette-card-border);
+  /** 与历史 Tailwind @theme 对齐的软边框（略偏冷灰，与 --color-border 可并存） */
+  --color-border-soft: var(--palette-border-soft);
+  --color-border-glass: var(--palette-border-glass);
+  --color-glass: var(--palette-glass);
+  --color-glass-strong: var(--palette-bg-container);
+  --color-glass-hover: var(--palette-bg-container);
+  /** 首页 / 分析卡等「强调条」用色，与 success / warning-light / danger-light 对齐 */
+  --color-accent-success: var(--palette-success);
+  --color-accent-warning: var(--palette-warning-light);
+  --color-accent-danger: var(--palette-danger-light);
+  /** 与旧 @theme 中 app 背景命名对齐 */
+  --color-app-bg: var(--palette-bg-layout);
+  --color-app-bg-start: var(--palette-bg-layout);
+  --color-app-bg-end: var(--palette-bg-layout);
+  --color-border: rgba(31, 42, 48, 0.1);
+  --color-border-light: rgba(31, 42, 48, 0.06);
+  --color-border-dark: rgba(31, 42, 48, 0.14);
+  --color-border-focus: rgba(37, 99, 235, 0.45);
+
+  /* ========== 智能分析 · 评分环 / 分项条 / 风险徽章（presentation）========== */
+  --palette-score-ring-track: #e2e8f0;
+  --color-score-ring-track: var(--palette-score-ring-track);
+  /** 分项进度：≥80 优 / 60–79 警戒 / <60 劣 */
+  --color-score-excellent: #2563eb;
+  --color-score-warning: #f59e0b;
+  --color-score-danger: #ef4444;
+  /** 中风险等级色块（amber-50 / amber-700） */
+  --color-risk-badge-bg: #fffbeb;
+  --color-risk-badge-text: #b45309;
+
+  /* ========== 文字色阶（5 级）========== */
+  --color-text-primary: var(--palette-text-primary);
+  --color-text-secondary: var(--palette-text-secondary);
+  --color-text-tertiary: var(--palette-text-tertiary);
+  --color-text-quaternary: var(--palette-text-quaternary);
+  --color-text-placeholder: var(--palette-text-placeholder);
+  --color-text-disabled: var(--palette-text-placeholder);
+  --color-text-inverse: #ffffff;
+  /** 兼容 Tailwind 语义别名 */
+  --color-text-muted: var(--color-text-tertiary);
+  --color-text-weak: var(--color-text-quaternary);
+
+  /* ========== 间距（8px 基准）========== */
+  --spacing-none: 0;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+  --spacing-4xl: 48px;
+  --spacing-xxl: var(--spacing-3xl);
+  --spacing-compact: 6px;
+
+  /* ========== 字体 ========== */
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-family-mono: "SF Mono", "Fira Code", Consolas, monospace;
+
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 15px;
+  --font-size-kpi-min: 22px;
+  --font-size-kpi-max: 28px;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+  --line-height-loose: 1.75;
+
+  /* ========== 圆角规范 ========== */
+  --radius-progress: 2px;
+  --radius-tag: 2px;
+  --radius-badge: 4px;
+  --radius-sm: 6px;
+  /** 卡片 / 下拉 / 侧栏行 hover 等与稿 8px 一致 */
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-panel: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-none: 0;
+  --radius-full: 9999px;
+  /** 与旧 @theme --radius-pill 对齐 */
+  --radius-pill: var(--radius-full);
+
+  --radius-control: var(--radius-sm);
+  --radius-card: var(--radius-lg);
+  --radius-shell: var(--radius-panel);
+  --radius-glass: var(--radius-lg);
+
+  /* ========== 阴影 ========== */
+  --shadow-surface: 0 1px 2px rgba(31, 42, 48, 0.035), 0 2px 6px rgba(31, 42, 48, 0.035);
+  --shadow-sm: 0 1px 2px rgba(31, 42, 48, 0.035);
+  --shadow-md: 0 2px 8px rgba(31, 42, 48, 0.055);
+  --shadow-lg: 0 4px 16px rgba(31, 42, 48, 0.075);
+  --shadow-xl: 0 8px 24px rgba(31, 42, 48, 0.09);
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 2px rgba(31, 42, 48, 0.04), 0 2px 8px rgba(31, 42, 48, 0.04);
+  --shadow-card-hover: 0 2px 8px rgba(31, 42, 48, 0.065), 0 0 0 1px rgba(37, 99, 235, 0.12);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+  /** 顶栏 / 控件焦点外环等 */
+  --shadow-glow: var(--palette-shadow-glow);
+
+  /* ========== 布局（标准页面）========== */
+  --header-height: 44px;
+  --header-padding-x: 16px;
+  --sider-width: 196px;
+  --sider-collapsed-width: 52px;
+  /** 侧栏导航（设计稿）：一级行高、二级行高、激活指示条、分组标题字阶 */
+  --sider-nav-l1-height: 34px;
+  --sider-nav-l2-height: 28px;
+  --sider-nav-l3-height: 28px;
+  --sider-nav-active-indicator-width: 2px;
+  /** 一级分组标题：稿 9px；全局字阶要求组件内不小于 10px 时用 10px */
+  --sider-section-label-size: 10px;
+  --sider-brand-icon-size: 28px;
+  /** 侧栏字阶（对齐《字号体系》：L1=列表主标题 14/500，子导航 12/400，品牌 15/500 + 辅文 11/400） */
+  --sider-brand-title-size: var(--font-size-lg);
+  --sider-brand-title-weight: var(--font-weight-medium);
+  --sider-brand-subtitle-size: var(--font-size-xs);
+  --sider-nav-l1-font-size: var(--font-size-md);
+  --sider-nav-l1-font-weight: var(--font-weight-medium);
+  --sider-nav-leaf-font-size: var(--font-size-sm);
+  --sider-nav-leaf-font-weight: var(--font-weight-normal);
+  --sider-nav-l1-icon-size: 15px;
+  --sider-nav-leaf-icon-size: 14px;
+  --content-max-width: 1440px;
+  --content-padding-x: 16px;
+  --content-padding-y: 16px;
+  --section-gap: var(--spacing-md);
+  --page-padding: var(--content-padding-x);
+
+  /**
+   * 报告大纲（ReportGenerator）：sticky 顶距与主区上内边距一致，与顶栏下方内容网格对齐
+   * 列表滚动区高度：视口 − 顶栏 − 主区上下 padding（避免超出可视区域）
+   */
+  --report-toc-sticky-top: var(--content-padding-y);
+  --report-toc-scroll-max-height: min(
+    calc(100vh - var(--header-height) - var(--content-padding-y) - var(--content-padding-y)),
+    720px
+  );
+
+  /* ========== 动画时长（扩展）========== */
+  --duration-instant: 100ms;
+  --duration-fast: 200ms;
+  --duration-base: 300ms;
+  --duration-slow: 500ms;
+  --duration-slower: 800ms;
+
+  --transition-fast: 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ========== Z-index 层级系统（扩展）========== */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-overlay: 100;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 2000;
+
+  /* 顶栏为唯一主 blur 层时使用的模糊强度 */
+  --blur-topbar: 12px;
+
+  /* ========== 表格样式令牌（新增）========== */
+  --table-header-bg: var(--palette-table-footer-surface);
+  --table-header-text: var(--color-text-secondary);
+  --table-row-hover-bg: var(--color-bg-interactive-hover);
+  --table-row-selected-bg: var(--color-primary-bg);
+  --table-border-color: var(--color-border-light);
+  --table-cell-padding-y: 12px;
+  --table-cell-padding-x: 16px;
+  --table-cell-padding-y-sm: 8px;
+  --table-cell-padding-x-sm: 12px;
+
+  /* ========== 贷后 / 工作台业务语义（引用主 token，避免业务写死 hex）========== */
+  --color-sla-danger: var(--color-danger-light);
+  --color-sla-warning: var(--color-warning);
+  --color-queue-row-selected-bg: var(--color-primary-bg);
+  --color-kpi-footnote: var(--color-text-quaternary);
+  --layout-workbench-left-width: 280px;
+  --layout-workbench-gap: var(--spacing-md);
+  /**
+   * 工作台页：模块头 + 面包屑 + 筛选条 + 与主内容间距的估算扣减，
+   * 使双栏区 min-height 逼近「视口 − 顶栏 44px」稿意（壳层内非全屏时的折中）。
+   */
+  --workbench-page-header-offset: 168px;
+
+  --color-searchlight-surface: var(--palette-searchlight-surface);
+  --color-searchlight-border: var(--palette-searchlight-border);
+  --color-searchlight-border-strong: var(--palette-searchlight-border-strong);
+  --color-searchlight-border-tile: var(--palette-searchlight-border-tile);
+  --color-progress-trail: var(--palette-progress-trail);
+  --color-table-footer-surface: var(--palette-table-footer-surface);
+  --color-skeleton-shimmer-a: var(--palette-skeleton-shimmer-a);
+  --color-skeleton-shimmer-b: var(--palette-skeleton-shimmer-b);
+  --color-bg-disabled: var(--palette-bg-disabled);
+
+  /* 快捷入口图标强调（映射到主色阶 + 语义色） */
+  --accent-entry-primary: var(--color-primary);
+  --accent-entry-primary-deep: var(--color-primary-deep);
+  --accent-entry-success: var(--color-success);
+  --accent-entry-warning: var(--color-warning-light);
+  --accent-entry-danger: var(--color-danger-light);
+  --accent-entry-muted: var(--color-text-tertiary);
+  --accent-entry-purple: var(--color-purple);
+  --accent-entry-info: var(--color-info);
+
+  /**
+   * 组件使用等级（与稿一致，仅作文档锚点；实现使用上方变量名）
+   * radius: 2 → --radius-progress / --radius-tag；4 → --radius-badge；6 → --radius-sm；8 → --radius-lg；10 → --radius-panel；12 → --radius-xl
+   * space: 4/8/12/16/20/24/32/48 → --spacing-xs … --spacing-4xl
+   */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 预留暗色 */
+  }
+}

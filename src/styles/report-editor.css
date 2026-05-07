@@ -1,0 +1,106 @@
+/**
+ * 尽调报告编辑器阅读层级 — 与 ReportGenerator 共用
+ */
+:root {
+  --report-label: #64748b;
+  --report-body: #0f172a;
+  --report-highlight-num: #2563eb;
+  --report-section-border: var(--palette-primary, #2563eb);
+  --evidence-quote-bg: #f8fafc;
+  --evidence-quote-border: var(--palette-primary, #2563eb);
+}
+
+/* TipTap / ProseMirror 根节点 */
+.report-prose .ProseMirror {
+  color: var(--report-body);
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 52rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-bottom: 3rem;
+}
+
+.report-prose .ProseMirror:focus {
+  outline: none;
+}
+
+/* 章节内主标题 h3（1.1、2.1 等） */
+.report-prose .ProseMirror h3.report-h3,
+.report-prose .ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--report-body);
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--report-section-border);
+  letter-spacing: -0.02em;
+}
+
+.report-prose .ProseMirror h3:first-child {
+  margin-top: 0;
+}
+
+.report-prose .ProseMirror p {
+  margin-bottom: 1rem;
+  color: var(--report-body);
+}
+
+/* 标签式 strong 开头段落：「企业名称：」类 */
+.report-prose .ProseMirror p strong:first-child {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.06em;
+  color: var(--report-label);
+  margin-bottom: 0.35rem;
+}
+
+/* 紧跟标签的一句内容：若 strong 为整段标签，下一段为内容 — 无法纯 CSS 区分，仅弱化「：」前标签感 */
+.report-prose .ProseMirror ul,
+.report-prose .ProseMirror ol {
+  margin-bottom: 1rem;
+  padding-left: 1.25rem;
+}
+
+.report-prose .ProseMirror li {
+  margin-bottom: 0.35rem;
+}
+
+/* 溯源高亮（TipTap Highlight mark — 角标用 data-cite-num + ::after，避免嵌套 sup 被 schema 剥离） */
+.report-prose .ProseMirror .highlight {
+  background-color: #eff6ff;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.2rem;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.report-prose .ProseMirror .highlight:hover {
+  background-color: #dbeafe;
+}
+
+.report-prose .ProseMirror .highlight[data-ref] {
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.25);
+}
+
+.report-prose .ProseMirror .highlight[data-cite-num]::after {
+  content: attr(data-cite-num);
+  font-size: 0.68em;
+  font-weight: 600;
+  vertical-align: super;
+  margin-left: 0.125rem;
+  color: var(--report-highlight-num);
+  cursor: pointer;
+}
+
+/* 报告内嵌图表说明行（紧跟 chart 占位 div 的段落） */
+.report-prose .ProseMirror p.report-chart-note {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--report-label);
+  margin-top: -0.25rem;
+  margin-bottom: 1.25rem;
+}

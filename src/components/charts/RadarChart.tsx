@@ -10,9 +10,11 @@ interface RadarChartProps {
   data: RadarDataPoint[];
   max?: number;
   height?: number;
+  /** 隐藏雷达尖角上的维度名与数值点，仅保留多边形 — 适合旁侧另有维度列表时 */
+  chartOnly?: boolean;
 }
 
-export function RadarChart({ data, max = 100, height = 320 }: RadarChartProps) {
+export function RadarChart({ data, max = 100, height = 320, chartOnly = false }: RadarChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,7 +33,9 @@ export function RadarChart({ data, max = 100, height = 320 }: RadarChartProps) {
         indicator: data.map((d) => ({ name: d.name, max })),
         shape: 'polygon',
         splitNumber: 5,
-        axisName: { color: '#475569', fontSize: 13, fontWeight: 500, padding: [0, 8] },
+        axisName: chartOnly
+          ? { show: false }
+          : { color: '#475569', fontSize: 13, fontWeight: 500, padding: [0, 8] },
         splitLine: { lineStyle: { color: '#e2e8f0' } },
         splitArea: { show: true, areaStyle: { color: ['#f8fafc', '#f1f5f9', '#f8fafc', '#f1f5f9', '#f8fafc'] } },
         axisLine: { lineStyle: { color: '#e2e8f0' } },
@@ -45,7 +49,7 @@ export function RadarChart({ data, max = 100, height = 320 }: RadarChartProps) {
           lineStyle: { color: '#3b82f6', width: 2 },
           itemStyle: { color: '#3b82f6', borderColor: '#fff', borderWidth: 2 },
           label: {
-            show: true,
+            show: !chartOnly,
             formatter: (params: { value: number }) => params.value,
             color: '#64748b',
             fontSize: 11,
@@ -65,7 +69,7 @@ export function RadarChart({ data, max = 100, height = 320 }: RadarChartProps) {
       window.removeEventListener('resize', onResize);
       chart.dispose();
     };
-  }, [data, max]);
+  }, [data, max, chartOnly]);
 
   return <div ref={chartRef} style={{ width: '100%', height }} />;
 }

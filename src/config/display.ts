@@ -40,14 +40,14 @@ export const taskTypeConfig = {
 
 // --- 任务状态（尽调任务 8 态生命周期）---
 export const taskStatusConfig = {
-  created:      { ...statusToken.created, label: '已创建', icon: Inbox },
-  gathering:    { ...statusToken.gathering, label: '采集中', icon: RefreshCw },
-  analyzing:    { ...statusToken.analyzing, label: '分析中', icon: FileSearch },
-  report_ready: { ...statusToken.report_ready, label: '报告就绪', icon: CheckCircle2 },
-  under_review: { ...statusToken.under_review, label: '审批中', icon: ClipboardCheck },
-  approved:     { ...statusToken.approved, label: '已通过', icon: CheckCircle2 },
-  rejected:     { ...statusToken.rejected, label: '已驳回', icon: XCircle },
-  archived:     { ...statusToken.archived, label: '已归档', icon: Archive },
+  created:      { ...statusToken.created, label: '已创建', icon: Inbox, bg: 'bg-slate-100', text: 'text-slate-700' },
+  gathering:    { ...statusToken.gathering, label: '采集中', icon: RefreshCw, bg: 'bg-slate-100', text: 'text-slate-700' },
+  analyzing:    { ...statusToken.analyzing, label: '分析中', icon: FileSearch, bg: 'bg-slate-100', text: 'text-slate-700' },
+  report_ready: { ...statusToken.report_ready, label: '报告就绪', icon: CheckCircle2, bg: 'bg-[var(--color-success-bg)]', text: 'text-green-700' },
+  under_review: { ...statusToken.under_review, label: '审批中', icon: ClipboardCheck, bg: 'bg-slate-100', text: 'text-slate-700' },
+  approved:     { ...statusToken.approved, label: '已通过', icon: CheckCircle2, bg: 'bg-slate-100', text: 'text-slate-700' },
+  rejected:     { ...statusToken.rejected, label: '已驳回', icon: XCircle, bg: 'bg-slate-100', text: 'text-slate-700' },
+  archived:     { ...statusToken.archived, label: '已归档', icon: Archive, bg: 'bg-slate-100', text: 'text-slate-700' },
 } as const;
 
 // --- 审批状态 ---
@@ -104,7 +104,7 @@ export const warningStatusConfig = {
   active: { bg: 'bg-[var(--risk-high-bg)]', text: 'text-[var(--risk-high-text)]', label: '待处理', icon: AlertCircle },
   processing: { bg: 'bg-[var(--risk-info-bg)]', text: 'text-[var(--risk-info-text)]', label: '处理中', icon: Clock },
   resolved: { bg: 'bg-[var(--risk-low-bg)]', text: 'text-[var(--risk-low-text)]', label: '已解决', icon: CheckCircle2 },
-  ignored: { bg: 'bg-gray-50', text: 'text-gray-700', label: '已忽略', icon: XCircle },
+  ignored: { bg: 'bg-[var(--color-bg-layout)]', text: 'text-[var(--color-text-secondary)]', label: '已忽略', icon: XCircle },
 } as const;
 
 // --- 合同差异类型 ---
@@ -148,11 +148,11 @@ export const checkConclusionConfig = {
 
 // --- 文件类型 ---
 export const fileTypeConfig = {
-  pdf: { emoji: '📄', bg: 'bg-red-50', label: 'PDF' },
-  excel: { emoji: '📊', bg: 'bg-green-50', label: 'Excel' },
-  image: { emoji: '🖼️', bg: 'bg-blue-50', label: '图片' },
-  audio: { emoji: '🎵', bg: 'bg-blue-50', label: '音频' },
-  api: { emoji: '🔗', bg: 'bg-blue-50', label: 'API' },
+  pdf: { emoji: '📄', bg: 'bg-[var(--color-error-bg)]', label: 'PDF' },
+  excel: { emoji: '📊', bg: 'bg-[var(--color-success-bg)]', label: 'Excel' },
+  image: { emoji: '🖼️', bg: 'bg-primary-bg', label: '图片' },
+  audio: { emoji: '🎵', bg: 'bg-primary-bg', label: '音频' },
+  api: { emoji: '🔗', bg: 'bg-primary-bg', label: 'API' },
 } as const;
 
 // --- 数据源连接状态（语义色点 + 文案，避免彩虹背景块）---
@@ -167,9 +167,9 @@ export const priorityConfig = {
   ...riskLevelConfig,
 } as const;
 
-// --- PSAK 钩稽校验状态 ---
+// --- 财务报表钩稽校验状态 ---
 export const validationStatusConfig = {
-  pending: { bg: 'bg-gray-50', text: 'text-gray-400', label: '待校验', icon: Clock },
+  pending: { bg: 'bg-[var(--color-bg-layout)]', text: 'text-[var(--color-text-quaternary)]', label: '待校验', icon: Clock },
   running: { bg: 'bg-[var(--risk-info-bg)]', text: 'text-[var(--risk-info-text)]', label: '校验中', icon: RefreshCw },
   pass: { bg: 'bg-[var(--risk-low-bg)]', text: 'text-[var(--risk-low-text)]', label: '通过', icon: CheckCircle2 },
   fail: { bg: 'bg-[var(--risk-high-bg)]', text: 'text-[var(--risk-high-text)]', label: '不通过', icon: XCircle },
@@ -181,7 +181,7 @@ export const checklistStatusConfig = {
   received: { bg: 'bg-[var(--risk-low-bg)]', text: 'text-[var(--risk-low-text)]', label: '已收取', icon: CheckCircle2 },
   pending: { bg: 'bg-[var(--risk-medium-bg)]', text: 'text-[var(--risk-medium-text)]', label: '待收取', icon: Clock },
   overdue: { bg: 'bg-[var(--risk-high-bg)]', text: 'text-[var(--risk-high-text)]', label: '逾期', icon: AlertTriangle },
-  not_required: { bg: 'bg-gray-50', text: 'text-gray-400', label: '非必需', icon: Inbox },
+  not_required: { bg: 'bg-[var(--color-bg-layout)]', text: 'text-[var(--color-text-quaternary)]', label: '非必需', icon: Inbox },
 } as const;
 
 // --- 尽调清单分类 ---
@@ -197,8 +197,8 @@ export const checklistCategoryConfig = {
 export const cotPhaseConfig = {
   ingest: { label: '文件接收', color: 'bg-gray-400' },
   classify: { label: '智能分类', color: 'bg-[var(--risk-info)]' },
-  extract: { label: '信息提取', color: 'bg-blue-500' },
-  validate: { label: '钩稽校验', color: 'bg-blue-600' },
+  extract: { label: '信息提取', color: 'bg-primary' },
+  validate: { label: '钩稽校验', color: 'bg-primary' },
   analyze: { label: '风险分析', color: 'bg-[var(--risk-medium)]' },
   conclude: { label: '生成结论', color: 'bg-[var(--risk-low)]' },
 } as const;
