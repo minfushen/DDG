@@ -449,6 +449,80 @@ jobs:
 
 ---
 
+### M3+ - 业务能力深化期（建议 4 周）
+
+**目标**：深化财务分析能力，提升报告生成效率和质量。
+
+| 任务 | 输出 | 关联 US |
+|------|------|---------|
+| 财务分析专业组件 | `src/components/business/FinancialAnalysis/`：偿债/盈利/营运/现金流四维分析模板 | US-005 |
+| 行业对标分析组件 | `src/components/business/IndustryBenchmark/`：企业指标 vs 行业 P25/P50/P75 | US-006 |
+| 报告完成度仪表盘 | `src/components/ui/CompletionDashboard.tsx`：实时显示各章节完成状态 | US-007 |
+| 智能填充建议 | `src/hooks/useAutoFill.ts`：基于已有数据推荐待填内容 | US-008 |
+| 提示词模板管理 | `src/services/promptTemplates/`：按行业/风险类型管理提示词 | US-010 |
+
+**技术方案**：
+
+#### 财务分析专业组件
+
+```typescript
+// src/components/business/FinancialAnalysis/index.tsx
+interface FinancialAnalysisProps {
+  financials: FinancialData;
+  industry: string;
+  benchmark?: IndustryBenchmark;
+}
+
+// 四维分析模块
+- DebtCapacityAnalysis: 偿债能力（资产负债率/流动比率/速动比率/利息保障倍数）
+- ProfitabilityAnalysis: 盈利能力（毛利率/净利率/ROE/ROA）
+- OperationAnalysis: 营运能力（应收账款周转天数/存货周转率/总资产周转率）
+- CashFlowAnalysis: 现金流（经营现金流/净利润比率/自由现金流）
+
+// 每项指标包含：
+- 当前值
+- 趋势（上升/下降/稳定）
+- 行业对标（P25/P50/P75）
+- 偏离度（>20% 高亮）
+```
+
+#### 行业对标分析
+
+```typescript
+// src/components/business/IndustryBenchmark/index.tsx
+interface IndustryBenchmarkProps {
+  enterpriseMetrics: Record<string, number>;
+  industry: string;
+  metrics: MetricDefinition[];
+}
+
+// 数据来源：
+- 内置行业数据库（制造业/服务业/贸易等）
+- 支持自定义行业数据导入
+- 数据更新时间可查
+```
+
+#### 报告完成度仪表盘
+
+```typescript
+// src/components/ui/CompletionDashboard.tsx
+interface CompletionDashboardProps {
+  sections: ReportSection[];
+  onComplete: (sectionId: string) => void;
+}
+
+// 完成度计算规则：
+- 0%: 空章节
+- 50%: AI 生成但未人工审核
+- 100%: 人工审核通过
+
+// 阈值：
+- 整体完成度 < 80% 时禁止提交审批
+- 缺失数据的章节标记为"待补充"
+```
+
+---
+
 ### M4 - 智能体协议落地期（建议 3 周）
 
 **目标**：让 AG-UI / A2UI 协议真正驱动业务页面，而不是当前的演示骨架。
@@ -604,4 +678,5 @@ M0  M1   M2     M3        M4
 | v1.0 | 2026-05-06 | 首版，确立 5 阶段路线 + 8 条 ADR |
 | v1.1 | 2026-05-06 | ADR-002 闭环决策：采用 ky 作为 HTTP 客户端 |
 | v1.2 | 2026-05-07 | 更新 1.3 节演示数据描述：从单一企业扩展到 4 家企业 |
+| v1.3 | 2026-05-07 | 新增 M3+ 业务能力深化期：财务分析组件/行业对标/报告完成度/智能填充/提示词管理 |
 
