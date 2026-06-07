@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UI 降噪 · 三种页面骨架方向（对比稿）</title>
+  <style>
+    :root {
+      --brand: #1e40af;
+      --border: #e2e8f0;
+      --muted: #64748b;
+      --bg: #f8fafc;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+      background: var(--bg);
+      color: #0f172a;
+      line-height: 1.5;
+      padding: 24px 16px 48px;
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    .lead { color: var(--muted); margin: 0 0 24px; max-width: 900px; }
+    .grid {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      align-items: start;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .card h2 {
+      margin: 0;
+      padding: 14px 16px;
+      font-size: 15px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+    }
+    .card-body { padding: 14px 16px 16px; font-size: 13px; color: #334155; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: var(--brand);
+      margin-bottom: 10px;
+    }
+    .mock {
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+    }
+    .row { display: flex; gap: 8px; align-items: stretch; }
+    .col-main { flex: 1; min-width: 0; }
+    .col-side { width: 34%; min-width: 120px; border-left: 1px dashed #e2e8f0; padding-left: 8px; }
+    .bar {
+      height: 10px;
+      border-radius: 6px;
+      background: #e2e8f0;
+      margin: 6px 0;
+    }
+    .bar-sm { width: 55%; }
+    .bar-md { width: 78%; }
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .pros, .cons {
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12px;
+    }
+    .pros { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+    .cons { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    ul { margin: 8px 0 0 18px; padding: 0; }
+    .hint {
+      margin-top: 24px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 13px;
+      color: #475569;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>信贷工作台 · 降噪与版式：三种骨架方向</h1>
+  <p class="lead">
+    对照 <code>docs/UNIFIED_VISUAL_MASTERPLAN.md</code> 与 <code>docs/UI_DESIGN_SPEC.md</code>：
+    目标是<strong>降低首屏焦点数量</strong>、统一<strong>主栏 / 侧栏比例</strong>、减少<strong>重复 KPI 与装饰渐变</strong>。
+    下面是三种可落地的重构路径（可先选方向，再按导航顺序逐页收敛）。
+  </p>
+
+  <div class="grid">
+    <section class="card">
+      <h2>方案 A · 渐进披露（折叠 / 分段）</h2>
+      <div class="card-body">
+        <span class="badge">推荐起步：见效快</span>
+        <p>首屏只保留「任务列表 + 一句 AI 摘要 + 最多 3 个 KPI」。次要模块默认折叠或放到 Tabs。</p>
+        <div class="mock" aria-hidden="true">
+          <div class="row">
+            <div class="col-main">
+              <div class="pill">PageHeader（≤3 KPI）</div>
+              <div class="bar bar-md"></div>
+              <div class="pill">任务列表（主焦点）</div>
+              <div class="bar"></div><div class="bar"></div><div class="bar bar-sm"></div>
+              <div class="pill" style="opacity:.7">次要区块 ▸ 默认折叠</div>
+            </div>
+            <div class="col-side">
+              <div class="pill">侧栏 360–400</div>
+              <div class="bar"></div><div class="bar bar-sm"></div>
+            </div>
+          </div>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><strong>优点</strong><ul><li>改动集中在页面结构，不动业务逻辑</li><li>立刻降低信息密度</li></ul></div>
+          <div class="cons"><strong>代价</strong><ul><li>需要设计「默认展开」规则</li><li>折叠过多可能藏关键入口</li></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>方案 B · 模板硬化（布局组件强制执行）</h2>
+      <div class="card-body">
+        <span class="badge">推荐中期：一致性最强</span>
+        <p>把 <code>MainLayout + PageHeader + SplitPane</code> 做成<strong>唯一合法骨架</strong>：固定最大宽 1600、外边距断点、侧栏宽度、区块间距 24。</p>
+        <div class="mock" aria-hidden="true">
+          <div class="pill">Shell（max-w + px 断点）</div>
+          <div class="bar bar-md"></div>
+          <div class="row">
+            <div class="col-main">
+              <div class="pill">SectionHeader × N（统一）</div>
+              <div class="bar"></div>
+            </div>
+            <div class="col-side">
+              <div class="pill">固定侧栏</div>
+              <div class="bar bar-sm"></div>
+            </div>
+          </div>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><strong>优点</strong><ul><li>跨页一致，切页不断裂</li><li>后续迭代成本低</li></ul></div>
+          <div class="cons"><strong>代价</strong><ul><li>需要调整多数页面 markup</li><li>短期 PR 体积较大</li></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>方案 C · 混合（A + B 分期）</h2>
+      <div class="card-body">
+        <span class="badge">推荐默认（平衡风险）</span>
+        <p><strong>第一轮</strong>：全局 token / 间距 / PageHeader KPI 上限 / 侧栏宽度（骨架）。<strong>第二轮</strong>：按导航顺序逐页「折叠次要模块 + 合并重复 KPI」。</p>
+        <div class="mock" aria-hidden="true">
+          <div class="pill">M1：tokens + layout shell</div>
+          <div class="bar"></div>
+          <div class="pill">M2：Dashboard → Data → Analysis → …</div>
+          <div class="bar bar-md"></div>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><strong>优点</strong><ul><li>风险可控、可阶段性验收</li><li>对齐 SDD 与舒适度自检</li></ul></div>
+          <div class="cons"><strong>代价</strong><ul><li>周期更长</li><li>需维护任务清单</li></ul></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="hint">
+    <strong>如何查看本文件：</strong>在本地用浏览器打开此 HTML（双击或通过 Cursor「在浏览器中打开」）。
+    若你希望我把下一轮对比做成「左右并排真实页面截图占位」，请在下一条消息说明优先模块（例如：贷前尽调四条路由）。
+  </div>
+</body>
+</html>

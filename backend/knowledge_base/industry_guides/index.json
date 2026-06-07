@@ -1,0 +1,38 @@
+[
+  {
+    "id": "manufacturing",
+    "title": "制造业尽职调查要点",
+    "category": "行业指南",
+    "file": "manufacturing.md"
+  },
+  {
+    "id": "technology",
+    "title": "科技行业尽职调查要点",
+    "category": "行业指南",
+    "file": "technology.md"
+  },
+  {
+    "id": "real_estate",
+    "title": "房地产行业尽职调查要点",
+    "category": "行业指南",
+    "file": "real_estate.md"
+  },
+  {
+    "id": "retail",
+    "title": "零售行业尽职调查要点",
+    "category": "行业指南",
+    "file": "retail.md"
+  },
+  {
+    "id": "healthcare",
+    "title": "医疗健康行业尽职调查要点",
+    "category": "行业指南",
+    "file": "healthcare.md"
+  },
+  {
+    "id": "energy",
+    "title": "能源行业尽职调查要点",
+    "category": "行业指南",
+    "file": "energy.md"
+  }
+]

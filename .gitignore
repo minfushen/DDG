@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+backend/venv*/
+
+# Build output
+dist/
+
+# Environment
+.env
+backend/.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Playwright MCP temp files
+.playwright-mcp/

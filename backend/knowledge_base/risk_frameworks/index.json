@@ -1,0 +1,20 @@
+[
+  {
+    "id": "financial_risk_indicators",
+    "title": "财务风险指标体系",
+    "category": "风险框架",
+    "file": "financial_risk_indicators.md"
+  },
+  {
+    "id": "risk_scoring_model",
+    "title": "风险评分模型",
+    "category": "风险框架",
+    "file": "risk_scoring_model.md"
+  },
+  {
+    "id": "due_diligence_checklist",
+    "title": "尽调检查清单",
+    "category": "风险框架",
+    "file": "due_diligence_checklist.md"
+  }
+]

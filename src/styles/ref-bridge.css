@@ -1,0 +1,23 @@
+/**
+ * 桥接：参考项目 tokens（ref-tokens.css）与本项目现有变量名 / 工具类
+ */
+:root {
+  --brand-primary: var(--palette-primary);
+  --brand-primary-hover: var(--palette-primary-deep);
+  --brand-primary-light: var(--palette-primary-light);
+  --brand-primary-lighter: var(--palette-primary-light);
+  --brand-primary-bg: var(--color-primary-bg);
+  --brand-primary-bg-dark: var(--color-primary-bg-hover);
+
+  --page-max-width: var(--content-max-width);
+  --sidebar-width: var(--sider-width);
+  --sidebar-collapsed-width: var(--sider-collapsed-width);
+
+  --surface-page: var(--color-bg-layout);
+  --border-subtle: var(--color-border-light);
+
+  --gray-800: var(--color-text-primary);
+  --gray-900: var(--color-text-primary);
+  --gray-200: var(--color-card-border);
+  --gray-100: var(--color-table-footer-surface);
+}

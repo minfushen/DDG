@@ -1,0 +1,20 @@
+[
+  {
+    "id": "high_risk_case_1",
+    "title": "案例：某制造企业应收账款造假",
+    "category": "尽调案例",
+    "file": "high_risk_case_1.md"
+  },
+  {
+    "id": "high_risk_case_2",
+    "title": "案例：某科技公司估值泡沫破裂",
+    "category": "尽调案例",
+    "file": "high_risk_case_2.md"
+  },
+  {
+    "id": "success_case_1",
+    "title": "案例：某制造业企业成功尽调",
+    "category": "尽调案例",
+    "file": "success_case_1.md"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "due_diligence_report_template",
+    "title": "尽职调查报告模板",
+    "category": "报告模板",
+    "file": "due_diligence_report_template.md"
+  },
+  {
+    "id": "financial_analysis_template",
+    "title": "财务分析报告模板",
+    "category": "报告模板",
+    "file": "financial_analysis_template.md"
+  }
+]

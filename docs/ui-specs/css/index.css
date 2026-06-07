@@ -1,0 +1,359 @@
+@import "tailwindcss";
+
+/* ========================================
+   现代金融科技主题配色 v2.0
+   更大胆的色彩、更清晰的层次
+   ======================================== */
+:root {
+  /* 品牌主色 — 深邃蓝 */
+  --brand-primary: #1E40AF;
+  --brand-primary-light: #3B82F6;
+  --brand-primary-lighter: #60A5FA;
+  --brand-primary-bg: #DBEAFE;
+  --brand-primary-bg-dark: #BFDBFE;
+
+  /* 强调色 — 青色 */
+  --accent-cyan: #06B6D4;
+  --accent-cyan-bg: #CFFAFE;
+
+  /* 语义色 — 更饱和、更醒目 */
+  --success: #059669;
+  --success-light: #10B981;
+  --success-bg: #D1FAE5;
+  --success-text: #065F46;
+
+  --warning: #D97706;
+  --warning-light: #F59E0B;
+  --warning-bg: #FEF3C7;
+  --warning-text: #92400E;
+
+  --danger: #DC2626;
+  --danger-light: #EF4444;
+  --danger-bg: #FEE2E2;
+  --danger-text: #991B1B;
+
+  /* 风险等级 — 更鲜明的对比 */
+  --risk-high: #DC2626;
+  --risk-high-bg: #FEE2E2;
+  --risk-high-text: #991B1B;
+  --risk-high-border: #FECACA;
+
+  --risk-medium: #D97706;
+  --risk-medium-bg: #FEF3C7;
+  --risk-medium-text: #92400E;
+  --risk-medium-border: #FDE68A;
+
+  --risk-low: #059669;
+  --risk-low-bg: #D1FAE5;
+  --risk-low-text: #065F46;
+  --risk-low-border: #A7F3D0;
+
+  --risk-info: #1E40AF;
+  --risk-info-bg: #DBEAFE;
+  --risk-info-text: #1E40AF;
+  --risk-info-border: #93C5FD;
+
+  /* 中性色 — 更深的对比 */
+  --gray-25: #FCFCFD;
+  --gray-50: #F9FAFB;
+  --gray-100: #F3F4F6;
+  --gray-200: #E5E7EB;
+  --gray-300: #D1D5DB;
+  --gray-400: #9CA3AF;
+  --gray-500: #6B7280;
+  --gray-600: #4B5563;
+  --gray-700: #374151;
+  --gray-800: #1F2937;
+  --gray-900: #111827;
+
+  /* 渐变 */
+  --gradient-primary: linear-gradient(135deg, #1E40AF 0%, #3B82F6 50%, #06B6D4 100%);
+  --gradient-accent: linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%);
+  --gradient-success: linear-gradient(135deg, #059669 0%, #10B981 100%);
+  --gradient-warning: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
+  --gradient-danger: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+  --gradient-card: linear-gradient(180deg, #FFFFFF 0%, #F9FAFB 100%);
+  --gradient-dark: linear-gradient(135deg, #1F2937 0%, #374151 100%);
+
+  /* 阴影 — 更有层次 */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+
+  /* 品牌阴影 */
+  --shadow-primary: 0 4px 14px 0 rgb(30 64 175 / 0.25);
+  --shadow-primary-lg: 0 8px 24px 0 rgb(30 64 175 / 0.3);
+  --shadow-cyan: 0 4px 14px 0 rgb(6 182 212 / 0.25);
+  --shadow-success: 0 4px 14px 0 rgb(5 150 105 / 0.25);
+  --shadow-warning: 0 4px 14px 0 rgb(217 119 6 / 0.25);
+  --shadow-danger: 0 4px 14px 0 rgb(220 38 38 / 0.25);
+
+  /* 发光效果 */
+  --glow-primary: 0 0 20px rgb(30 64 175 / 0.3);
+  --glow-cyan: 0 0 20px rgb(6 182 212 / 0.3);
+
+  /* 圆角 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+
+  /* 过渡 */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ========================================
+   基础重置
+   ======================================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%);
+  color: var(--gray-800);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========================================
+   自定义滚动条
+   ======================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--gray-300) 0%, var(--gray-400) 100%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--gray-400) 0%, var(--gray-500) 100%);
+}
+
+/* ========================================
+   动画定义
+   ======================================== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: var(--glow-primary); }
+  50% { box-shadow: 0 0 30px rgb(30 64 175 / 0.4); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes progress {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.02); opacity: 0.9; }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 动画类 */
+.animate-fade-in { animation: fadeIn 0.25s ease-out; }
+.animate-fade-in-up { animation: fadeInUp 0.35s ease-out; }
+.animate-fade-in-down { animation: fadeInDown 0.35s ease-out; }
+.animate-slide-in-left { animation: slideInLeft 0.3s ease-out; }
+.animate-slide-in-right { animation: slideInRight 0.3s ease-out; }
+.animate-scale-in { animation: scaleIn 0.25s ease-out; }
+.animate-pulse { animation: pulse 2s infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-glow { animation: glow 2s ease-in-out infinite; }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-breathe { animation: breathe 3s ease-in-out infinite; }
+.animate-gradient { animation: gradientShift 3s ease infinite; background-size: 200% 200%; }
+
+/* 骨架屏 */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--gray-100) 25%,
+    var(--gray-200) 50%,
+    var(--gray-100) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ========================================
+   TipTap 编辑器样式
+   ======================================== */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p {
+  margin: 0.75rem 0;
+}
+
+.ProseMirror h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin: 1.5rem 0 0.75rem;
+}
+
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror li {
+  margin: 0.25rem 0;
+}
+
+.ProseMirror strong {
+  color: var(--gray-900);
+}
+
+.ProseMirror .highlight {
+  background: linear-gradient(120deg, var(--brand-primary-bg) 0%, #E0E7FF 100%);
+  padding: 0.125rem 0.25rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ProseMirror .highlight:hover {
+  background: linear-gradient(120deg, var(--brand-primary-bg-dark) 0%, #C7D2FE 100%);
+  box-shadow: 0 0 0 2px var(--brand-primary-lighter);
+}
+
+/* ========================================
+   响应式工具类
+   ======================================== */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* ========================================
+   深色模式支持（预留）
+   ======================================== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gray-50: #111827;
+    --gray-100: #1F2937;
+    --gray-200: #374151;
+    --gray-800: #F3F4F6;
+    --gray-900: #F9FAFB;
+  }
+}
