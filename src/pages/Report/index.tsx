@@ -19,6 +19,35 @@ interface ReportData {
   risk_rating: string;
   risk_score: number;
   recommendation: string;
+  report_type?: string;
+  years?: string[];
+  generated_from?: string;
+  sections?: FinancialReportSection[];
+  risk_summary?: string[];
+}
+
+interface FinancialReportRow {
+  item: string;
+  values: Record<string, string>;
+}
+
+interface FinancialReportTable {
+  columns: string[];
+  rows: FinancialReportRow[];
+}
+
+interface FinancialReportSubsection {
+  title: string;
+  unit?: string;
+  table?: FinancialReportTable;
+  analysis?: string[];
+  risks?: string[];
+  risk提示?: string;
+}
+
+interface FinancialReportSection {
+  title: string;
+  subsections: FinancialReportSubsection[];
 }
 
 // ── 参考数据（行业基准，待后端丰富后替换）─────────────────────
@@ -40,10 +69,10 @@ const FINANCIAL_METRICS = [
 ];
 
 const LEGAL_ITEMS = [
-  { type: '裁判文书', count: 3, description: '合同纠纷案件，均已结案，企业作为被告承担次要责任', severity: 'low' as const },
-  { type: '行政处罚', count: 2, description: '2024年环保处罚85万元，2025年税务处罚12万元', severity: 'medium' as const },
-  { type: '失信被执行人', count: 0, description: '无失信被执行记录', severity: 'low' as const },
-  { type: '股权出质', count: 1, description: '实控人部分股权质押，质押比例15%', severity: 'low' as const },
+  { type: '裁判文书', count: 3, description: '合同纠纷案件，均已结案，企业作为被告承担次要责任', severity: 'low' },
+  { type: '行政处罚', count: 2, description: '2024年环保处罚85万元，2025年税务处罚12万元', severity: 'medium' },
+  { type: '失信被执行人', count: 0, description: '无失信被执行记录', severity: 'low' },
+  { type: '股权出质', count: 1, description: '实控人部分股权质押，质押比例15%', severity: 'low' },
 ];
 
 const EVIDENCE_DOCS = [
@@ -84,6 +113,115 @@ function riskBgClass(rating: string): string {
 
 function dimStatusColor(status: 'low' | 'medium' | 'high'): string {
   return status === 'low' ? '#22C55E' : status === 'medium' ? '#F59E0B' : '#DC2626';
+}
+
+function FinancialReportTableView({ table }: { table: FinancialReportTable }) {
+  return (
+    <div className="overflow-x-auto border border-[#E5E7EB] rounded-lg bg-white">
+      <table className="w-full min-w-[560px]">
+        <thead>
+          <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
+            <th className="px-4 py-3 text-left text-xs font-semibold text-[#667085]">科目</th>
+            {table.columns.map((column) => (
+              <th key={column} className="px-4 py-3 text-right text-xs font-semibold text-[#667085]">
+                {column}年
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row) => (
+            <tr key={row.item} className="border-b border-[#F3F4F6] last:border-0">
+              <td className="px-4 py-3 text-sm font-medium text-[#101828] whitespace-nowrap">{row.item}</td>
+              {table.columns.map((column) => (
+                <td key={column} className="px-4 py-3 text-sm text-right text-[#374151] font-mono whitespace-nowrap">
+                  {row.values[column] ?? '数据不可用'}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskId?: string }) {
+  return (
+    <div className="min-h-screen bg-[#F9FAFB]">
+      <div className="max-w-[1040px] mx-auto px-6 py-8">
+        <header className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-xl font-bold text-[#101828]">客户财务状况大模型分析报告</h1>
+            <p className="text-xs text-[#9CA3AF] mt-1">
+              {report.enterprise_name} · 任务ID: {taskId} · 数据来源：{report.generated_from || '用户上传财报'}
+            </p>
+          </div>
+          <div className={`${riskBgClass(report.risk_rating)} px-4 py-2 rounded-lg border border-[#E5E7EB] text-right`}>
+            <div className={`text-sm font-semibold ${riskColorClass(report.risk_rating)}`}>
+              {riskLabel(report.risk_rating)} · {report.risk_score}分
+            </div>
+            <div className="text-xs text-[#667085] mt-0.5">{report.recommendation}</div>
+          </div>
+        </header>
+
+        <div className="space-y-8">
+          {report.sections?.map((section) => (
+            <section key={section.title} className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+              <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">
+                {section.title}
+              </h2>
+              <div className="space-y-6">
+                {section.subsections.map((subsection) => (
+                  <div key={subsection.title}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-base font-semibold text-[#101828]">{subsection.title}</h3>
+                      {subsection.unit && <span className="text-xs text-[#9CA3AF]">单位：{subsection.unit}</span>}
+                    </div>
+
+                    {subsection.table && <FinancialReportTableView table={subsection.table} />}
+
+                    {subsection.analysis && subsection.analysis.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {subsection.analysis.map((paragraph, index) => (
+                          <p key={index} className="text-sm leading-7 text-[#374151]">
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {subsection.risk提示 && (
+                      <div className="mt-4 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg">
+                        <p className="text-sm text-[#92400E]">{subsection.risk提示}</p>
+                      </div>
+                    )}
+
+                    {subsection.risks && subsection.risks.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {subsection.risks.map((risk, index) => (
+                          <div key={index} className="flex items-start gap-2 text-sm text-[#374151]">
+                            <AlertTriangle className="w-4 h-4 text-[#F59E0B] mt-0.5 flex-shrink-0" />
+                            <span>{risk}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <footer className="pt-8 mt-8 border-t border-[#E5E7EB] text-center">
+          <p className="text-xs text-[#D1D5DB]">
+            本报告由尽调 Agent 基于上传财务报表自动生成，仅供客户经理尽调参考
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
 }
 
 // ── 组件 ──────────────────────────────────────────
@@ -149,6 +287,10 @@ export function ReportPage() {
         </div>
       </div>
     );
+  }
+
+  if (report?.report_type === 'financial_analysis') {
+    return <FinancialAnalysisReport report={report} taskId={taskId} />;
   }
 
   return (

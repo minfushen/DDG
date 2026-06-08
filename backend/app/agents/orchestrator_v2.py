@@ -38,6 +38,60 @@ short_term_memory = ShortTermMemory()
 long_term_memory = LongTermMemory()
 
 
+RATE_LIMIT_RETRY_DELAYS = (8, 20, 45)
+
+
+def is_rate_limit_error(error: Exception) -> bool:
+    """判断是否为上游模型限流错误。"""
+    error_text = str(error).lower()
+    return (
+        "ratelimit" in error_text
+        or "rate limit" in error_text
+        or "too many requests" in error_text
+        or "429" in error_text
+    )
+
+
+async def run_node_with_rate_limit_retry(
+    node_func,
+    state: OrchestratorState,
+    label: str,
+) -> OrchestratorState:
+    """在线程中执行阻塞节点，并对模型限流做退避重试。"""
+    last_error: Optional[Exception] = None
+
+    for attempt, delay in enumerate((0, *RATE_LIMIT_RETRY_DELAYS), start=1):
+        if delay:
+            await asyncio.sleep(delay)
+
+        try:
+            return await asyncio.to_thread(node_func, state)
+        except Exception as e:
+            last_error = e
+            if not is_rate_limit_error(e):
+                raise
+            if attempt > len(RATE_LIMIT_RETRY_DELAYS):
+                break
+
+    detail = str(last_error) if last_error else "未知限流错误"
+    return {
+        **state,
+        "agent_state": "forming_conclusion",
+        "error": f"{label} 请求过于频繁，已自动重试但仍被上游限流。请稍后重试。",
+        "timeline": state["timeline"] + [
+            {
+                "id": str(uuid.uuid4()),
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "agent": "系统",
+                "content": f"{label} 被上游模型限流",
+                "detail": detail,
+                "status": "completed",
+                "type": "risk",
+            }
+        ],
+    }
+
+
 def create_task(state: OrchestratorState) -> OrchestratorState:
     """创建任务并解析用户意图"""
     intent = parse_intent(state["enterprise_name"])
@@ -100,6 +154,38 @@ def parse_intent(enterprise_name: str) -> Intent:
     return {"type": "full", "target": None}
 
 
+def is_likely_listed_company(enterprise_name: str) -> bool:
+    """保守判断是否为已知上市公司。
+
+    真实股票代码解析器接入前，未命中即视为非上市/未知，财务分析需上传。
+    """
+    listed_keywords = [
+        "欣旺达", "比亚迪", "宁德时代", "贵州茅台", "招商银行", "平安银行",
+        "万科", "美的", "格力", "海康威视", "立讯精密", "隆基绿能",
+    ]
+    return any(keyword in enterprise_name for keyword in listed_keywords)
+
+
+def make_upload_required_state(state: OrchestratorState) -> OrchestratorState:
+    """生成等待上传近三年财报的状态。"""
+    return {
+        **state,
+        "agent_state": "waiting_upload",
+        "timeline": state["timeline"] + [
+            {
+                "id": str(uuid.uuid4()),
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "agent": "财务Agent",
+                "content": "等待上传近三年财务报表",
+                "detail": "非上市企业财务分析需上传利润表、资产负债表、现金流量表，支持 Excel/CSV",
+                "status": "running",
+                "type": "action",
+            }
+        ],
+        "error": None,
+    }
+
+
 def run_plan_agent(state: OrchestratorState) -> OrchestratorState:
     try:
         from app.agents.crew.roles import create_plan_agent
@@ -118,6 +204,7 @@ def run_plan_agent(state: OrchestratorState) -> OrchestratorState:
             process=Process.sequential,
             verbose=True,
             memory=False,
+            max_rpm=3,
         )
         result = plan_crew.kickoff(inputs={
             "enterprise_name": state["enterprise_name"],
@@ -164,6 +251,9 @@ def run_plan_agent(state: OrchestratorState) -> OrchestratorState:
             ],
         }
     except Exception as e:
+        if is_rate_limit_error(e):
+            raise
+
         default_plan = {
             "steps": [
                 {"id": "business_analysis", "name": "工商分析", "agent": "business_agent", "tools": ["search_enterprise_info"], "output": "工商分析报告"},
@@ -273,6 +363,9 @@ def run_crew(state: OrchestratorState) -> OrchestratorState:
             "crew_result": {"raw": str(result)},
         }
     except Exception as e:
+        if is_rate_limit_error(e):
+            raise
+
         return {
             **state,
             "agent_state": "forming_conclusion",
@@ -292,84 +385,43 @@ def run_crew(state: OrchestratorState) -> OrchestratorState:
 
 
 def run_single_agent(state: OrchestratorState) -> OrchestratorState:
-    """执行单个 Agent 任务（用于单个任务模式）
+    """执行单个 Agent 任务（用于单个任务模式）。
 
-    根据 state['intent']['target'] 创建对应的 Agent 和 Task，
-    直接执行指定分析，跳过 Plan Agent 和完整 Crew。
+    单点分析走轻量子 Agent，避免为了一个明确意图启动 CrewAI/LiteLLM 编排。
     """
-    from app.agents.crew.roles import (
-        create_business_agent,
-        create_financial_agent,
-        create_legal_agent,
-        create_industry_agent,
-    )
-    from app.agents.crew.tasks import (
-        create_business_task,
-        create_financial_task,
-        create_legal_task,
-        create_industry_task,
-    )
-    from crewai import Crew, Process
+    from app.agents.sub_agents.business_agent import run_business_agent
+    from app.agents.sub_agents.financial_agent import run_financial_agent
+    from app.agents.sub_agents.legal_agent import run_legal_agent
+    from app.agents.sub_agents.industry_agent import run_industry_agent
 
     intent = state.get("intent", {})
     target = intent.get("target", "financial")
 
-    # Agent/Task 工厂映射
-    agent_map = {
-        "business": (create_business_agent, create_business_task, "工商分析"),
-        "financial": (create_financial_agent, create_financial_task, "财务分析"),
-        "legal": (create_legal_agent, create_legal_task, "司法分析"),
-        "industry": (create_industry_agent, create_industry_task, "行业分析"),
+    agent_runner_map = {
+        "business": run_business_agent,
+        "financial": run_financial_agent,
+        "legal": run_legal_agent,
+        "industry": run_industry_agent,
     }
+    runner = agent_runner_map.get(target, run_financial_agent)
 
-    agent_factory, task_factory, label = agent_map.get(target, agent_map["financial"])
+    result = asyncio.run(runner(state["enterprise_name"]))
+    timeline = state["timeline"] + result.get("timeline", [])
+    evidence = state["evidence"] + result.get("evidence", [])
 
-    agent = agent_factory(verbose=True)
-    task = task_factory(
-        agent=agent,
-        enterprise_name=state["enterprise_name"],
-        context=state.get("context", ""),
-    )
-
-    crew = Crew(
-        agents=[agent],
-        tasks=[task],
-        process=Process.sequential,
-        verbose=True,
-        memory=False,
-    )
-
-    result = crew.kickoff(inputs={
-        "enterprise_name": state["enterprise_name"],
-        "context": state.get("context", ""),
-    })
-
-    timeline = state["timeline"].copy()
-    evidence = state["evidence"].copy()
-
-    timeline.append({
-        "id": str(uuid.uuid4()),
-        "time": datetime.now().strftime("%H:%M:%S"),
-        "agent": f"{label}Agent",
-        "content": f"{label}完成",
-        "detail": f"针对 {state['enterprise_name']} 的{label}已生成",
-        "status": "completed",
-        "type": "analysis",
-    })
-
-    if hasattr(result, 'tasks_output'):
-        for task_output in result.tasks_output:
-            if hasattr(task_output, 'raw'):
-                evidence.append({
-                    "label": f"{label}结果",
-                    "value": task_output.raw[:100] + "..." if len(task_output.raw) > 100 else task_output.raw,
-                    "source": "CrewAI 分析",
-                })
+    if not result.get("success"):
+        return {
+            **state,
+            "agent_state": "forming_conclusion",
+            "error": result.get("error", "单个 Agent 执行失败"),
+            "timeline": timeline,
+            "evidence": evidence,
+        }
 
     long_term_memory.add(
         category="enterprise",
-        title=f"{state['enterprise_name']} {label}",
-        content=str(result),
+        title=f"{state['enterprise_name']} {target}分析",
+        content=json.dumps(result, ensure_ascii=False),
         metadata={"task_id": state["task_id"]},
     )
 
@@ -378,7 +430,7 @@ def run_single_agent(state: OrchestratorState) -> OrchestratorState:
         "agent_state": "forming_conclusion",
         "timeline": timeline,
         "evidence": evidence,
-        "crew_result": {"raw": str(result)},
+        "crew_result": {"raw": json.dumps(result, ensure_ascii=False)},
     }
 
 
@@ -527,7 +579,7 @@ async def run_orchestrator_v2(
                 ],
             },
         )
-        state = await asyncio.to_thread(run_plan_agent, state)
+        state = await run_node_with_rate_limit_retry(run_plan_agent, state, "Plan Agent")
         yield SSEEvent(type="state", data=_make_state_payload(state))
 
         yield SSEEvent(
@@ -547,12 +599,17 @@ async def run_orchestrator_v2(
                 ],
             },
         )
-        state = await asyncio.to_thread(run_crew, state)
+        state = await run_node_with_rate_limit_retry(run_crew, state, "CrewAI 团队执行")
         yield SSEEvent(type="state", data=_make_state_payload(state))
 
     else:
         # 单个任务：直接执行目标 Agent
         target = intent.get("target", "financial")
+        if target == "financial" and not is_likely_listed_company(state["enterprise_name"]):
+            state = make_upload_required_state(state)
+            yield SSEEvent(type="state", data=_make_state_payload(state))
+            return
+
         yield SSEEvent(
             type="state",
             data={
@@ -571,7 +628,7 @@ async def run_orchestrator_v2(
                 ],
             },
         )
-        state = await asyncio.to_thread(run_single_agent, state)
+        state = await run_node_with_rate_limit_retry(run_single_agent, state, "单个 Agent 执行")
         yield SSEEvent(type="state", data=_make_state_payload(state))
 
     # ── 步骤4: 形成结论（快速同步节点）──

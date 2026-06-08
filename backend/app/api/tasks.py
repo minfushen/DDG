@@ -11,13 +11,66 @@ import uuid
 import asyncio
 from datetime import datetime
 
-from app.agents.orchestrator_v2 import run_orchestrator_v2
+from app.agents.orchestrator_v2 import run_orchestrator_v2, form_conclusion, generate_report
 from app.agents.state import SSEEvent
 
 router = APIRouter()
 
 # 任务存储（生产环境应使用数据库）
 tasks: Dict[str, Dict[str, Any]] = {}
+task_events: Dict[str, asyncio.Event] = {}
+
+
+async def run_task_background(task_id: str):
+    """后台执行任务并更新内存状态。"""
+    task = tasks[task_id]
+
+    try:
+        async for event in run_orchestrator_v2(
+            task_id=task_id,
+            enterprise_name=task["enterprise_name"],
+            template_name=task.get("template_name", "due_diligence_report_template"),
+        ):
+            if event.type == "state":
+                tasks[task_id].update(event.data)
+            elif event.type == "error":
+                tasks[task_id].update({
+                    "agent_state": "completed",
+                    "error": event.data.get("error", "任务执行失败"),
+                })
+
+            notify_task_update(task_id)
+
+    except Exception as e:
+        tasks[task_id].update({
+            "agent_state": "completed",
+            "error": str(e),
+        })
+        notify_task_update(task_id)
+
+
+def notify_task_update(task_id: str):
+    """通知 SSE 订阅者任务状态已变化。"""
+    if task_id in task_events:
+        task_events[task_id].set()
+        task_events[task_id] = asyncio.Event()
+
+
+def make_task_state_event(task_id: str) -> SSEEvent:
+    """把当前任务状态包装为 SSE state 事件。"""
+    task = tasks[task_id]
+    return SSEEvent(
+        type="state",
+        data={
+            "agent_state": task.get("agent_state"),
+            "timeline": task.get("timeline", []),
+            "plan": task.get("plan", []),
+            "evidence": task.get("evidence", []),
+            "report": task.get("report"),
+            "error": task.get("error"),
+            "upload_required": task.get("agent_state") == "waiting_upload",
+        },
+    )
 
 
 class CreateTaskRequest(BaseModel):
@@ -47,6 +100,94 @@ class TaskStatusResponse(BaseModel):
     report: Optional[dict]
 
 
+class ResumeTaskRequest(BaseModel):
+    """恢复任务请求"""
+    parsed_financial_data: Dict[str, Any]
+
+
+async def resume_financial_task_with_uploaded_data(
+    task_id: str,
+    parsed_financial_data: Dict[str, Any],
+):
+    """基于上传财报恢复财务任务。"""
+    from app.agents.sub_agents.financial_agent import run_financial_agent_with_uploaded_data
+
+    task = tasks[task_id]
+    task.update({
+        "agent_state": "calling_financial",
+        "error": None,
+        "timeline": task.get("timeline", []) + [{
+            "id": uuid.uuid4().hex,
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "agent": "系统",
+            "content": "已接收上传财报，继续财务分析",
+            "status": "completed",
+            "type": "action",
+        }],
+    })
+    notify_task_update(task_id)
+
+    result = await run_financial_agent_with_uploaded_data(
+        enterprise_name=task["enterprise_name"],
+        parsed_financial_data=parsed_financial_data,
+    )
+    task["timeline"] = task.get("timeline", []) + result.get("timeline", [])
+    task["evidence"] = task.get("evidence", []) + result.get("evidence", [])
+
+    if not result.get("success"):
+        task.update({
+            "agent_state": "waiting_upload",
+            "error": result.get("error", "上传财报分析失败"),
+        })
+        notify_task_update(task_id)
+        return
+
+    if result.get("financial_analysis_report"):
+        task.update({
+            "agent_state": "completed",
+            "report": result["financial_analysis_report"],
+            "error": None,
+            "timeline": task.get("timeline", []) + [{
+                "id": uuid.uuid4().hex,
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "agent": "系统",
+                "content": "企业客户财务状况分析报告生成完成",
+                "detail": "已按银行财务分析模板生成正式报告结构",
+                "status": "completed",
+                "type": "action",
+            }],
+        })
+        notify_task_update(task_id)
+        return
+
+    state = {
+        "task_id": task_id,
+        "enterprise_name": task["enterprise_name"],
+        "template_name": task.get("template_name", "due_diligence_report_template"),
+        "agent_state": task["agent_state"],
+        "timeline": task["timeline"],
+        "plan": task.get("plan", []),
+        "evidence": task["evidence"],
+        "report": task.get("report"),
+        "error": task.get("error"),
+        "execution_plan": None,
+        "crew_result": None,
+        "context": None,
+        "intent": {"type": "single", "target": "financial"},
+    }
+
+    state = form_conclusion(state)
+    task.update({key: state.get(key) for key in ["agent_state", "timeline", "plan", "evidence", "report", "error"]})
+    notify_task_update(task_id)
+
+    state = generate_report(state)
+    task.update({key: state.get(key) for key in ["agent_state", "timeline", "plan", "evidence", "report", "error"]})
+    notify_task_update(task_id)
+
+    task["agent_state"] = "completed"
+    notify_task_update(task_id)
+
+
 @router.post("/tasks", response_model=CreateTaskResponse)
 async def create_task(request: CreateTaskRequest):
     """创建尽调任务"""
@@ -62,8 +203,12 @@ async def create_task(request: CreateTaskRequest):
         "plan": [],
         "evidence": [],
         "report": None,
+        "error": None,
+        "execution_started": True,
         "created_at": datetime.now().isoformat(),
     }
+    task_events[task_id] = asyncio.Event()
+    asyncio.create_task(run_task_background(task_id))
 
     return CreateTaskResponse(
         task_id=task_id,
@@ -78,22 +223,15 @@ async def stream_task(task_id: str):
     if task_id not in tasks:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    task = tasks[task_id]
-
     async def event_generator():
-        """SSE事件生成器"""
+        """SSE事件生成器：只订阅状态，不重新执行任务。"""
         try:
-            async for event in run_orchestrator_v2(
-                task_id=task_id,
-                enterprise_name=task["enterprise_name"],
-                template_name=task.get("template_name", "due_diligence_report_template"),
-            ):
-                # 更新任务状态
-                if event.type == "state":
-                    tasks[task_id].update(event.data)
+            yield f"data: {make_task_state_event(task_id).model_dump_json()}\n\n"
 
-                # 发送SSE事件
-                yield f"data: {event.model_dump_json()}\n\n"
+            while task_id in tasks and tasks[task_id].get("agent_state") not in {"waiting_confirm", "completed"}:
+                event = task_events[task_id]
+                await event.wait()
+                yield f"data: {make_task_state_event(task_id).model_dump_json()}\n\n"
 
         except Exception as e:
             # 发送错误事件
@@ -128,6 +266,23 @@ async def get_task(task_id: str):
         evidence=task["evidence"],
         report=task.get("report"),
     )
+
+
+@router.post("/tasks/{task_id}/resume")
+async def resume_task(task_id: str, request: ResumeTaskRequest):
+    """上传财报解析成功后继续执行等待中的财务任务。"""
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    task = tasks[task_id]
+    if task.get("agent_state") != "waiting_upload":
+        raise HTTPException(status_code=400, detail="当前任务不处于等待上传状态")
+
+    if not request.parsed_financial_data:
+        raise HTTPException(status_code=400, detail="缺少解析后的财务数据")
+
+    asyncio.create_task(resume_financial_task_with_uploaded_data(task_id, request.parsed_financial_data))
+    return {"task_id": task_id, "status": "resuming"}
 
 
 @router.get("/tasks/{task_id}/report")

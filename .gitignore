@@ -4,6 +4,7 @@ backend/venv*/
 
 # Build output
 dist/
+backend/output/uploads/
 
 # Environment
 .env

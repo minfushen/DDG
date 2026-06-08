@@ -7,16 +7,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ArrowRight, Building2 } from 'lucide-react';
+import { createTask } from '../../services/agentApi';
 
 export function AgentWorkbench() {
   const [value, setValue] = useState('');
+  const [isStarting, setIsStarting] = useState(false);
   const navigate = useNavigate();
 
-  const handleStart = () => {
-    const name = value.trim();
-    if (!name) return;
-    const taskId = Date.now().toString(36);
-    navigate(`/execution/${taskId}?name=${encodeURIComponent(name)}`);
+  const handleStartWith = async (name: string) => {
+    const trimmedName = name.trim();
+    if (!trimmedName || isStarting) return;
+
+    try {
+      setIsStarting(true);
+      const task = await createTask(trimmedName);
+      navigate(`/execution/${task.task_id}?name=${encodeURIComponent(trimmedName)}`);
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   return (
@@ -44,7 +52,7 @@ export function AgentWorkbench() {
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleStart()}
+            onKeyDown={(e) => e.key === 'Enter' && handleStartWith(value)}
             placeholder="输入企业名称，或带分析意图的句子"
             className="flex-1 text-base bg-transparent outline-none placeholder:text-[#6B7280] text-white"
             autoFocus
@@ -59,15 +67,15 @@ export function AgentWorkbench() {
         {/* CTA */}
         <div className="flex justify-center mt-5">
           <button
-            onClick={handleStart}
-            disabled={!value.trim()}
+            onClick={() => handleStartWith(value)}
+            disabled={!value.trim() || isStarting}
             className={`px-10 py-3.5 rounded-xl text-base font-semibold transition-all duration-300 ${
-              value.trim()
+              value.trim() && !isStarting
                 ? 'bg-[#3B82F6] text-white hover:bg-[#2563EB] hover:shadow-lg hover:shadow-blue-500/25 active:scale-[0.98]'
                 : 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'
             }`}
           >
-            <span className="flex items-center gap-2">开始尽调<ArrowRight className="w-5 h-5" /></span>
+            <span className="flex items-center gap-2">{isStarting ? '创建任务中' : '开始尽调'}<ArrowRight className="w-5 h-5" /></span>
           </button>
         </div>
 
@@ -90,9 +98,9 @@ export function AgentWorkbench() {
                 key={example}
                 onClick={() => {
                   setValue(example);
-                  // 延迟触发，让 setValue 生效
-                  setTimeout(() => handleStart(), 50);
+                  handleStartWith(example);
                 }}
+                disabled={isStarting}
                 className="px-3 py-1.5 text-xs text-[#667085] bg-[#F3F4F6] hover:bg-[#E5E7EB] rounded-lg transition-colors"
               >
                 {example}

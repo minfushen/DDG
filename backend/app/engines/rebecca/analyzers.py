@@ -2,6 +2,7 @@
 """财务分析引擎 - 10 维度分析"""
 import pandas as pd
 import numpy as np
+import re
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -349,93 +350,200 @@ class FinancialDDAnalyzer:
 
     # ========== 指标计算方法 ==========
 
+    def _year_columns(self, df: pd.DataFrame) -> List[str]:
+        """识别年度列，返回从新到旧排序的列名。"""
+        if df is None:
+            return []
+        years = []
+        for col in df.columns:
+            value = str(col).strip()
+            if value.isdigit() and len(value) == 4:
+                years.append(value)
+        return sorted(years, reverse=True)
+
+    def _to_number(self, value: Any) -> Optional[float]:
+        """把报表中的金额字符串转换为数字。"""
+        if value is None or pd.isna(value):
+            return None
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            return float(value)
+        text = str(value).strip()
+        if not text or text in {"-", "--", "N/A", "nan"}:
+            return None
+        negative = text.startswith("(") and text.endswith(")")
+        text = re.sub(r"[^0-9.\-]", "", text)
+        if not text or text in {"-", "."}:
+            return None
+        try:
+            number = float(text)
+        except ValueError:
+            return None
+        return -number if negative else number
+
+    def _get_value(self, df: pd.DataFrame, keywords: List[str], year: Optional[str] = None) -> Optional[float]:
+        """按科目关键词和年度列提取金额。"""
+        if df is None or df.empty:
+            return None
+
+        years = self._year_columns(df)
+        target_year = year or (years[0] if years else None)
+        value_col = None
+        if target_year is not None:
+            for col in df.columns:
+                if str(col) == str(target_year):
+                    value_col = col
+                    break
+        if value_col is None and len(df.columns) > 1:
+            value_col = df.columns[1]
+        if value_col is None:
+            return None
+
+        label_col = self._label_column(df)
+        for _, row in df.iterrows():
+            label = str(row.get(label_col, ""))
+            if any(keyword in label for keyword in keywords):
+                return self._to_number(row.get(value_col))
+        return None
+
+    def _label_column(self, df: pd.DataFrame):
+        for col in df.columns:
+            if any(keyword in str(col) for keyword in ["项目", "科目", "指标", "名称"]):
+                return col
+        for col in df.columns:
+            if not (str(col).isdigit() and len(str(col)) == 4):
+                return col
+        return df.columns[0]
+
+    def _latest_and_previous(self, df: pd.DataFrame) -> tuple[Optional[str], Optional[str]]:
+        years = self._year_columns(df)
+        latest = years[0] if len(years) >= 1 else None
+        previous = years[1] if len(years) >= 2 else None
+        return latest, previous
+
     def _calculate_gross_margin(self) -> Optional[float]:
         """计算毛利率"""
         if self.income is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 0.40  # Mock 数据
+        revenue = self._get_value(self.income, ["营业收入", "主营业务收入", "收入"])
+        cost = self._get_value(self.income, ["营业成本", "主营业务成本", "成本"])
+        gross_profit = self._get_value(self.income, ["毛利润", "毛利"])
+        if revenue and gross_profit is not None:
+            return gross_profit / revenue
+        if revenue and cost is not None:
+            return (revenue - cost) / revenue
+        return None
 
     def _calculate_net_margin(self) -> Optional[float]:
         """计算净利率"""
         if self.income is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 0.15  # Mock 数据
+        revenue = self._get_value(self.income, ["营业收入", "主营业务收入", "收入"])
+        net_profit = self._get_value(self.income, ["净利润"])
+        if revenue and net_profit is not None:
+            return net_profit / revenue
+        return None
 
     def _calculate_roe(self) -> Optional[float]:
         """计算净资产收益率"""
         if self.income is None or self.balance is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 0.18  # Mock 数据
+        net_profit = self._get_value(self.income, ["净利润"])
+        equity = self._get_value(self.balance, ["所有者权益", "股东权益", "净资产"])
+        if equity and net_profit is not None:
+            return net_profit / equity
+        return None
 
     def _calculate_current_ratio(self) -> Optional[float]:
         """计算流动比率"""
         if self.balance is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 1.33  # Mock 数据
+        current_assets = self._get_value(self.balance, ["流动资产合计", "流动资产"])
+        current_liabilities = self._get_value(self.balance, ["流动负债合计", "流动负债"])
+        if current_liabilities and current_assets is not None:
+            return current_assets / current_liabilities
+        return None
 
     def _calculate_quick_ratio(self) -> Optional[float]:
         """计算速动比率"""
         if self.balance is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 1.0  # Mock 数据
+        current_assets = self._get_value(self.balance, ["流动资产合计", "流动资产"])
+        inventory = self._get_value(self.balance, ["存货"])
+        current_liabilities = self._get_value(self.balance, ["流动负债合计", "流动负债"])
+        if current_liabilities and current_assets is not None:
+            return (current_assets - (inventory or 0)) / current_liabilities
+        return None
 
     def _calculate_debt_ratio(self) -> Optional[float]:
         """计算资产负债率"""
         if self.balance is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 0.60  # Mock 数据
+        total_assets = self._get_value(self.balance, ["资产总计", "资产合计", "总资产"])
+        total_liabilities = self._get_value(self.balance, ["负债合计", "负债总计", "总负债"])
+        if total_assets and total_liabilities is not None:
+            return total_liabilities / total_assets
+        return None
 
     def _calculate_receivable_turnover(self) -> Optional[float]:
         """计算应收账款周转率"""
         if self.income is None or self.balance is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 8.0  # Mock 数据
+        revenue = self._get_value(self.income, ["营业收入", "主营业务收入", "收入"])
+        receivable = self._get_value(self.balance, ["应收账款"])
+        if receivable and revenue is not None:
+            return revenue / receivable
+        return None
 
     def _calculate_inventory_turnover(self) -> Optional[float]:
         """计算存货周转率"""
         if self.income is None or self.balance is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 6.0  # Mock 数据
+        cost = self._get_value(self.income, ["营业成本", "主营业务成本", "成本"])
+        inventory = self._get_value(self.balance, ["存货"])
+        if inventory and cost is not None:
+            return cost / inventory
+        return None
 
     def _calculate_revenue_growth(self) -> Optional[float]:
         """计算营收增长率"""
         if self.income is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 0.12  # Mock 数据
+        latest, previous = self._latest_and_previous(self.income)
+        if not latest or not previous:
+            return None
+        latest_revenue = self._get_value(self.income, ["营业收入", "主营业务收入", "收入"], latest)
+        previous_revenue = self._get_value(self.income, ["营业收入", "主营业务收入", "收入"], previous)
+        if previous_revenue and latest_revenue is not None:
+            return (latest_revenue - previous_revenue) / previous_revenue
+        return None
 
     def _calculate_profit_growth(self) -> Optional[float]:
         """计算净利润增长率"""
         if self.income is None:
             return None
-        # TODO: 从 DataFrame 中提取数据计算
-        return 0.18  # Mock 数据
+        latest, previous = self._latest_and_previous(self.income)
+        if not latest or not previous:
+            return None
+        latest_profit = self._get_value(self.income, ["净利润"], latest)
+        previous_profit = self._get_value(self.income, ["净利润"], previous)
+        if previous_profit and latest_profit is not None:
+            return (latest_profit - previous_profit) / previous_profit
+        return None
 
     def _get_operating_cashflow(self) -> Optional[float]:
         """获取经营活动现金流"""
         if self.cashflow is None:
             return None
-        # TODO: 从 DataFrame 中提取数据
-        return 300000000  # Mock 数据
+        return self._get_value(self.cashflow, ["经营活动产生的现金流量净额", "经营活动现金流", "经营活动"])
 
     def _get_investing_cashflow(self) -> Optional[float]:
         """获取投资活动现金流"""
         if self.cashflow is None:
             return None
-        # TODO: 从 DataFrame 中提取数据
-        return -200000000  # Mock 数据
+        return self._get_value(self.cashflow, ["投资活动产生的现金流量净额", "投资活动现金流", "投资活动"])
 
     def _get_financing_cashflow(self) -> Optional[float]:
         """获取筹资活动现金流"""
         if self.cashflow is None:
             return None
-        # TODO: 从 DataFrame 中提取数据
-        return -50000000  # Mock 数据
+        return self._get_value(self.cashflow, ["筹资活动产生的现金流量净额", "筹资活动现金流", "筹资活动"])

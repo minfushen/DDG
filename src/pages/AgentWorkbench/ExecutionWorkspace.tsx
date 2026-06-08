@@ -5,13 +5,22 @@
 // ========================================
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, CheckCircle2, Circle,
   FileText, Shield, TrendingUp, AlertTriangle,
-  Building2, Network,
+  Building2, Network, Upload,
 } from 'lucide-react';
-import { createTask, streamTask, type TimelineEntry, type PlanStep, type EvidenceItem } from '../../services/agentApi';
+import {
+  getTaskStatus,
+  parseUploadedFiles,
+  resumeTaskWithFinancialData,
+  streamTask,
+  uploadFinancialFile,
+  type TimelineEntry,
+  type PlanStep,
+  type EvidenceItem,
+} from '../../services/agentApi';
 
 // ── 状态机 ───────────────────────────────────────
 
@@ -27,7 +36,9 @@ type AgentState =
   | 'analyzing'
   | 'forming_conclusion'
   | 'generating_report'
-  | 'waiting_confirm';
+  | 'waiting_upload'
+  | 'waiting_confirm'
+  | 'completed';
 
 const STATE_LABELS: Record<AgentState, string> = {
   creating_task: '创建尽调任务',
@@ -41,8 +52,43 @@ const STATE_LABELS: Record<AgentState, string> = {
   analyzing: '分析数据',
   forming_conclusion: '形成风险结论',
   generating_report: '生成尽调报告',
+  waiting_upload: '等待上传财报',
   waiting_confirm: '等待确认',
+  completed: '执行完成',
 };
+
+const FINISHED_STATES = new Set<AgentState>(['waiting_confirm', 'completed']);
+
+function applyTaskData(
+  current: {
+    taskId: string | null;
+    agentState: AgentState;
+    timeline: TimelineEntry[];
+    plan: PlanStep[];
+    evidence: EvidenceItem[];
+    report: any;
+    isRunning: boolean;
+    error: string | null;
+  },
+  data: any,
+) {
+  const nextAgentState = data.agent_state as AgentState | undefined;
+
+  return {
+    ...current,
+    agentState: nextAgentState ?? current.agentState,
+    timeline: data.timeline ?? current.timeline,
+    plan: data.plan ?? current.plan,
+    evidence: data.evidence ?? current.evidence,
+    report: data.report ?? current.report,
+    error: data.error ?? current.error,
+    isRunning: data.error
+      ? false
+      : nextAgentState
+        ? !FINISHED_STATES.has(nextAgentState) && nextAgentState !== 'waiting_upload'
+        : current.isRunning,
+  };
+}
 
 // ── Agent 图标映射 ────────────────────────────────
 
@@ -69,84 +115,106 @@ function typeStyle(type: string) {
 
 export function ExecutionWorkspace() {
   const navigate = useNavigate();
+  const { taskId: routeTaskId } = useParams<{ taskId: string }>();
   const [searchParams] = useSearchParams();
   const enterpriseName = searchParams.get('name') || 'XX科技有限公司';
 
-  const [taskId, setTaskId] = useState<string | null>(null);
-  const [agentState, setAgentState] = useState<AgentState>('creating_task');
-  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
-  const [plan, setPlan] = useState<PlanStep[]>([]);
-  const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
+  const [taskState, setTaskState] = useState({
+    taskId: null as string | null,
+    agentState: 'creating_task' as AgentState,
+    timeline: [] as TimelineEntry[],
+    plan: [] as PlanStep[],
+    evidence: [] as EvidenceItem[],
+    report: null as any,
+    isRunning: true,
+    error: null as string | null,
+  });
   const [showPlan, setShowPlan] = useState(true);
   const [showEvidence, setShowEvidence] = useState(true);
-  const [isRunning, setIsRunning] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [documentType, setDocumentType] = useState('auto');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const { taskId, agentState, timeline, plan, evidence, report, isRunning, error } = taskState;
 
   const timelineEndRef = useRef<HTMLDivElement>(null);
 
   // ── 自动滚动 ───────────────────────────────────
 
   useEffect(() => {
-    timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    timelineEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [timeline]);
 
   // ── 创建任务并开始执行 ─────────────────────────
 
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    setTaskState({
+      taskId: routeTaskId ?? null,
+      agentState: 'creating_task',
+      timeline: [],
+      plan: [],
+      evidence: [],
+      report: null,
+      isRunning: true,
+      error: null,
+    });
+    setUploadError(null);
+    setUploadFiles([]);
+
     const startTask = async () => {
       try {
-        // 创建任务
-        const response = await createTask(enterpriseName);
-        setTaskId(response.task_id);
+        if (!routeTaskId) {
+          setTaskState((current) => ({
+            ...current,
+            error: '缺少任务ID',
+            isRunning: false,
+          }));
+          return;
+        }
 
-        // 开始SSE流式监听
-        for await (const event of streamTask(response.task_id)) {
+        if (cancelled) return;
+        setTaskState((current) => ({ ...current, taskId: routeTaskId }));
+
+        const status = await getTaskStatus(routeTaskId);
+        if (cancelled) return;
+        setTaskState((current) => applyTaskData(current, status));
+        if (FINISHED_STATES.has(status.agent_state as AgentState)) return;
+
+        for await (const event of streamTask(routeTaskId, controller.signal)) {
+          if (cancelled) return;
+
           if (event.type === 'state') {
             const data = event.data;
-
-            // 更新状态
-            if (data.agent_state) {
-              setAgentState(data.agent_state);
-            }
-
-            // 更新时间轴
-            if (data.timeline) {
-              setTimeline(data.timeline);
-            }
-
-            // 更新计划
-            if (data.plan) {
-              setPlan(data.plan);
-            }
-
-            // 更新证据
-            if (data.evidence) {
-              setEvidence(data.evidence);
-            }
-
-            // 处理后端返回的错误（data.error 字段）
-            if (data.error) {
-              setError(data.error);
-              setIsRunning(false);
-            }
-
-            // 检查是否完成
-            if (data.agent_state === 'waiting_confirm') {
-              setIsRunning(false);
-            }
+            setTaskState((current) => applyTaskData(current, data));
           } else if (event.type === 'error') {
-            setError(event.data?.error || '未知错误');
-            setIsRunning(false);
+            setTaskState((current) => ({
+              ...current,
+              error: event.data?.error || '未知错误',
+              isRunning: false,
+            }));
           }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : '启动任务失败');
-        setIsRunning(false);
+        if (cancelled || (err as any)?.name === 'AbortError') return;
+        setTaskState((current) => ({
+          ...current,
+          error: err instanceof Error ? err.message : '启动任务失败',
+          isRunning: false,
+        }));
       }
     };
 
     startTask();
-  }, [enterpriseName]);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [routeTaskId]);
 
   // ── 跳转到报告页 ───────────────────────────────
 
@@ -155,6 +223,30 @@ export function ExecutionWorkspace() {
       navigate(`/report/${taskId}`);
     }
   };
+
+  const handleUploadAndResume = async () => {
+    if (!taskId || uploadFiles.length === 0) return;
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      for (const file of uploadFiles) {
+        await uploadFinancialFile(taskId, file, documentType);
+      }
+
+      const parsed = await parseUploadedFiles(taskId);
+      await resumeTaskWithFinancialData(taskId, parsed.parsed_data);
+      setTaskState((current) => ({ ...current, isRunning: true, error: null }));
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : '上传或解析失败');
+      setTaskState((current) => ({ ...current, isRunning: false }));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const isWaitingUpload = agentState === 'waiting_upload';
 
   return (
     <div className="h-screen flex flex-col bg-[#F9FAFB]">
@@ -189,13 +281,19 @@ export function ExecutionWorkspace() {
           >
             证据
           </button>
-          {isRunning && (
+          {isWaitingUpload && (
+            <div className="flex items-center gap-1.5 ml-3">
+              <div className="w-1.5 h-1.5 bg-[#F59E0B] rounded-full" />
+              <span className="text-xs text-[#B45309]">等待上传</span>
+            </div>
+          )}
+          {isRunning && !isWaitingUpload && (
             <div className="flex items-center gap-1.5 ml-3">
               <div className="w-1.5 h-1.5 bg-[#22C55E] rounded-full animate-pulse" />
               <span className="text-xs text-[#22C55E]">执行中</span>
             </div>
           )}
-          {!isRunning && (
+          {!isRunning && !isWaitingUpload && report && (
             <button
               onClick={handleViewReport}
               className="px-3 py-1.5 text-xs bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors"
@@ -266,11 +364,72 @@ export function ExecutionWorkspace() {
           <div className="max-w-[720px] mx-auto px-8 py-8">
             {/* 当前状态指示器 */}
             <div className="flex items-center gap-3 mb-8">
-              <div className={`w-3 h-3 rounded-full ${isRunning ? 'bg-[#22C55E] animate-pulse' : 'bg-[#22C55E]'}`} />
+              <div className={`w-3 h-3 rounded-full ${
+                isWaitingUpload ? 'bg-[#F59E0B]' : isRunning ? 'bg-[#22C55E] animate-pulse' : 'bg-[#22C55E]'
+              }`} />
               <span className="text-lg font-semibold text-[#101828]">
                 {STATE_LABELS[agentState]}
               </span>
             </div>
+
+            {isWaitingUpload && (
+              <div className="mb-8 rounded-lg border border-[#FED7AA] bg-[#FFFBEB] p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-white border border-[#FDE68A] flex items-center justify-center flex-shrink-0">
+                    <Upload className="w-4 h-4 text-[#B45309]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-sm font-semibold text-[#101828] mb-1">上传近三年财务报表</h2>
+                    <p className="text-xs text-[#667085] mb-4">
+                      非上市企业财务分析需要真实财报数据。Excel 标准模板可包含三张 sheet；CSV 建议按利润表、资产负债表、现金流量表分别上传。
+                    </p>
+
+                    <div className="grid grid-cols-[1fr_160px_auto] gap-3 items-center">
+                      <label className="block">
+                        <input
+                          type="file"
+                          multiple
+                          accept=".xlsx,.xls,.csv"
+                          className="block w-full text-xs text-[#667085] file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-white file:text-xs file:font-medium file:text-[#374151] hover:file:bg-[#F3F4F6]"
+                          onChange={(event) => setUploadFiles(Array.from(event.target.files ?? []))}
+                        />
+                      </label>
+                      <select
+                        value={documentType}
+                        onChange={(event) => setDocumentType(event.target.value)}
+                        className="h-8 rounded-lg border border-[#E5E7EB] bg-white px-2 text-xs text-[#374151] outline-none focus:border-[#3B82F6]"
+                      >
+                        <option value="auto">自动识别</option>
+                        <option value="income_statement">利润表</option>
+                        <option value="balance_sheet">资产负债表</option>
+                        <option value="cash_flow">现金流量表</option>
+                      </select>
+                      <button
+                        onClick={handleUploadAndResume}
+                        disabled={uploading || uploadFiles.length === 0}
+                        className="h-8 px-3 rounded-lg bg-[#2563EB] text-xs font-medium text-white hover:bg-[#1D4ED8] disabled:bg-[#D1D5DB] disabled:cursor-not-allowed transition-colors"
+                      >
+                        {uploading ? '处理中...' : '上传并继续'}
+                      </button>
+                    </div>
+
+                    {uploadFiles.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {uploadFiles.map((file) => (
+                          <span key={`${file.name}-${file.size}`} className="px-2 py-1 rounded bg-white text-[11px] text-[#667085] border border-[#E5E7EB]">
+                            {file.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {uploadError && (
+                      <p className="mt-3 text-xs text-[#DC2626]">{uploadError}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 时间轴 */}
             {timeline.length === 0 && (

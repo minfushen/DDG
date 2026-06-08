@@ -49,6 +49,7 @@ export interface TaskStatus {
   report: any;
   enterprise_type?: string;
   need_user_upload?: boolean;
+  upload_required?: boolean;
 }
 
 export interface SSEEvent {
@@ -62,6 +63,16 @@ export interface UploadResponse {
   filename: string;
   status: string;
   message: string;
+}
+
+async function getErrorMessage(response: Response): Promise<string> {
+  try {
+    const data = await response.json();
+    if (typeof data?.detail === 'string') return data.detail;
+  } catch {
+    // ignore non-JSON error body
+  }
+  return `HTTP error! status: ${response.status}`;
 }
 
 // ── API 函数 ─────────────────────────────────────────
@@ -105,8 +116,8 @@ export async function getTaskStatus(taskId: string): Promise<TaskStatus> {
 /**
  * SSE流式获取任务执行状态
  */
-export async function* streamTask(taskId: string): AsyncGenerator<SSEEvent> {
-  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/stream`);
+export async function* streamTask(taskId: string, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/stream`, { signal });
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
@@ -163,7 +174,7 @@ export async function uploadFinancialFile(
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    throw new Error(await getErrorMessage(response));
   }
 
   return response.json();
@@ -200,7 +211,27 @@ export async function parseUploadedFiles(taskId: string): Promise<{
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    throw new Error(await getErrorMessage(response));
+  }
+
+  return response.json();
+}
+
+/**
+ * 上传财报解析成功后恢复任务执行
+ */
+export async function resumeTaskWithFinancialData(
+  taskId: string,
+  parsedFinancialData: any
+): Promise<{ task_id: string; status: string }> {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parsed_financial_data: parsedFinancialData }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response));
   }
 
   return response.json();

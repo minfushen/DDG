@@ -36,7 +36,7 @@ async def run_business_agent(enterprise_name: str) -> Dict[str, Any]:
         })
 
         # 调用搜索工具
-        result_json = search_enterprise_info.invoke({"enterprise_name": enterprise_name})
+        result_json = search_enterprise_info._run(enterprise_name=enterprise_name)
         result = json.loads(result_json)
 
         # 更新时间轴

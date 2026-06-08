@@ -36,7 +36,7 @@ async def run_legal_agent(enterprise_name: str) -> Dict[str, Any]:
         })
 
         # 调用搜索工具
-        result_json = search_legal_records.invoke({"enterprise_name": enterprise_name})
+        result_json = search_legal_records._run(enterprise_name=enterprise_name)
         result = json.loads(result_json)
 
         # 更新时间轴

@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 from pathlib import Path
 import json
 import uuid
+import math
 from datetime import datetime
 
 from app.config import settings
@@ -16,6 +17,17 @@ router = APIRouter()
 
 # 上传文件存储
 uploaded_files: Dict[str, Dict[str, Any]] = {}
+
+
+def dataframe_records(df):
+    """将 DataFrame 转为 JSON 安全 records，避免 NaN 泄漏到前端。"""
+    records = []
+    for record in df.to_dict(orient="records"):
+        records.append({
+            key: (None if isinstance(value, float) and math.isnan(value) else value)
+            for key, value in record.items()
+        })
+    return records
 
 
 class UploadResponse(BaseModel):
@@ -51,7 +63,7 @@ async def upload_financial_file(
     """
     try:
         # 验证文件类型
-        allowed_extensions = [".xlsx", ".xls", ".pdf"]
+        allowed_extensions = [".xlsx", ".xls", ".csv", ".pdf"]
         file_ext = Path(file.filename).suffix.lower()
 
         if file_ext not in allowed_extensions:
@@ -146,18 +158,33 @@ async def parse_uploaded_files(task_id: str):
 
                 if document_type == "auto" or document_type == "balance_sheet":
                     if financial_data.balance_sheet is not None:
-                        parsed_data["balance_sheet"] = financial_data.balance_sheet.to_dict()
+                        parsed_data["balance_sheet"] = dataframe_records(financial_data.balance_sheet)
 
                 if document_type == "auto" or document_type == "income_statement":
                     if financial_data.income_statement is not None:
-                        parsed_data["income_statement"] = financial_data.income_statement.to_dict()
+                        parsed_data["income_statement"] = dataframe_records(financial_data.income_statement)
 
                 if document_type == "auto" or document_type == "cash_flow":
                     if financial_data.cash_flow is not None:
-                        parsed_data["cash_flow"] = financial_data.cash_flow.to_dict()
+                        parsed_data["cash_flow"] = dataframe_records(financial_data.cash_flow)
 
             except Exception as e:
                 print(f"解析文件失败 {file_path}: {e}")
+
+        missing = [
+            label
+            for key, label in [
+                ("income_statement", "利润表"),
+                ("balance_sheet", "资产负债表"),
+                ("cash_flow", "现金流量表"),
+            ]
+            if not parsed_data.get(key)
+        ]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"财报解析不完整，缺少: {', '.join(missing)}。请上传包含三张表的标准 Excel，或分别上传三份 CSV。",
+            )
 
         return {
             "task_id": task_id,

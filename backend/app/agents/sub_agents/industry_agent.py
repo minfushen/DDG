@@ -36,10 +36,10 @@ async def run_industry_agent(enterprise_name: str) -> Dict[str, Any]:
         })
 
         # 调用 RAG 检索工具
-        result_json = search_industry_knowledge.invoke({
-            "query": f"{enterprise_name} 行业分析",
-            "knowledge_type": "guide",
-        })
+        result_json = search_industry_knowledge._run(
+            query=f"{enterprise_name} 行业分析",
+            knowledge_type="guide",
+        )
         result = json.loads(result_json)
 
         # 更新时间轴

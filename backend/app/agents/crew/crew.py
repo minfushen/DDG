@@ -88,7 +88,7 @@ def create_due_diligence_crew(
         process=Process.sequential,  # 顺序执行：先规划，再执行
         verbose=verbose,
         memory=memory,
-        max_rpm=10,  # 限制每分钟请求数
+        max_rpm=3,  # 完整尽调会连续调用多个 Agent，低速率更不容易触发上游限流
         language="zh",  # 中文
     )
 
@@ -184,7 +184,7 @@ def create_dynamic_crew(
         process=Process.sequential,
         verbose=verbose,
         memory=memory,
-        max_rpm=10,
+        max_rpm=3,
         language="zh",
     )
 
