@@ -9,6 +9,7 @@ import uuid
 import json
 
 from app.agents.tools.search_tool import search_financial_data
+from app.agents.tools.listed_company_tool import fetch_listed_company_financial, resolve_listed_company
 from app.engines.rebecca.analyzers import FinancialDDAnalyzer
 from app.engines.rebecca.adapter import AnalyzerAdapter
 from app.agents.sub_agents.financial_report_builder import build_financial_analysis_report
@@ -71,6 +72,7 @@ def _run_rebecca_analysis(
     enterprise_name: str,
     rebecca_data: Dict[str, Any],
     include_structured_report: bool = False,
+    data_source: str = "用户上传财报",
 ) -> Dict[str, Any]:
     timeline = []
     evidence = []
@@ -92,19 +94,19 @@ def _run_rebecca_analysis(
     findings = []
     if revenue is not None:
         findings.append(f"{latest_year}年营收{revenue / 100000000:.1f}亿")
-        evidence.append({"label": "营业收入", "value": f"{revenue / 100000000:.1f}亿", "source": "用户上传财报"})
+        evidence.append({"label": "营业收入", "value": f"{revenue / 100000000:.1f}亿", "source": data_source})
     if revenue and net_profit is not None:
         findings.append(f"净利润率{net_profit / revenue * 100:.1f}%")
-        evidence.append({"label": "净利润率", "value": f"{net_profit / revenue * 100:.1f}%", "source": "用户上传财报"})
+        evidence.append({"label": "净利润率", "value": f"{net_profit / revenue * 100:.1f}%", "source": data_source})
     if total_assets and total_liabilities is not None:
         findings.append(f"资产负债率{total_liabilities / total_assets * 100:.0f}%")
-        evidence.append({"label": "资产负债率", "value": f"{total_liabilities / total_assets * 100:.0f}%", "source": "用户上传财报"})
+        evidence.append({"label": "资产负债率", "value": f"{total_liabilities / total_assets * 100:.0f}%", "source": data_source})
 
     timeline.append({
         "id": str(uuid.uuid4()),
         "time": datetime.now().strftime("%H:%M:%S"),
         "agent": "财务Agent",
-        "content": "读取用户上传的近三年财务报表",
+        "content": f"读取{data_source}近三年财务报表",
         "detail": "资产负债表、利润表、现金流量表",
         "status": "completed",
         "type": "discovery",
@@ -123,7 +125,7 @@ def _run_rebecca_analysis(
         "conclusion": "应收账款需结合账龄和客户集中度进一步核实" if receivable is not None else None,
     })
     if receivable is not None:
-        evidence.append({"label": "应收账款", "value": f"{receivable / 100000000:.1f}亿", "source": "用户上传财报"})
+        evidence.append({"label": "应收账款", "value": f"{receivable / 100000000:.1f}亿", "source": data_source})
 
     analyzer = FinancialDDAnalyzer(rebecca_data)
     analysis_result = analyzer.generate_full_analysis()
@@ -161,7 +163,7 @@ def _run_rebecca_analysis(
         "conclusion": "需结合负债规模判断现金流覆盖情况",
     })
     if operating_cash_flow is not None:
-        evidence.append({"label": "经营活动现金流", "value": f"{operating_cash_flow / 100000000:.1f}亿", "source": "用户上传财报"})
+        evidence.append({"label": "经营活动现金流", "value": f"{operating_cash_flow / 100000000:.1f}亿", "source": data_source})
 
     result = {"success": True, "timeline": timeline, "evidence": evidence}
     if include_structured_report:
@@ -179,6 +181,68 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
         Dict: 分析结果，包含 timeline、evidence、success
     """
     try:
+        listed_info = resolve_listed_company(enterprise_name)
+        if listed_info:
+            result_json = fetch_listed_company_financial._run(
+                enterprise_name=enterprise_name,
+                stock_code=listed_info["stock_code"],
+                stock_exchange=listed_info["stock_exchange"],
+            )
+            listed_data = json.loads(result_json)
+            if not listed_data.get("success"):
+                return {
+                    "success": False,
+                    "error": listed_data.get("error", "上市公司公开财报获取失败"),
+                    "fallback_to_upload": True,
+                    "timeline": [{
+                        "id": str(uuid.uuid4()),
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "agent": "财务Agent",
+                        "content": "公开财报获取失败",
+                        "detail": listed_data.get("error", "请上传近三年三大表继续分析"),
+                        "status": "completed",
+                        "type": "risk",
+                    }],
+                    "evidence": [],
+                }
+
+            import pandas as pd
+
+            financial_statements = listed_data.get("financial_statements", {})
+            rebecca_data = {
+                "income_statement": pd.DataFrame(financial_statements.get("income_statement", [])),
+                "balance_sheet": pd.DataFrame(financial_statements.get("balance_sheet", [])),
+                "cash_flow": pd.DataFrame(financial_statements.get("cash_flow", [])),
+            }
+            result = _run_rebecca_analysis(
+                enterprise_name,
+                rebecca_data,
+                include_structured_report=True,
+                data_source="东方财富公开财报",
+            )
+            result["timeline"] = [{
+                "id": str(uuid.uuid4()),
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "agent": "财务Agent",
+                "content": "识别上市公司并获取公开财报",
+                "detail": f"{listed_data.get('security_name')} {listed_data.get('secu_code')}，来源：{listed_data.get('data_source')}",
+                "status": "completed",
+                "type": "discovery",
+                "findings": [f"已获取年度：{', '.join(listed_data.get('years', []))}"],
+            }, {
+                "id": str(uuid.uuid4()),
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "agent": "财务Agent",
+                "content": "标准化上市公司三大表",
+                "detail": "已映射东方财富字段到利润表、资产负债表、现金流量表标准科目",
+                "status": "completed",
+                "type": "analysis",
+            }] + result.get("timeline", [])
+            if result.get("financial_analysis_report"):
+                result["financial_analysis_report"]["generated_from"] = "东方财富公开财报"
+                result["financial_analysis_report"]["stock_code"] = listed_data.get("secu_code")
+            return result
+
         result_json = search_financial_data._run(enterprise_name=enterprise_name)
         financial_data = json.loads(result_json)
         import pandas as pd

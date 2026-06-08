@@ -5,8 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.api import analysis
-from app.api import knowledge
 from app.api import tasks
 from app.api import upload
 
@@ -48,9 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
-app.include_router(analysis.router, prefix="/api/v1", tags=["analysis"])
-app.include_router(knowledge.router, prefix="/api/v1", tags=["knowledge"])
+# 注册当前产品形态需要的路由
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
 

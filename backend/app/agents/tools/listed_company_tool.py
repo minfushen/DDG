@@ -1,199 +1,216 @@
 # ========================================
 # 上市公司数据获取工具
-# 从公开渠道获取上市公司财务数据
+# 从东方财富公开接口获取 A 股财务数据
 # ========================================
 
-from typing import Type, Optional, Dict, Any
+from typing import Type, Dict, Any, List, Optional
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
+import httpx
 import json
 
 
 class FetchListedCompanyFinancialInput(BaseModel):
     """获取上市公司财务数据输入"""
     enterprise_name: str = Field(description="企业名称")
-    stock_code: str = Field(description="股票代码")
-    stock_exchange: str = Field(description="上市交易所")
+    stock_code: str = Field(default="", description="股票代码")
+    stock_exchange: str = Field(default="", description="上市交易所")
+
+
+LISTED_COMPANY_MAP = {
+    "欣旺达": {"stock_code": "300207", "stock_exchange": "SZ", "secu_code": "300207.SZ", "security_name": "欣旺达", "company_name": "欣旺达电子股份有限公司"},
+    "欣旺达电子股份有限公司": {"stock_code": "300207", "stock_exchange": "SZ", "secu_code": "300207.SZ", "security_name": "欣旺达", "company_name": "欣旺达电子股份有限公司"},
+    "比亚迪": {"stock_code": "002594", "stock_exchange": "SZ", "secu_code": "002594.SZ", "security_name": "比亚迪", "company_name": "比亚迪股份有限公司"},
+    "宁德时代": {"stock_code": "300750", "stock_exchange": "SZ", "secu_code": "300750.SZ", "security_name": "宁德时代", "company_name": "宁德时代新能源科技股份有限公司"},
+    "贵州茅台": {"stock_code": "600519", "stock_exchange": "SH", "secu_code": "600519.SH", "security_name": "贵州茅台", "company_name": "贵州茅台酒股份有限公司"},
+}
+
+
+INCOME_FIELD_MAP = {
+    "营业收入": "TOTAL_OPERATE_INCOME",
+    "营业成本": "OPERATE_COST",
+    "销售费用": "SALE_EXPENSE",
+    "管理费用": "MANAGE_EXPENSE",
+    "研发费用": "RESEARCH_EXPENSE",
+    "财务费用": "FINANCE_EXPENSE",
+    "投资收益": "INVEST_INCOME",
+    "营业利润": "OPERATE_PROFIT",
+    "营业外收入": "NONBUSINESS_INCOME",
+    "利润总额": "TOTAL_PROFIT",
+    "净利润": "NETPROFIT",
+}
+
+
+BALANCE_FIELD_MAP = {
+    "货币资金": "MONETARYFUNDS",
+    "应收账款": "ACCOUNTS_RECE",
+    "其他应收款": "TOTAL_OTHER_RECE",
+    "存货": "INVENTORY",
+    "流动资产合计": "TOTAL_CURRENT_ASSETS",
+    "固定资产": "FIXED_ASSET",
+    "在建工程": "CIP",
+    "非流动资产合计": "TOTAL_NONCURRENT_ASSETS",
+    "资产总计": "TOTAL_ASSETS",
+    "短期借款": "SHORT_LOAN",
+    "应付票据": "NOTE_PAYABLE",
+    "应付账款": "ACCOUNTS_PAYABLE",
+    "一年内到期非流动负债": "NONCURRENT_LIAB_1YEAR",
+    "其他流动负债": "OTHER_CURRENT_LIAB",
+    "流动负债合计": "TOTAL_CURRENT_LIAB",
+    "长期借款": "LONG_LOAN",
+    "应付债券": "BOND_PAYABLE",
+    "长期应付款": "LONG_PAYABLE",
+    "非流动负债合计": "TOTAL_NONCURRENT_LIAB",
+    "负债合计": "TOTAL_LIABILITIES",
+    "实收资本": "SHARE_CAPITAL",
+    "资本公积": "CAPITAL_RESERVE",
+    "所有者权益": "TOTAL_EQUITY",
+}
+
+
+CASHFLOW_FIELD_MAP = {
+    "经营活动产生的现金流量净额": "NETCASH_OPERATE",
+    "投资活动产生的现金流量净额": "NETCASH_INVEST",
+    "筹资活动产生的现金流量净额": "NETCASH_FINANCE",
+}
+
+
+REPORT_MAP = {
+    "income_statement": "RPT_F10_FINANCE_GINCOME",
+    "balance_sheet": "RPT_F10_FINANCE_GBALANCE",
+    "cash_flow": "RPT_F10_FINANCE_GCASHFLOW",
+}
+
+
+def resolve_listed_company(enterprise_name: str, stock_code: str = "", stock_exchange: str = "") -> Optional[Dict[str, str]]:
+    """根据输入企业名或股票代码解析上市公司证券信息。"""
+    if stock_code:
+        code = stock_code.split(".")[0]
+        exchange = stock_exchange or ("SH" if code.startswith("6") else "SZ")
+        return {
+            "stock_code": code,
+            "stock_exchange": exchange,
+            "secu_code": f"{code}.{exchange}",
+            "security_name": enterprise_name,
+        }
+
+    for keyword, info in LISTED_COMPANY_MAP.items():
+        if keyword in enterprise_name:
+            return info
+    return None
+
+
+def _fetch_eastmoney_report(secu_code: str, report_name: str) -> List[Dict[str, Any]]:
+    params = {
+        "reportName": report_name,
+        "columns": "ALL",
+        "filter": f'(SECUCODE="{secu_code}")',
+        "pageNumber": "1",
+        "pageSize": "20",
+        "sortTypes": "-1",
+        "sortColumns": "REPORT_DATE",
+        "source": "HSF10",
+        "client": "PC",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://emweb.securities.eastmoney.com/",
+    }
+    response = httpx.get(
+        "https://datacenter.eastmoney.com/securities/api/data/v1/get",
+        params=params,
+        headers=headers,
+        timeout=12,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    rows = payload.get("result", {}).get("data", [])
+    annual_rows = [row for row in rows if "年报" in str(row.get("REPORT_TYPE", ""))]
+    return annual_rows[:3]
+
+
+def _year_from_report(row: Dict[str, Any]) -> str:
+    return str(row.get("REPORT_DATE", ""))[:4]
+
+
+def _build_statement(rows: List[Dict[str, Any]], field_map: Dict[str, str]) -> List[Dict[str, Any]]:
+    years = [_year_from_report(row) for row in rows]
+    years = [year for year in years if year.isdigit()]
+    statement = []
+    for item, field in field_map.items():
+        record = {"项目": item}
+        for row in rows:
+            year = _year_from_report(row)
+            if year.isdigit():
+                record[year] = row.get(field)
+        if any(record.get(year) is not None for year in years):
+            statement.append(record)
+    return statement
+
+
+def _add_gross_profit(income_statement: List[Dict[str, Any]]):
+    revenue = next((row for row in income_statement if row.get("项目") == "营业收入"), None)
+    cost = next((row for row in income_statement if row.get("项目") == "营业成本"), None)
+    if not revenue or not cost:
+        return
+
+    record = {"项目": "毛利润"}
+    for year, value in revenue.items():
+        if year == "项目":
+            continue
+        cost_value = cost.get(year)
+        record[year] = value - cost_value if value is not None and cost_value is not None else None
+    income_statement.insert(2, record)
 
 
 class FetchListedCompanyFinancialTool(BaseTool):
     """获取上市公司财务数据工具"""
     name: str = "fetch_listed_company_financial"
-    description: str = """从公开渠道获取上市公司财务数据。
-
-数据来源：
-- 巨潮资讯网（cninfo.com.cn）
-- 东方财富（eastmoney.com）
-- 同花顺（10jqka.com.cn）
-
-获取内容：
-- 近三年资产负债表
-- 近三年利润表
-- 近三年现金流量表
-"""
+    description: str = "从东方财富公开接口获取上市公司近三年财务报表，并转换成标准三大表结构。"
     args_schema: Type[BaseModel] = FetchListedCompanyFinancialInput
 
-    def _run(self, enterprise_name: str, stock_code: str, stock_exchange: str) -> str:
-        """运行工具"""
-        # TODO: 接入真实的上市公司数据API
-        # 目前返回模拟数据
+    def _run(self, enterprise_name: str, stock_code: str = "", stock_exchange: str = "") -> str:
+        company = resolve_listed_company(enterprise_name, stock_code, stock_exchange)
+        if not company:
+            return json.dumps({
+                "success": False,
+                "error": "未识别到上市公司证券代码",
+                "enterprise_name": enterprise_name,
+            }, ensure_ascii=False)
 
-        # 模拟从巨潮资讯网获取的数据
-        mock_data = {
-            "enterprise_name": enterprise_name,
-            "stock_code": stock_code,
-            "stock_exchange": stock_exchange,
-            "data_source": "cninfo",
-            "report_date": "2024-12-31",
-            "financial_statements": {
-                "balance_sheet": {
-                    "2024": {
-                        "货币资金": 1500000000,
-                        "应收账款": 287000000,
-                        "存货": 92000000,
-                        "流动资产合计": 2000000000,
-                        "固定资产": 500000000,
-                        "无形资产": 200000000,
-                        "非流动资产合计": 1000000000,
-                        "资产总计": 3000000000,
-                        "短期借款": 300000000,
-                        "应付账款": 200000000,
-                        "流动负债合计": 800000000,
-                        "长期借款": 500000000,
-                        "非流动负债合计": 700000000,
-                        "负债合计": 1500000000,
-                        "所有者权益合计": 1500000000,
-                    },
-                    "2023": {
-                        "货币资金": 1200000000,
-                        "应收账款": 238000000,
-                        "存货": 82000000,
-                        "流动资产合计": 1700000000,
-                        "固定资产": 450000000,
-                        "无形资产": 180000000,
-                        "非流动资产合计": 900000000,
-                        "资产总计": 2600000000,
-                        "短期借款": 250000000,
-                        "应付账款": 180000000,
-                        "流动负债合计": 700000000,
-                        "长期借款": 400000000,
-                        "非流动负债合计": 600000000,
-                        "负债合计": 1300000000,
-                        "所有者权益合计": 1300000000,
-                    },
-                    "2022": {
-                        "货币资金": 1000000000,
-                        "应收账款": 182000000,
-                        "存货": 66000000,
-                        "流动资产合计": 1400000000,
-                        "固定资产": 400000000,
-                        "无形资产": 160000000,
-                        "非流动资产合计": 800000000,
-                        "资产总计": 2200000000,
-                        "短期借款": 200000000,
-                        "应付账款": 150000000,
-                        "流动负债合计": 600000000,
-                        "长期借款": 300000000,
-                        "非流动负债合计": 500000000,
-                        "负债合计": 1100000000,
-                        "所有者权益合计": 1100000000,
-                    },
+        try:
+            income_rows = _fetch_eastmoney_report(company["secu_code"], REPORT_MAP["income_statement"])
+            balance_rows = _fetch_eastmoney_report(company["secu_code"], REPORT_MAP["balance_sheet"])
+            cash_rows = _fetch_eastmoney_report(company["secu_code"], REPORT_MAP["cash_flow"])
+
+            income_statement = _build_statement(income_rows, INCOME_FIELD_MAP)
+            _add_gross_profit(income_statement)
+            balance_sheet = _build_statement(balance_rows, BALANCE_FIELD_MAP)
+            cash_flow = _build_statement(cash_rows, CASHFLOW_FIELD_MAP)
+
+            return json.dumps({
+                "success": True,
+                "enterprise_name": enterprise_name,
+                "security_name": company["security_name"],
+                "stock_code": company["stock_code"],
+                "stock_exchange": company["stock_exchange"],
+                "secu_code": company["secu_code"],
+                "data_source": "东方财富公开财报接口",
+                "years": sorted({key for row in income_statement for key in row.keys() if key.isdigit()}),
+                "financial_statements": {
+                    "income_statement": income_statement,
+                    "balance_sheet": balance_sheet,
+                    "cash_flow": cash_flow,
                 },
-                "income_statement": {
-                    "2024": {
-                        "营业收入": 820000000,
-                        "营业成本": 574000000,
-                        "毛利润": 246000000,
-                        "销售费用": 82000000,
-                        "管理费用": 65000000,
-                        "研发费用": 49000000,
-                        "财务费用": 15000000,
-                        "营业利润": 120000000,
-                        "利润总额": 115000000,
-                        "净利润": 102500000,
-                    },
-                    "2023": {
-                        "营业收入": 680000000,
-                        "营业成本": 476000000,
-                        "毛利润": 204000000,
-                        "销售费用": 68000000,
-                        "管理费用": 54000000,
-                        "研发费用": 40000000,
-                        "财务费用": 12000000,
-                        "营业利润": 95000000,
-                        "利润总额": 90000000,
-                        "净利润": 80240000,
-                    },
-                    "2022": {
-                        "营业收入": 520000000,
-                        "营业成本": 364000000,
-                        "毛利润": 156000000,
-                        "销售费用": 52000000,
-                        "管理费用": 42000000,
-                        "研发费用": 31000000,
-                        "财务费用": 10000000,
-                        "营业利润": 68000000,
-                        "利润总额": 65000000,
-                        "净利润": 53040000,
-                    },
-                },
-                "cash_flow_statement": {
-                    "2024": {
-                        "销售商品收到的现金": 900000000,
-                        "经营活动现金流入小计": 920000000,
-                        "购买商品支付的现金": 600000000,
-                        "经营活动现金流出小计": 633000000,
-                        "经营活动产生的现金流量净额": 287000000,
-                        "投资活动现金流入小计": 50000000,
-                        "投资活动现金流出小计": 170000000,
-                        "投资活动产生的现金流量净额": -120000000,
-                        "筹资活动现金流入小计": 100000000,
-                        "筹资活动现金流出小计": 150000000,
-                        "筹资活动产生的现金流量净额": -50000000,
-                        "现金及现金等价物净增加额": 117000000,
-                    },
-                    "2023": {
-                        "销售商品收到的现金": 750000000,
-                        "经营活动现金流入小计": 770000000,
-                        "购买商品支付的现金": 520000000,
-                        "经营活动现金流出小计": 550000000,
-                        "经营活动产生的现金流量净额": 220000000,
-                        "投资活动现金流入小计": 40000000,
-                        "投资活动现金流出小计": 140000000,
-                        "投资活动产生的现金流量净额": -100000000,
-                        "筹资活动现金流入小计": 80000000,
-                        "筹资活动现金流出小计": 120000000,
-                        "筹资活动产生的现金流量净额": -40000000,
-                        "现金及现金等价物净增加额": 80000000,
-                    },
-                    "2022": {
-                        "销售商品收到的现金": 580000000,
-                        "经营活动现金流入小计": 600000000,
-                        "购买商品支付的现金": 400000000,
-                        "经营活动现金流出小计": 420000000,
-                        "经营活动产生的现金流量净额": 180000000,
-                        "投资活动现金流入小计": 30000000,
-                        "投资活动现金流出小计": 110000000,
-                        "投资活动产生的现金流量净额": -80000000,
-                        "筹资活动现金流入小计": 60000000,
-                        "筹资活动现金流出小计": 90000000,
-                        "筹资活动产生的现金流量净额": -30000000,
-                        "现金及现金等价物净增加额": 70000000,
-                    },
-                },
-            },
-            "audit_info": {
-                "audit_opinion": "标准无保留意见",
-                "auditor": "XX会计师事务所",
-                "key_audit_matters": [
-                    "收入确认",
-                    "应收账款坏账准备",
-                ],
-            },
-        }
-
-        return json.dumps(mock_data, ensure_ascii=False, indent=2)
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({
+                "success": False,
+                "error": f"获取上市公司公开财报失败: {str(e)}",
+                "enterprise_name": enterprise_name,
+                "stock_code": company.get("stock_code"),
+                "stock_exchange": company.get("stock_exchange"),
+            }, ensure_ascii=False)
 
 
-# 创建工具实例
 fetch_listed_company_financial = FetchListedCompanyFinancialTool()

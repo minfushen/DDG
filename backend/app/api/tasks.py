@@ -56,6 +56,20 @@ def notify_task_update(task_id: str):
         task_events[task_id] = asyncio.Event()
 
 
+def append_timeline(task_id: str, agent: str, content: str, detail: str = "", status: str = "completed", event_type: str = "action"):
+    """追加一条任务时间轴并通知订阅者。"""
+    tasks[task_id]["timeline"] = tasks[task_id].get("timeline", []) + [{
+        "id": uuid.uuid4().hex,
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "agent": agent,
+        "content": content,
+        "detail": detail,
+        "status": status,
+        "type": event_type,
+    }]
+    notify_task_update(task_id)
+
+
 def make_task_state_event(task_id: str) -> SSEEvent:
     """把当前任务状态包装为 SSE state 事件。"""
     task = tasks[task_id]
@@ -69,6 +83,7 @@ def make_task_state_event(task_id: str) -> SSEEvent:
             "report": task.get("report"),
             "error": task.get("error"),
             "upload_required": task.get("agent_state") == "waiting_upload",
+            "full_due_diligence_context": task.get("full_due_diligence_context"),
         },
     )
 
@@ -111,26 +126,92 @@ async def resume_financial_task_with_uploaded_data(
 ):
     """基于上传财报恢复财务任务。"""
     from app.agents.sub_agents.financial_agent import run_financial_agent_with_uploaded_data
+    from app.agents.crew.full_due_diligence_runner import run_full_due_diligence
 
     task = tasks[task_id]
     task.update({
         "agent_state": "calling_financial",
         "error": None,
-        "timeline": task.get("timeline", []) + [{
-            "id": uuid.uuid4().hex,
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "agent": "系统",
-            "content": "已接收上传财报，继续财务分析",
-            "status": "completed",
-            "type": "action",
-        }],
     })
+    append_timeline(
+        task_id,
+        "系统",
+        "已接收上传财报，继续财务分析",
+        "开始校验表格完整性和重点科目覆盖情况",
+    )
     notify_task_update(task_id)
+
+    append_timeline(
+        task_id,
+        "财务Agent",
+        "校验财报结构",
+        "确认利润表、资产负债表、现金流量表均已解析完成",
+        "completed",
+        "discovery",
+    )
+
+    append_timeline(
+        task_id,
+        "财务Agent",
+        "标准化重点科目",
+        "对齐年度列，提取营收、利润、资产、负债、权益及现金流科目",
+        "completed",
+        "analysis",
+    )
+
+    if task.get("full_due_diligence_context"):
+        previous_timeline = task.get("timeline", [])
+        previous_evidence = task.get("evidence", [])
+        context = task.get("full_due_diligence_context") or {}
+        context_timeline_len = len(context.get("timeline", []))
+        context_evidence_len = len(context.get("evidence", []))
+        append_timeline(
+            task_id,
+            "系统",
+            "恢复完整尽调综合报告生成",
+            "沿用已完成的工商、司法、行业专项结果，并补齐财务专项",
+            "completed",
+            "action",
+        )
+        full_result = await run_full_due_diligence(
+            enterprise_name=task["enterprise_name"],
+            parsed_financial_data=parsed_financial_data,
+            existing_context=context,
+        )
+        task["timeline"] = previous_timeline + full_result.get("timeline", [])[context_timeline_len:]
+        task["evidence"] = previous_evidence + full_result.get("evidence", [])[context_evidence_len:]
+        if not full_result.get("success"):
+            task.update({
+                "agent_state": "waiting_upload",
+                "error": full_result.get("error", "完整尽调恢复失败"),
+                "full_due_diligence_context": full_result.get("full_due_diligence_context", task.get("full_due_diligence_context")),
+            })
+            notify_task_update(task_id)
+            return
+
+        task.update({
+            "agent_state": "completed",
+            "report": full_result.get("report"),
+            "error": None,
+            "full_due_diligence_context": full_result.get("full_due_diligence_context"),
+            "timeline": task.get("timeline", []) + [{
+                "id": uuid.uuid4().hex,
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "agent": "系统",
+                "content": "完整尽调报告生成完成",
+                "detail": "已补齐财务专项并形成统一授信审查意见",
+                "status": "completed",
+                "type": "action",
+            }],
+        })
+        notify_task_update(task_id)
+        return
 
     result = await run_financial_agent_with_uploaded_data(
         enterprise_name=task["enterprise_name"],
         parsed_financial_data=parsed_financial_data,
     )
+
     task["timeline"] = task.get("timeline", []) + result.get("timeline", [])
     task["evidence"] = task.get("evidence", []) + result.get("evidence", [])
 
@@ -143,6 +224,14 @@ async def resume_financial_task_with_uploaded_data(
         return
 
     if result.get("financial_analysis_report"):
+        append_timeline(
+            task_id,
+            "财务Agent",
+            "生成银行财务分析专报",
+            "按资产、负债、权益、利润、现金流和财务指标章节组织结论",
+            "completed",
+            "conclusion",
+        )
         task.update({
             "agent_state": "completed",
             "report": result["financial_analysis_report"],
@@ -205,6 +294,7 @@ async def create_task(request: CreateTaskRequest):
         "report": None,
         "error": None,
         "execution_started": True,
+        "full_due_diligence_context": None,
         "created_at": datetime.now().isoformat(),
     }
     task_events[task_id] = asyncio.Event()

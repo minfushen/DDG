@@ -8,6 +8,8 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 import json
 
+from app.agents.tools.listed_company_tool import resolve_listed_company
+
 
 class IdentifyEnterpriseTypeInput(BaseModel):
     """识别企业类型输入"""
@@ -29,33 +31,10 @@ class IdentifyEnterpriseTypeTool(BaseTool):
 
     def _run(self, enterprise_name: str) -> str:
         """运行工具"""
-        # TODO: 接入真实的上市公司查询API
-        # 目前通过关键词判断
-
-        # 上市公司关键词（常见上市公司）
-        listed_companies = {
-            "腾讯": {"stock_code": "0700.HK", "stock_exchange": "港交所"},
-            "阿里巴巴": {"stock_code": "BABA", "stock_exchange": "纽交所"},
-            "百度": {"stock_code": "BIDU", "stock_exchange": "纳斯达克"},
-            "京东": {"stock_code": "JD", "stock_exchange": "纳斯达克"},
-            "美团": {"stock_code": "3690.HK", "stock_exchange": "港交所"},
-            "小米": {"stock_code": "1810.HK", "stock_exchange": "港交所"},
-            "华为": {"stock_code": None, "stock_exchange": None},  # 非上市
-            "字节跳动": {"stock_code": None, "stock_exchange": None},  # 非上市
-        }
-
-        # 判断是否为上市公司
-        is_listed = False
-        stock_code = None
-        stock_exchange = None
-
-        for company, info in listed_companies.items():
-            if company in enterprise_name:
-                if info["stock_code"]:
-                    is_listed = True
-                    stock_code = info["stock_code"]
-                    stock_exchange = info["stock_exchange"]
-                break
+        listed_info = resolve_listed_company(enterprise_name)
+        is_listed = listed_info is not None
+        stock_code = listed_info.get("stock_code") if listed_info else None
+        stock_exchange = listed_info.get("stock_exchange") if listed_info else None
 
         # 根据企业类型确定数据获取策略
         if is_listed:

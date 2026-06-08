@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     LANGCHAIN_API_KEY: str = ""
     LANGCHAIN_PROJECT: str = "ddg-agent"
 
+    # 搜索工具配置
+    TAVILY_API_KEY: str = ""
+
+    # 企业工商专项 API 配置（可选）
+    # BUSINESS_REGISTRY_PROVIDER: auto | tianyancha | qichacha | none
+    BUSINESS_REGISTRY_PROVIDER: str = "auto"
+    TIANYANCHA_API_TOKEN: str = ""
+    QICHACHA_API_KEY: str = ""
+    QICHACHA_API_SECRET: str = ""
+
     # 路径配置
     BASE_DIR: Path = Path(__file__).parent.parent.parent
     OUTPUT_DIR: Path = BASE_DIR / "output"

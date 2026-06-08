@@ -32,6 +32,7 @@ class OrchestratorState(TypedDict):
     crew_result: Optional[dict]
     context: Optional[str]  # 历史上下文（用于多轮对话）
     intent: Optional[Intent]  # 用户意图（用于路由）
+    full_due_diligence_context: Optional[dict]  # 完整尽调阶段性上下文
 
 
 short_term_memory = ShortTermMemory()
@@ -140,9 +141,9 @@ def parse_intent(enterprise_name: str) -> Intent:
 
     # 关键词映射：agent_type -> 触发关键词列表
     keyword_map = {
+        "industry": ["行业风险", "行业情况", "行业分析", "所属行业", "产业", "竞争", "市场", "政策", "景气", "格局", "赛道"],
         "financial": ["财务", "盈利", "现金流", "偿债", "资产负债", "营收", "利润", "毛利率", "roe", "流动比率", "速动比率"],
         "legal": ["司法", "法律", "诉讼", "裁判", "失信", "处罚", "风险", "被执行", "立案"],
-        "industry": ["行业", "产业", "竞争", "市场", "政策", "景气", "格局", "赛道"],
         "business": ["工商", "股东", "注册", "法人", "高管", "经营", "变更", "对外投资"],
     }
 
@@ -159,11 +160,9 @@ def is_likely_listed_company(enterprise_name: str) -> bool:
 
     真实股票代码解析器接入前，未命中即视为非上市/未知，财务分析需上传。
     """
-    listed_keywords = [
-        "欣旺达", "比亚迪", "宁德时代", "贵州茅台", "招商银行", "平安银行",
-        "万科", "美的", "格力", "海康威视", "立讯精密", "隆基绿能",
-    ]
-    return any(keyword in enterprise_name for keyword in listed_keywords)
+    from app.agents.tools.listed_company_tool import resolve_listed_company
+
+    return resolve_listed_company(enterprise_name) is not None
 
 
 def make_upload_required_state(state: OrchestratorState) -> OrchestratorState:
@@ -311,48 +310,28 @@ def parse_execution_plan(result: str) -> dict:
 
 def run_crew(state: OrchestratorState) -> OrchestratorState:
     try:
-        from app.agents.crew import create_due_diligence_crew, create_dynamic_crew
-        execution_plan = state.get("execution_plan")
-        if execution_plan:
-            crew = create_dynamic_crew(
-                enterprise_name=state["enterprise_name"],
-                execution_plan=execution_plan,
-                verbose=True,
-                memory=False,
-            )
-        else:
-            crew = create_due_diligence_crew(
-                enterprise_name=state["enterprise_name"],
-                verbose=True,
-                memory=False,
-            )
-        result = crew.kickoff(inputs={
-            "enterprise_name": state["enterprise_name"],
-            "context": state.get("context", ""),
-        })
-        timeline = state["timeline"].copy()
-        evidence = state["evidence"].copy()
-        timeline.append({
-            "id": str(uuid.uuid4()),
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "agent": "系统",
-            "content": "CrewAI 团队执行完成",
-            "detail": "所有分析Agent完成任务",
-            "status": "completed",
-            "type": "action",
-        })
-        if hasattr(result, 'tasks_output'):
-            for task_output in result.tasks_output:
-                if hasattr(task_output, 'raw'):
-                    evidence.append({
-                        "label": task_output.agent if hasattr(task_output, 'agent') else "分析结果",
-                        "value": task_output.raw[:100] + "..." if len(task_output.raw) > 100 else task_output.raw,
-                        "source": "CrewAI 分析",
-                    })
+        from app.agents.crew.full_due_diligence_runner import run_full_due_diligence_sync
+
+        result = run_full_due_diligence_sync(state["enterprise_name"])
+        timeline = state["timeline"].copy() + result.get("timeline", [])
+        evidence = state["evidence"].copy() + result.get("evidence", [])
+
+        if result.get("fallback_to_upload"):
+            return {
+                **state,
+                "agent_state": "waiting_upload",
+                "timeline": timeline,
+                "evidence": evidence,
+                "report": result.get("report"),
+                "error": result.get("error"),
+                "full_due_diligence_context": result.get("full_due_diligence_context"),
+                "crew_result": {"raw": json.dumps(result.get("report"), ensure_ascii=False)},
+            }
+
         long_term_memory.add(
             category="enterprise",
             title=f"{state['enterprise_name']} 尽调分析",
-            content=str(result),
+            content=json.dumps(result.get("report"), ensure_ascii=False),
             metadata={"task_id": state["task_id"]},
         )
         return {
@@ -360,7 +339,9 @@ def run_crew(state: OrchestratorState) -> OrchestratorState:
             "agent_state": "forming_conclusion",
             "timeline": timeline,
             "evidence": evidence,
-            "crew_result": {"raw": str(result)},
+            "report": result.get("report"),
+            "full_due_diligence_context": result.get("full_due_diligence_context"),
+            "crew_result": {"raw": json.dumps(result.get("report"), ensure_ascii=False)},
         }
     except Exception as e:
         if is_rate_limit_error(e):
@@ -410,6 +391,13 @@ def run_single_agent(state: OrchestratorState) -> OrchestratorState:
     evidence = state["evidence"] + result.get("evidence", [])
 
     if not result.get("success"):
+        if target == "financial" and result.get("fallback_to_upload"):
+            return make_upload_required_state({
+                **state,
+                "timeline": timeline,
+                "evidence": evidence,
+                "error": result.get("error"),
+            })
         return {
             **state,
             "agent_state": "forming_conclusion",
@@ -425,16 +413,67 @@ def run_single_agent(state: OrchestratorState) -> OrchestratorState:
         metadata={"task_id": state["task_id"]},
     )
 
+    structured_report = (
+        result.get("financial_analysis_report")
+        or result.get("business_analysis_report")
+        or result.get("industry_analysis_report")
+        or result.get("legal_analysis_report")
+        or state.get("report")
+    )
+
     return {
         **state,
         "agent_state": "forming_conclusion",
         "timeline": timeline,
         "evidence": evidence,
+        "report": structured_report,
         "crew_result": {"raw": json.dumps(result, ensure_ascii=False)},
     }
 
 
 def form_conclusion(state: OrchestratorState) -> OrchestratorState:
+    if (state.get("report") or {}).get("report_type") in {"financial_analysis", "business_analysis", "industry_analysis", "legal_analysis", "full_due_diligence"}:
+        report = state["report"]
+        report_type = report.get("report_type")
+        is_financial_report = report_type == "financial_analysis"
+        if report_type == "full_due_diligence":
+            content = "形成完整尽调综合结论"
+            detail = f"风险评级：{report.get('risk_rating')}，评分：{report.get('risk_score')}，维度：{len(report.get('risk_dimensions', []))}个"
+            conclusion = report.get("recommendation")
+        elif report_type == "business_analysis":
+            content = "形成工商分析报告结论"
+            detail = f"已抽取 {len(report.get('basic_info', {}))} 个工商字段，来源：{report.get('generated_from', '公开数据')}"
+            conclusion = report.get("recommendation") or "工商基础信息已形成字段级来源和置信度说明"
+        elif report_type == "industry_analysis":
+            industry = report.get("industry", {})
+            content = "形成行业分析报告结论"
+            detail = f"行业：{industry.get('semantic_industry_name') or industry.get('name')}，置信度：{round((industry.get('confidence') or 0) * 100)}%"
+            conclusion = "行业识别、尽调重点、指标阈值和风险提示已由知识库生成"
+        elif report_type == "legal_analysis":
+            content = "形成司法分析报告结论"
+            detail = f"风险评级：{report.get('risk_rating')}，评分：{report.get('risk_score')}，线索：{len(report.get('legal_items', []))}条"
+            conclusion = report.get("recommendation")
+        else:
+            content = "形成财务分析专报结论"
+            detail = f"风险评级：{report.get('risk_rating')}，评分：{report.get('risk_score')}"
+            conclusion = report.get("recommendation")
+        return {
+            **state,
+            "agent_state": "generating_report",
+            "timeline": state["timeline"] + [
+                {
+                    "id": str(uuid.uuid4()),
+                    "time": datetime.now().strftime("%H:%M:%S"),
+                    "agent": "系统",
+                    "content": content,
+                    "detail": detail,
+                    "conclusion": conclusion,
+                    "status": "completed",
+                    "type": "conclusion",
+                }
+            ],
+        }
+
     risk_factors = []
     for ev in state["evidence"]:
         if "风险" in ev.get("label", "") or "处罚" in ev.get("label", ""):
@@ -535,6 +574,7 @@ async def run_orchestrator_v2(
         "execution_plan": None,
         "crew_result": None,
         "context": None,
+        "full_due_diligence_context": None,
     }
 
     def _make_state_payload(s: OrchestratorState) -> dict:
@@ -546,6 +586,7 @@ async def run_orchestrator_v2(
             "evidence": s.get("evidence", []),
             "report": s.get("report"),
             "error": s.get("error"),
+            "full_due_diligence_context": s.get("full_due_diligence_context"),
         }
 
     # ── 步骤1: 创建任务（快速同步节点）──
@@ -601,6 +642,9 @@ async def run_orchestrator_v2(
         )
         state = await run_node_with_rate_limit_retry(run_crew, state, "CrewAI 团队执行")
         yield SSEEvent(type="state", data=_make_state_payload(state))
+
+        if state.get("agent_state") == "waiting_upload":
+            return
 
     else:
         # 单个任务：直接执行目标 Agent

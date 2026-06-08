@@ -2,198 +2,127 @@
 
 ## 项目简介
 
-尽调智能体平台后端服务，基于 FastAPI 构建，集成 Rebecca 规则引擎和 LangGraph Agent 进行智能财务分析。
+对公尽调智能体后端服务，基于 FastAPI 提供任务编排、SSE 执行流、财务文件上传解析和结构化报告接口。当前核心产品形态围绕四个专项 Agent 展开：工商分析、财务分析、行业分析、司法分析。
 
 ## 技术栈
 
 - **Web 框架**: FastAPI 0.110+
-- **Agent 框架**: LangGraph 0.2+（状态图编排）
-- **LLM 集成**: LangChain + DashScope (qwen-max)
-- **规则引擎**: Rebecca（10 维度财务分析）
-- **向量库**: ChromaDB（RAG 知识检索）
-- **数据处理**: Pandas, NumPy
-- **文档生成**: python-docx
+- **Agent 编排**: LangGraph + CrewAI（完整尽调链路仍保留）
+- **财务规则引擎**: Rebecca
+- **知识检索**: ChromaDB + 本地行业/风控知识库
+- **数据处理**: Pandas, NumPy, openpyxl
+- **外部数据**: 东方财富公开财报、Tavily 搜索、可选权威工商/司法通道
 
 ## 目录结构
 
-```
+```text
 backend/
 ├── app/
-│   ├── api/              # API 路由
-│   │   ├── analysis.py   # 分析接口
-│   │   ├── chat.py       # 对话接口
-│   │   └── knowledge.py  # 知识库接口
-│   ├── config/           # 配置管理
-│   ├── engines/
-│   │   └── rebecca/      # Rebecca 规则引擎
-│   ├── models/           # 数据模型
-│   ├── agents/           # LangGraph Agent
-│   │   ├── state.py      # Agent 状态定义
-│   │   ├── intent_router.py  # 意图识别
-│   │   ├── due_diligence_agent.py  # 尽调 Agent
-│   │   └── tools/        # Agent 工具
-│   └── rag/              # RAG 知识库
-│       ├── vector_store.py   # 向量存储
-│       ├── knowledge_base.py # 知识库
-│       └── retriever.py      # 检索器
-├── knowledge_base/       # 知识文档
-│   ├── regulations/      # 法规文档
-│   ├── industry_guides/  # 行业指南
-│   ├── case_studies/     # 案例库
-│   └── risk_frameworks/  # 风险框架
-├── tests/                # 单元测试
-├── output/               # 输出目录
-├── db/                   # 数据库目录
-├── requirements.txt      # 依赖清单
-└── run.py                # 启动脚本
+│   ├── api/
+│   │   ├── tasks.py       # 任务创建、SSE 流、恢复执行、报告读取
+│   │   └── upload.py      # 非上市企业财报上传与解析
+│   ├── agents/
+│   │   ├── orchestrator_v2.py
+│   │   ├── state.py
+│   │   ├── crew/          # 完整尽调链路依赖，未移除
+│   │   ├── sub_agents/    # 工商/财务/行业/司法专项 Agent
+│   │   └── tools/         # 数据获取、上市公司识别、行业分类、RAG 等工具
+│   ├── engines/rebecca/   # 财务报表解析和指标分析
+│   ├── rag/               # 本地知识库检索
+│   ├── memory/            # 短期/长期记忆
+│   ├── config/            # 配置管理
+│   └── main.py            # FastAPI 入口
+├── knowledge_base/        # 行业、风控、法规、模板知识文档
+├── tests/                 # 单元测试
+├── output/                # 上传文件、生成结果等运行时输出
+├── db/                    # 本地运行时数据
+├── requirements.txt
+└── run.py
 ```
 
 ## 快速开始
-
-### 1. 安装依赖
 
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-```
-
-### 2. 配置环境变量
-
-```bash
-cp .env.example .env
-# 编辑 .env 文件配置 LLM API Key 等参数
-```
-
-### 3. 启动服务
-
-```bash
 python run.py
 ```
 
 服务启动后访问：
+
 - API 文档: http://localhost:8000/docs
 - ReDoc 文档: http://localhost:8000/redoc
 - 健康检查: http://localhost:8000/health
 
 ## API 接口
 
-### 1. 系统接口
+### 系统接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/` | 根路径 |
 | GET | `/health` | 健康检查 |
 
-### 2. 分析接口
+### 任务接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/v1/analysis/parse` | 解析财报文件 |
-| POST | `/api/v1/analysis/analyze` | 执行财务分析 |
-| POST | `/api/v1/analysis/report` | 生成尽调报告 |
-| GET | `/api/v1/reports/{filename}` | 下载报告文件 |
+| POST | `/api/v1/tasks` | 创建尽调或专项分析任务 |
+| GET | `/api/v1/tasks/{task_id}/stream` | SSE 流式获取任务执行状态 |
+| GET | `/api/v1/tasks/{task_id}` | 获取任务状态快照 |
+| POST | `/api/v1/tasks/{task_id}/resume` | 上传财报解析后恢复等待中的财务任务 |
+| GET | `/api/v1/tasks/{task_id}/report` | 获取结构化报告 |
 
-### 3. 对话接口
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v1/chat` | Agent 对话（SSE 流式） |
-| POST | `/api/v1/chat/sync` | Agent 对话（同步） |
-
-### 4. 知识库接口
+### 财报上传接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/v1/knowledge/search` | 检索知识库 |
-| POST | `/api/v1/knowledge/ingest` | 导入知识文档 |
-| POST | `/api/v1/knowledge/ingest-directory` | 导入知识库目录 |
+| POST | `/api/v1/upload/financial` | 上传 Excel、CSV 或 PDF 财报文件 |
+| GET | `/api/v1/upload/{task_id}/files` | 获取任务已上传文件列表 |
+| POST | `/api/v1/upload/{task_id}/parse` | 解析已上传财报并返回标准化三大表数据 |
 
 ## 请求示例
 
-### 财务分析
+### 创建任务
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/analysis/analyze" \
+curl -X POST "http://localhost:8000/api/v1/tasks" \
   -H "Content-Type: application/json" \
-  -d '{
-    "enterprise_name": "测试企业",
-    "financial_data": {
-      "income_statement": {"revenue": 1000000000},
-      "balance_sheet": {"total_assets": 5000000000},
-      "cash_flow": {"operating_cash_flow": 300000000}
-    }
-  }'
+  -d '{"enterprise_name":"分析一下欣旺达的财务风险情况"}'
 ```
 
-### Agent 对话
+### 订阅执行流
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/chat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "帮我分析一下腾讯的财报",
-    "session_id": "sess_123",
-    "context": {
-      "enterprise_name": "腾讯"
-    }
-  }'
+curl -N "http://localhost:8000/api/v1/tasks/{task_id}/stream"
 ```
 
-### 知识库检索
+### 上传并解析非上市公司财报
 
 ```bash
-curl "http://localhost:8000/api/v1/knowledge/search?query=应收账款&knowledge_type=regulation&top_k=5"
+curl -X POST "http://localhost:8000/api/v1/upload/financial" \
+  -F "task_id={task_id}" \
+  -F "document_type=auto" \
+  -F "file=@/path/to/三年财务报表.xlsx"
+
+curl -X POST "http://localhost:8000/api/v1/upload/{task_id}/parse"
 ```
 
 ## 测试
 
 ```bash
-# 激活虚拟环境
+cd backend
 source venv/bin/activate
-
-# 运行所有测试
 pytest
-
-# 运行特定测试
-pytest tests/test_analysis_api.py
-
-# 运行测试并显示覆盖率
-pytest --cov=app
 ```
 
-## 开发计划
+当前本地 `venv312` 可能未安装 pytest，可先执行 `pip install pytest` 或使用项目配置的虚拟环境。
 
-- **M1**: 后端基础 + Rebecca 集成 ✅
-- **M2**: LLM Agent 集成（LangGraph）✅
-- **M3**: RAG 知识库（ChromaDB）✅
-- **M4**: 前端对话界面 ✅
-- **M5**: 联调优化 ✅
+## 当前 Agent 能力
 
-## 架构说明
-
-### Agent 工作流
-
-```
-用户输入 → 意图识别 → Agent 决策 → 工具调用 → 结果整合 → 流式输出
-                ↓
-        ┌───────┴───────┐
-        ↓       ↓       ↓
-    分析工具  解读工具  知识工具
-        ↓       ↓       ↓
-    Rebecca   LLM     ChromaDB
-```
-
-### 10 维度分析
-
-1. 盈利能力
-2. 偿债能力
-3. 营运能力
-4. 成长能力
-5. 现金流分析
-6. 成本结构
-7. 资产质量
-8. 负债结构
-9. 盈利趋势
-10. 风险评估
+- **财务分析**: 上市公司自动获取公开财报；非上市公司强制上传近三年财报，解析三大表并生成银行风格财务报告。
+- **工商分析**: 优先接权威工商通道，失败后使用 Tavily 搜索聚合工商基础信息和风险信号。
+- **行业分析**: 使用 `industry_code4.json` 行业代码库分类，并结合本地行业知识库生成景气度、竞争格局、政策环境、授信审查重点等内容。
+- **司法分析**: 探测裁判文书网、执行信息公开网等权威来源，并用 Tavily 搜索做公开司法风险兜底。

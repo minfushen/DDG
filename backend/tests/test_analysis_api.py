@@ -1,6 +1,5 @@
 # backend/tests/test_analysis_api.py
-"""分析 API 测试"""
-import pytest
+"""应用基础接口测试。"""
 from fastapi.testclient import TestClient
 
 
@@ -24,59 +23,7 @@ def test_health_check(client: TestClient):
     assert "services" in data
 
 
-def test_analyze_financial_data(client: TestClient):
-    """测试财务分析接口"""
-    request_data = {
-        "enterprise_name": "测试企业",
-        "financial_data": {
-            "income_statement": {
-                "revenue": 1000000000,
-                "cost_of_goods_sold": 600000000,
-                "gross_profit": 400000000,
-            },
-            "balance_sheet": {
-                "total_assets": 5000000000,
-                "total_liabilities": 3000000000,
-                "total_equity": 2000000000,
-            },
-            "cash_flow": {
-                "operating_cash_flow": 300000000,
-                "investing_cash_flow": -200000000,
-                "financing_cash_flow": -50000000,
-            },
-        },
-    }
-
-    response = client.post("/api/v1/analysis/analyze", json=request_data)
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["status"] == "completed"
-    assert data["enterprise_name"] == "测试企业"
-    assert "analysis_result" in data
-    assert "risks" in data
-
-
-def test_generate_report(client: TestClient):
-    """测试报告生成接口"""
-    request_data = {
-        "enterprise_name": "测试企业",
-        "analysis_result": {
-            "profitability": {
-                "gross_profit_margin": {
-                    "columns": ["指标", "本期"],
-                    "data": [["毛利率", "40%"]],
-                }
-            }
-        },
-        "report_format": "docx",
-    }
-
-    response = client.post("/api/v1/analysis/report", json=request_data)
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["status"] == "completed"
-    assert data["enterprise_name"] == "测试企业"
-    assert "report_path" in data
-    assert "download_url" in data
+def test_removed_legacy_analysis_api(client: TestClient):
+    """旧版分析接口已下线，避免后续误用历史 API。"""
+    response = client.post("/api/v1/analysis/analyze", json={})
+    assert response.status_code == 404

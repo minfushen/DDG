@@ -9,21 +9,37 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Download, FileText, Shield, TrendingUp,
   CheckCircle2, AlertTriangle, ExternalLink, Loader2,
+  Share2, CreditCard, BarChart3, Scale, Globe2, Folder,
 } from 'lucide-react';
 import { getTaskReport } from '../../services/agentApi';
+import './Report.css';
 
 // ── 类型 ──────────────────────────────────────────
 
 interface ReportData {
   enterprise_name: string;
-  risk_rating: string;
-  risk_score: number;
-  recommendation: string;
+  risk_rating?: string;
+  risk_score?: number;
+  recommendation?: string;
   report_type?: string;
   years?: string[];
   generated_from?: string;
-  sections?: FinancialReportSection[];
+  sections?: Array<FinancialReportSection | BusinessReportSection | IndustryReportSection | LegalReportSection>;
   risk_summary?: string[];
+  basic_info?: Record<string, BusinessInfoItem>;
+  raw_answer?: string;
+  industry?: IndustryInfo;
+  summary?: Record<string, number>;
+  legal_items?: LegalItem[];
+  executive_summary?: string[];
+  risk_dimensions?: FullRiskDimension[];
+  credit_decision?: CreditDecision;
+  cross_findings?: CrossFinding[];
+  sub_reports?: Record<string, ReportData | undefined>;
+  evidence_docs?: EvidenceDocItem[];
+  due_diligence_questions?: string[];
+  pending_upload?: boolean;
+  crew_review?: { status?: string; reviewer?: string; reason?: string };
 }
 
 interface FinancialReportRow {
@@ -48,6 +64,120 @@ interface FinancialReportSubsection {
 interface FinancialReportSection {
   title: string;
   subsections: FinancialReportSubsection[];
+}
+
+interface BusinessInfoItem {
+  value?: string;
+  source_name?: string;
+  source_url?: string;
+  confidence?: number;
+  trust_level?: string;
+}
+
+interface BusinessInfoRow {
+  field: string;
+  value: string;
+  source: string;
+  confidence: number;
+  trust_level: string;
+}
+
+interface BusinessSource {
+  title?: string;
+  url?: string;
+  trust_level?: string;
+  confidence?: number;
+}
+
+interface BusinessReportSection {
+  title: string;
+  rows?: BusinessInfoRow[];
+  sources?: BusinessSource[];
+  risks?: string[];
+  analysis?: string[];
+}
+
+interface IndustryCandidate {
+  code: string;
+  name: string;
+  path: string[];
+  score: number;
+  signals?: string[];
+}
+
+interface IndustryInfo {
+  code?: string;
+  name?: string;
+  path?: string[];
+  path_codes?: string[];
+  semantic_industry_id?: string;
+  semantic_industry_name?: string;
+  confidence?: number;
+  matched_signals?: string[];
+  candidates?: IndustryCandidate[];
+}
+
+interface IndustryReportSection {
+  title: string;
+  analysis?: string[];
+  signals?: string[];
+  risks?: string[];
+  rows?: Array<Record<string, string>>;
+  sources?: Array<{ title?: string; file?: string; path?: string }>;
+}
+
+interface LegalItem {
+  title?: string;
+  url?: string;
+  types?: string[];
+  case_numbers?: string[];
+  causes?: string[];
+  excerpt?: string;
+  source?: string;
+  trust_level?: string;
+  confidence?: number;
+}
+
+interface LegalReportSection {
+  title: string;
+  analysis?: string[];
+  risks?: string[];
+  summary?: Array<{ label: string; value: number }>;
+  items?: LegalItem[];
+  attempts?: Array<{ provider?: string; success?: boolean; reason?: string; status_code?: number }>;
+}
+
+interface FullRiskDimension {
+  key?: string;
+  name: string;
+  score: number;
+  max_score?: number;
+  weight?: number;
+  status: 'low' | 'medium' | 'high';
+  details?: string[];
+}
+
+interface CrossFinding {
+  title: string;
+  risk_level?: string;
+  conclusion: string;
+  evidence_refs?: string[];
+}
+
+interface CreditDecision {
+  suggestion?: string;
+  risk_score?: number;
+  credit_limit_advice?: string;
+  term_advice?: string;
+  collateral_advice?: string;
+  post_loan_monitoring?: string[];
+}
+
+interface EvidenceDocItem {
+  name?: string;
+  source?: string;
+  value?: string;
+  status?: string;
 }
 
 // ── 参考数据（行业基准，待后端丰富后替换）─────────────────────
@@ -115,6 +245,26 @@ function dimStatusColor(status: 'low' | 'medium' | 'high'): string {
   return status === 'low' ? '#22C55E' : status === 'medium' ? '#F59E0B' : '#DC2626';
 }
 
+function trustLabel(level?: string): string {
+  const map: Record<string, string> = {
+    high: '高可信',
+    medium: '中可信',
+    low: '辅助参考',
+    unknown: '未识别',
+  };
+  return map[level || 'unknown'] || level || '未识别';
+}
+
+function trustClass(level?: string): string {
+  const map: Record<string, string> = {
+    high: 'text-[#16A34A] bg-[#F0FDF4]',
+    medium: 'text-[#B45309] bg-[#FFFBEB]',
+    low: 'text-[#475467] bg-[#F2F4F7]',
+    unknown: 'text-[#667085] bg-[#F9FAFB]',
+  };
+  return map[level || 'unknown'] || map.unknown;
+}
+
 function FinancialReportTableView({ table }: { table: FinancialReportTable }) {
   return (
     <div className="overflow-x-auto border border-[#E5E7EB] rounded-lg bg-white">
@@ -147,6 +297,10 @@ function FinancialReportTableView({ table }: { table: FinancialReportTable }) {
 }
 
 function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskId?: string }) {
+  const financialSections = (report.sections || []) as FinancialReportSection[];
+  const rating = report.risk_rating || 'medium';
+  const score = report.risk_score ?? 0;
+
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
       <div className="max-w-[1040px] mx-auto px-6 py-8">
@@ -157,16 +311,16 @@ function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskI
               {report.enterprise_name} · 任务ID: {taskId} · 数据来源：{report.generated_from || '用户上传财报'}
             </p>
           </div>
-          <div className={`${riskBgClass(report.risk_rating)} px-4 py-2 rounded-lg border border-[#E5E7EB] text-right`}>
-            <div className={`text-sm font-semibold ${riskColorClass(report.risk_rating)}`}>
-              {riskLabel(report.risk_rating)} · {report.risk_score}分
+          <div className={`${riskBgClass(rating)} px-4 py-2 rounded-lg border border-[#E5E7EB] text-right`}>
+            <div className={`text-sm font-semibold ${riskColorClass(rating)}`}>
+              {riskLabel(rating)} · {score}分
             </div>
-            <div className="text-xs text-[#667085] mt-0.5">{report.recommendation}</div>
+            <div className="text-xs text-[#667085] mt-0.5">{report.recommendation || '暂无建议'}</div>
           </div>
         </header>
 
         <div className="space-y-8">
-          {report.sections?.map((section) => (
+          {financialSections.map((section) => (
             <section key={section.title} className="bg-white border border-[#E5E7EB] rounded-lg p-6">
               <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">
                 {section.title}
@@ -224,6 +378,573 @@ function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskI
   );
 }
 
+function BusinessAnalysisReport({ report, taskId }: { report: ReportData; taskId?: string }) {
+  const sections = (report.sections || []) as BusinessReportSection[];
+  const basicSection = sections.find((section) => section.rows?.length);
+  const sourceSection = sections.find((section) => section.sources?.length);
+  const riskSection = sections.find((section) => section.risks?.length);
+  const rows = basicSection?.rows || Object.entries(report.basic_info || {}).map(([field, item]) => ({
+    field,
+    value: item.value || '数据不可用',
+    source: item.source_name || item.source_url || '未识别',
+    confidence: item.confidence || 0,
+    trust_level: item.trust_level || 'unknown',
+  }));
+
+  return (
+    <div className="min-h-screen bg-[#F9FAFB]">
+      <div className="max-w-[1040px] mx-auto px-6 py-8">
+        <header className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.history.back()}
+              className="p-2 -ml-2 rounded-lg hover:bg-[#F3F4F6] transition-colors"
+              title="返回"
+            >
+              <ArrowLeft className="w-4 h-4 text-[#667085]" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-[#101828]">企业工商分析报告</h1>
+              <p className="text-xs text-[#9CA3AF] mt-1">
+                {report.enterprise_name} · 任务ID: {taskId} · 数据来源：{report.generated_from || '公开搜索'}
+              </p>
+            </div>
+          </div>
+          <div className="px-4 py-2 rounded-lg border border-[#E5E7EB] bg-white text-right">
+            <div className="text-sm font-semibold text-[#101828]">字段级核验</div>
+            <div className="text-xs text-[#667085] mt-0.5">{rows.length} 个工商字段</div>
+          </div>
+        </header>
+
+        <div className="space-y-8">
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <div className="flex items-center justify-between mb-5 pb-3 border-b border-[#E5E7EB]">
+              <h2 className="text-lg font-bold text-[#101828]">一、工商基础信息</h2>
+              <span className="text-xs text-[#9CA3AF]">按字段保留来源与置信度</span>
+            </div>
+            <div className="overflow-x-auto border border-[#E5E7EB] rounded-lg">
+              <table className="w-full min-w-[760px]">
+                <thead>
+                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#667085]">字段</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#667085]">值</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#667085]">来源</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-[#667085]">置信度</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.field} className="border-b border-[#F3F4F6] last:border-0 align-top">
+                      <td className="px-4 py-3 text-sm font-medium text-[#101828] whitespace-nowrap">{row.field}</td>
+                      <td className="px-4 py-3 text-sm text-[#374151] max-w-[300px] leading-6">{row.value || '数据不可用'}</td>
+                      <td className="px-4 py-3 text-sm text-[#667085] max-w-[280px] leading-6">
+                        <div className="line-clamp-2">{row.source || '未识别'}</div>
+                        <span className={`inline-flex mt-2 px-2 py-0.5 rounded text-xs ${trustClass(row.trust_level)}`}>
+                          {trustLabel(row.trust_level)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-[#374151] font-mono whitespace-nowrap">
+                        {Math.round((row.confidence || 0) * 100)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {basicSection?.analysis?.map((paragraph, index) => (
+              <p key={index} className="mt-4 text-sm leading-7 text-[#374151]">{paragraph}</p>
+            ))}
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">二、来源可信度</h2>
+            <div className="space-y-3">
+              {(sourceSection?.sources || []).map((source, index) => (
+                <a
+                  key={`${source.url || source.title}-${index}`}
+                  href={source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-start justify-between gap-4 p-4 border border-[#E5E7EB] rounded-lg hover:bg-[#F9FAFB] transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[#101828] line-clamp-2">{source.title || '公开搜索结果'}</p>
+                    <p className="text-xs text-[#9CA3AF] mt-1 truncate">{source.url || '无链接'}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`px-2 py-0.5 rounded text-xs ${trustClass(source.trust_level)}`}>
+                      {trustLabel(source.trust_level)}
+                    </span>
+                    <span className="text-xs text-[#667085] font-mono">{Math.round((source.confidence || 0) * 100)}%</span>
+                    <ExternalLink className="w-4 h-4 text-[#D1D5DB]" />
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">三、风险提示</h2>
+            <div className="space-y-3">
+              {(riskSection?.risks || report.risk_summary || []).map((risk, index) => (
+                <div key={index} className="flex items-start gap-2 text-sm text-[#374151] leading-6">
+                  <AlertTriangle className="w-4 h-4 text-[#F59E0B] mt-1 flex-shrink-0" />
+                  <span>{risk}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <footer className="pt-8 mt-8 border-t border-[#E5E7EB] text-center">
+          <p className="text-xs text-[#D1D5DB]">
+            本报告由尽调 Agent 基于公开搜索结果自动生成，字段结论建议结合权威工商登记系统复核
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function IndustryAnalysisReport({ report, taskId }: { report: ReportData; taskId?: string }) {
+  const sections = (report.sections || []) as IndustryReportSection[];
+  const industry = report.industry || {};
+  const identifySection = sections.find((section) => section.title.includes('行业识别'));
+  const focusSection = sections.find((section) => section.title.includes('尽调重点'));
+  const metricSection = sections.find((section) => section.title.includes('财务指标'));
+  const riskSection = sections.find((section) => section.risks?.length);
+  const sourceSection = sections.find((section) => section.sources?.length);
+  const confidence = Math.round((industry.confidence || 0) * 100);
+
+  return (
+    <div className="min-h-screen bg-[#F9FAFB]">
+      <div className="max-w-[1040px] mx-auto px-6 py-8">
+        <header className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.history.back()}
+              className="p-2 -ml-2 rounded-lg hover:bg-[#F3F4F6] transition-colors"
+              title="返回"
+            >
+              <ArrowLeft className="w-4 h-4 text-[#667085]" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-[#101828]">企业行业分析报告</h1>
+              <p className="text-xs text-[#9CA3AF] mt-1">
+                {report.enterprise_name} · 任务ID: {taskId} · 数据来源：{report.generated_from || '行业知识库'}
+              </p>
+            </div>
+          </div>
+          <div className="px-4 py-2 rounded-lg border border-[#E5E7EB] bg-white text-right">
+            <div className="text-sm font-semibold text-[#101828]">{industry.semantic_industry_name || industry.name || '行业待识别'}</div>
+            <div className="text-xs text-[#667085] mt-0.5">识别置信度 {confidence}%</div>
+          </div>
+        </header>
+
+        <div className="space-y-8">
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">一、行业识别结论</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+              <div className="p-4 bg-[#F9FAFB] rounded-lg border border-[#E5E7EB]">
+                <p className="text-xs text-[#667085] mb-1">标准行业码</p>
+                <p className="text-sm font-semibold text-[#101828]">{industry.code || '未识别'}</p>
+              </div>
+              <div className="p-4 bg-[#F9FAFB] rounded-lg border border-[#E5E7EB]">
+                <p className="text-xs text-[#667085] mb-1">四级行业</p>
+                <p className="text-sm font-semibold text-[#101828]">{industry.name || '未识别'}</p>
+              </div>
+              <div className="p-4 bg-[#F9FAFB] rounded-lg border border-[#E5E7EB]">
+                <p className="text-xs text-[#667085] mb-1">授信分析行业</p>
+                <p className="text-sm font-semibold text-[#101828]">{industry.semantic_industry_name || '未映射'}</p>
+              </div>
+            </div>
+            <p className="text-sm text-[#374151] leading-7 mb-4">
+              标准行业路径：{industry.path?.join(' > ') || '未识别'}
+            </p>
+            <div className="space-y-2">
+              {(identifySection?.signals || industry.matched_signals || []).map((signal, index) => (
+                <div key={index} className="flex items-start gap-2 text-sm text-[#374151]">
+                  <CheckCircle2 className="w-4 h-4 text-[#16A34A] mt-0.5 flex-shrink-0" />
+                  <span>{signal}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">二、行业尽调重点</h2>
+            <div className="space-y-3">
+              {(focusSection?.analysis || []).map((item, index) => (
+                <div key={index} className="flex items-start gap-2 text-sm text-[#374151] leading-6">
+                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#3B82F6] flex-shrink-0" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">三、关键财务指标阈值</h2>
+            <div className="overflow-x-auto border border-[#E5E7EB] rounded-lg">
+              <table className="w-full min-w-[640px]">
+                <thead>
+                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
+                    {Object.keys(metricSection?.rows?.[0] || { 指标: '', 健康范围: '', 预警阈值: '' }).map((key) => (
+                      <th key={key} className="px-4 py-3 text-left text-xs font-semibold text-[#667085]">{key}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(metricSection?.rows || []).map((row, index) => (
+                    <tr key={index} className="border-b border-[#F3F4F6] last:border-0">
+                      {Object.entries(row).map(([key, value]) => (
+                        <td key={key} className="px-4 py-3 text-sm text-[#374151] whitespace-nowrap">{value}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">四、行业风险提示</h2>
+            <div className="space-y-3">
+              {(riskSection?.risks || report.risk_summary || []).map((risk, index) => (
+                <div key={index} className="flex items-start gap-2 text-sm text-[#374151] leading-6">
+                  <AlertTriangle className="w-4 h-4 text-[#F59E0B] mt-1 flex-shrink-0" />
+                  <span>{risk}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">五、知识库来源</h2>
+            <div className="space-y-3">
+              {(sourceSection?.sources || []).map((source, index) => (
+                <div key={`${source.file}-${index}`} className="p-4 border border-[#E5E7EB] rounded-lg bg-[#F9FAFB]">
+                  <p className="text-sm font-medium text-[#101828]">{source.title || source.file}</p>
+                  <p className="text-xs text-[#9CA3AF] mt-1">{source.file}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <footer className="pt-8 mt-8 border-t border-[#E5E7EB] text-center">
+          <p className="text-xs text-[#D1D5DB]">
+            本报告由尽调 Agent 基于行业代码库和本地行业知识库自动生成，行业景气度等动态数据将在后续阶段增强
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function LegalAnalysisReport({ report, taskId }: { report: ReportData; taskId?: string }) {
+  const sections = (report.sections || []) as LegalReportSection[];
+  const overview = sections.find((section) => section.summary?.length);
+  const detail = sections.find((section) => section.items?.length);
+  const authority = sections.find((section) => section.attempts?.length);
+  const riskSection = sections.find((section) => section.risks?.length);
+  const rating = report.risk_rating || 'medium';
+  const score = report.risk_score ?? 0;
+  const items = detail?.items || report.legal_items || [];
+
+  return (
+    <div className="min-h-screen bg-[#F9FAFB]">
+      <div className="max-w-[1040px] mx-auto px-6 py-8">
+        <header className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.history.back()}
+              className="p-2 -ml-2 rounded-lg hover:bg-[#F3F4F6] transition-colors"
+              title="返回"
+            >
+              <ArrowLeft className="w-4 h-4 text-[#667085]" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-[#101828]">企业司法风险分析报告</h1>
+              <p className="text-xs text-[#9CA3AF] mt-1">
+                {report.enterprise_name} · 任务ID: {taskId} · 数据来源：{report.generated_from || '公开搜索'}
+              </p>
+            </div>
+          </div>
+          <div className={`${riskBgClass(rating)} px-4 py-2 rounded-lg border border-[#E5E7EB] text-right`}>
+            <div className={`text-sm font-semibold ${riskColorClass(rating)}`}>{riskLabel(rating)} · {score}分</div>
+            <div className="text-xs text-[#667085] mt-0.5">司法线索 {items.length} 条</div>
+          </div>
+        </header>
+
+        <div className="space-y-8">
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">一、司法风险概览</h2>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-5">
+              {(overview?.summary || []).map((item) => (
+                <div key={item.label} className="p-4 bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg text-center">
+                  <p className="text-2xl font-bold text-[#101828]">{item.value}</p>
+                  <p className="text-xs text-[#667085] mt-1">{item.label}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm leading-7 text-[#374151]">{report.recommendation || '暂无司法风险建议'}</p>
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">二、司法线索明细</h2>
+            <div className="space-y-3">
+              {items.length > 0 ? items.map((item, index) => (
+                <a
+                  key={`${item.url || item.title}-${index}`}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block p-4 border border-[#E5E7EB] rounded-lg hover:bg-[#F9FAFB] transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#101828] line-clamp-2">{item.title || '公开司法线索'}</p>
+                      <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-1">{item.source || item.url || '公开搜索结果'}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-xs flex-shrink-0 ${trustClass(item.trust_level)}`}>
+                      {trustLabel(item.trust_level)} · {Math.round((item.confidence || 0) * 100)}%
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(item.types || []).map((type) => (
+                      <span key={type} className="px-2 py-0.5 rounded bg-[#F2F4F7] text-xs text-[#475467]">{type}</span>
+                    ))}
+                    {(item.case_numbers || []).map((caseNo) => (
+                      <span key={caseNo} className="px-2 py-0.5 rounded bg-[#EFF6FF] text-xs text-[#1D4ED8]">{caseNo}</span>
+                    ))}
+                  </div>
+                  <p className="text-sm leading-6 text-[#374151] line-clamp-3">{item.excerpt || '无摘要'}</p>
+                </a>
+              )) : (
+                <p className="text-sm text-[#667085]">公开搜索未稳定识别司法线索，建议人工复核权威司法网站。</p>
+              )}
+            </div>
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">三、权威源可用性</h2>
+            <div className="space-y-3">
+              {(authority?.attempts || []).map((attempt, index) => (
+                <div key={`${attempt.provider}-${index}`} className="p-4 border border-[#E5E7EB] rounded-lg bg-[#F9FAFB]">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium text-[#101828]">{attempt.provider || '权威司法源'}</p>
+                    <span className="text-xs text-[#667085]">HTTP {attempt.status_code || '-'}</span>
+                  </div>
+                  <p className="text-xs leading-6 text-[#667085]">{attempt.reason || '不可用'}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white border border-[#E5E7EB] rounded-lg p-6">
+            <h2 className="text-lg font-bold text-[#101828] mb-5 pb-3 border-b border-[#E5E7EB]">四、风险提示</h2>
+            <div className="space-y-3">
+              {(riskSection?.risks || report.risk_summary || []).map((risk, index) => (
+                <div key={index} className="flex items-start gap-2 text-sm text-[#374151] leading-6">
+                  <AlertTriangle className="w-4 h-4 text-[#F59E0B] mt-1 flex-shrink-0" />
+                  <span>{risk}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <footer className="pt-8 mt-8 border-t border-[#E5E7EB] text-center">
+          <p className="text-xs text-[#D1D5DB]">
+            本报告由尽调 Agent 基于公开搜索线索生成，正式授信前需以裁判文书网、执行信息公开网等权威渠道人工复核
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function FullDueDiligenceReport({ report }: { report: ReportData }) {
+  const rating = report.risk_rating || 'medium';
+  const score = report.risk_score ?? 0;
+  const dimensions = report.risk_dimensions || [];
+  const decision = report.credit_decision || {};
+  const subReports = report.sub_reports || {};
+  const evidenceDocs = report.evidence_docs || [];
+  const ratingText = rating === 'low' ? 'AAA-' : rating === 'medium' ? 'A' : 'BBB-';
+  const ratingClass = rating === 'low' ? 'low' : rating === 'high' ? 'high' : 'medium';
+  const strengths = (report.executive_summary || []).slice(0, 3);
+  const concerns = (report.cross_findings || []).filter((item) => item.risk_level !== 'low').slice(0, 3);
+  const navItems = [
+    { id: 'credit', label: '授信建议', icon: CreditCard },
+    { id: 'risk', label: '风险评级', icon: Shield },
+    { id: 'financial', label: '财务分析', icon: BarChart3 },
+    { id: 'legal', label: '司法分析', icon: Scale },
+    { id: 'industry', label: '行业分析', icon: Globe2 },
+    { id: 'evidence', label: '附件证据', icon: Folder },
+  ];
+
+  return (
+    <div className="ddg-report-page">
+      <header className="ddg-report-topbar">
+        <div className="ddg-report-topbar-inner">
+          <div className="ddg-report-title-group">
+            <button onClick={() => window.history.back()} className="ddg-report-back" title="返回">
+              <ArrowLeft />
+            </button>
+            <div>
+              <h1>{report.enterprise_name}</h1>
+              <p>完整尽调报告 · 生成日期 2026-06-07</p>
+            </div>
+            <span className={`ddg-report-rating-badge ${ratingClass}`}>{ratingText}</span>
+          </div>
+          <div className="ddg-report-actions">
+            <button><Download />导出 PDF</button>
+            <button><Share2 />分享</button>
+          </div>
+        </div>
+      </header>
+
+      <div className="ddg-report-layout">
+        <aside className="ddg-report-sidebar">
+          <p>报告目录</p>
+          <nav>
+            {navItems.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  className={index === 0 ? 'active' : ''}
+                >
+                  <Icon />
+                  {item.label}
+                </a>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <main className="ddg-report-main">
+          <section id="credit" className="ddg-report-hero-card">
+            <div className="ddg-report-score-card">
+              <span>评级</span>
+              <strong>{ratingText}</strong>
+              <p>{score}分</p>
+            </div>
+            <div className="ddg-report-credit-content">
+              <div className="ddg-report-section-heading inline">
+                <h2>综合授信建议</h2>
+                <span>{decision.suggestion || '建议采纳'}</span>
+              </div>
+              <p>{report.recommendation || '暂无授信建议'}</p>
+              <div className="ddg-report-metrics-grid">
+                {[
+                  { label: '建议敞口', value: decision.credit_limit_advice?.match(/[0-9０-９]+[-—~至到]?[0-9０-９]*\s*亿?元?/)?.[0] || '审慎测算' },
+                  { label: '期限建议', value: decision.term_advice || '短周期' },
+                  { label: '风险等级', value: riskLabel(rating) },
+                  { label: '担保结构', value: decision.collateral_advice || '落实担保' },
+                ].map((item) => (
+                  <div key={item.label} className="ddg-report-mini-metric">
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {report.pending_upload && (
+              <div className="ddg-report-alert">
+                <AlertTriangle />
+                当前报告为阶段性结果，需上传近三年三大表后形成最终完整尽调结论。
+              </div>
+            )}
+          </section>
+
+          <section className="ddg-report-two-col">
+            <div className="ddg-report-card success">
+              <div className="ddg-report-card-title"><CheckCircle2 /><h3>核心优势</h3></div>
+              <ul>
+                {(strengths.length ? strengths : ['未识别明确优势，建议结合专项报告人工复核。']).map((item, index) => <li key={index}>{item}</li>)}
+              </ul>
+            </div>
+            <div className="ddg-report-card warning">
+              <div className="ddg-report-card-title"><AlertTriangle /><h3>关注要点</h3></div>
+              <ul>
+                {(concerns.length ? concerns : report.cross_findings || []).slice(0, 3).map((item, index) => <li key={index}>{item.conclusion}</li>)}
+              </ul>
+            </div>
+          </section>
+
+          <section id="risk" className="ddg-report-section-card">
+            <div className="ddg-report-section-heading"><Shield /><h2>风险评级</h2></div>
+            <div className="ddg-risk-grid">
+              {dimensions.map((dim) => (
+                <div key={dim.name} className="ddg-risk-card">
+                  <div>
+                    <h3>{dim.name}</h3>
+                    <span>权重 {Math.round((dim.weight || 0) * 100)}%</span>
+                  </div>
+                  <strong>{dim.score}</strong>
+                  <div className="ddg-risk-bar"><span style={{ width: `${dim.score}%` }} /></div>
+                  <p>{(dim.details || [])[0] || '未发现明确重大异常。'}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section id="financial" className="ddg-report-section-card">
+            <div className="ddg-report-section-heading"><BarChart3 /><h2>财务分析</h2></div>
+            <p className="ddg-report-body-text">{subReports.financial?.recommendation || '财务专项报告待补充。'}</p>
+            <div className="ddg-report-table-wrap">
+              <table>
+                <tbody>
+                  {['营业收入', '净利润率', '资产负债率', '经营现金流'].map((name, index) => (
+                    <tr key={name}>
+                      <td>{name}</td>
+                      <td>{index === 0 ? '来自财务专项' : '见专项报告'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="legal" className="ddg-report-section-card">
+            <div className="ddg-report-section-heading"><Scale /><h2>司法分析</h2></div>
+            <p className="ddg-report-body-text">{subReports.legal?.recommendation || '司法专项报告待补充。'}</p>
+          </section>
+
+          <section id="industry" className="ddg-report-section-card">
+            <div className="ddg-report-section-heading"><Globe2 /><h2>行业分析</h2></div>
+            <p className="ddg-report-body-text">{subReports.industry?.recommendation || '行业专项报告待补充。'}</p>
+            <div className="ddg-cross-grid">
+              {(report.cross_findings || []).slice(0, 4).map((item, index) => (
+                <div key={index}>{item.conclusion}</div>
+              ))}
+            </div>
+          </section>
+
+          <section id="evidence" className="ddg-report-section-card">
+            <div className="ddg-report-section-heading"><Folder /><h2>附件证据</h2></div>
+            <div className="ddg-evidence-grid">
+              {evidenceDocs.slice(0, 6).map((doc, index) => (
+                <div key={`${doc.name}-${index}`} className="ddg-evidence-card">
+                  <FileText />
+                  <div>
+                    <h3>{doc.name || '证据项'}</h3>
+                    <p>{doc.source || '未识别来源'}</p>
+                    <span>{doc.status === 'verified' ? '已验证' : '待复核'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  );
+}
 // ── 组件 ──────────────────────────────────────────
 
 export function ReportPage() {
@@ -289,8 +1010,24 @@ export function ReportPage() {
     );
   }
 
+  if (report?.report_type === 'full_due_diligence') {
+    return <FullDueDiligenceReport report={report} />;
+  }
+
   if (report?.report_type === 'financial_analysis') {
     return <FinancialAnalysisReport report={report} taskId={taskId} />;
+  }
+
+  if (report?.report_type === 'business_analysis') {
+    return <BusinessAnalysisReport report={report} taskId={taskId} />;
+  }
+
+  if (report?.report_type === 'industry_analysis') {
+    return <IndustryAnalysisReport report={report} taskId={taskId} />;
+  }
+
+  if (report?.report_type === 'legal_analysis') {
+    return <LegalAnalysisReport report={report} taskId={taskId} />;
   }
 
   return (
