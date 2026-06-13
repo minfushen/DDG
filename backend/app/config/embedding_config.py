@@ -1,8 +1,59 @@
 # backend/app/config/embedding_config.py
 """Embedding 模型配置"""
+import json
+import unicodedata
+from typing import List
+from urllib import error, request
+
 from functools import lru_cache
 
 from app.config import settings
+
+
+class SiliconFlowEmbeddings:
+    """Minimal LangChain-compatible embeddings client for SiliconFlow."""
+
+    def __init__(self, api_key: str, base_url: str, model: str):
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.batch_size = 1
+        self.max_chars = 500
+
+    def _embed_batch(self, texts: List[str]) -> List[List[float]]:
+        payload = json.dumps({"model": self.model, "input": texts}).encode("utf-8")
+        req = request.Request(
+            f"{self.base_url}/embeddings",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+        except error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:500]
+            raise RuntimeError(f"SiliconFlow embedding request failed: {exc.code} {detail}") from exc
+        return [item["embedding"] for item in sorted(result.get("data", []), key=lambda x: x.get("index", 0))]
+
+    def _embed(self, texts: List[str]) -> List[List[float]]:
+        vectors: List[List[float]] = []
+        cleaned = [
+            (unicodedata.normalize("NFKC", text).strip() or "空白文本")[:self.max_chars]
+            for text in texts
+        ]
+        for index in range(0, len(cleaned), self.batch_size):
+            vectors.extend(self._embed_batch(cleaned[index:index + self.batch_size]))
+        return vectors
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self._embed(texts)
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._embed([text])[0]
 
 
 @lru_cache()
@@ -16,22 +67,11 @@ def get_embedding_model():
     provider = settings.EMBEDDING_PROVIDER.lower()
 
     if provider == "siliconflow":
-        # SiliconFlow（OpenAI 兼容格式）
-        try:
-            from langchain_openai import OpenAIEmbeddings
-
-            return OpenAIEmbeddings(
-                model=settings.EMBEDDING_MODEL_ID,
-                api_key=settings.EMBEDDING_API_KEY,
-                base_url=settings.EMBEDDING_BASE_URL,
-                # SiliconFlow 嵌入维度为 1024
-                # 不需要指定 dimensions，模型返回固定维度
-            )
-        except ImportError:
-            raise ImportError(
-                "SiliconFlow embedding 需要 langchain-openai。"
-                "请运行: pip install langchain-openai"
-            )
+        return SiliconFlowEmbeddings(
+            api_key=settings.EMBEDDING_API_KEY,
+            base_url=settings.EMBEDDING_BASE_URL,
+            model=settings.EMBEDDING_MODEL_ID,
+        )
 
     elif provider == "dashscope":
         # 阿里云 DashScope
