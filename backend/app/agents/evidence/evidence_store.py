@@ -87,7 +87,7 @@ def normalize_evidence(item: Dict[str, Any], agent: str = "system", domain: Opti
     reliability = _infer_reliability(source, confidence_input, trust_level)
     confidence = _infer_confidence(source, reliability, confidence_input)
     source_type = str(item.get("source_type") or _infer_source_type(source))
-    claim = str(item.get("claim") or f"{label}：{value}" if value else label)
+    claim = str(item.get("claim") or (f"{label}：{value}" if value else f"{label}（待补充详细数据）"))
     requires_manual_review = bool(
         item.get("requires_manual_review")
         or reliability == "low"

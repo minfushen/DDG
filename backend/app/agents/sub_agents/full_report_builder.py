@@ -229,7 +229,7 @@ def _evidence_docs(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "source_name": normalized.get("source_name"),
             "source_url": normalized.get("source_url"),
             "source_type": normalized.get("source_type"),
-            "value": normalized.get("value", ""),
+            "value": normalized.get("value") or normalized.get("claim") or "",
             "claim": normalized.get("claim"),
             "confidence": normalized.get("confidence"),
             "reliability": normalized.get("reliability"),
