@@ -24,52 +24,19 @@ class SearchIndustryKnowledgeTool(BaseTool):
     def _run(self, query: str, knowledge_type: str = "all") -> str:
         """运行工具"""
         try:
-            from app.config import settings
-            from app.config.embedding_config import get_embedding_model
-            from app.rag import VectorStoreManager, KnowledgeBase, KnowledgeRetriever
+            from app.rag.knowledge_retrieval_service import retrieve_knowledge
 
-            # 初始化 RAG 组件
-            embedding_model = get_embedding_model()
-            manager = VectorStoreManager(embedding_model)
-            kb = KnowledgeBase(manager)
-            retriever = KnowledgeRetriever(kb)
-
-            # 执行检索
-            result = retriever.search_formatted(
-                query=query,
-                knowledge_type=knowledge_type,
-                top_k=5,
-            )
+            domain = "industry" if knowledge_type in {"guide", "industry"} else "all"
+            result = retrieve_knowledge(query=query, domain=domain, top_k=5)
 
             return json.dumps({
                 "success": True,
-                "results": result,
+                "results": result.get("results", []),
+                "mode": result.get("mode"),
             }, ensure_ascii=False)
 
         except Exception as e:
-            # 降级方案：返回模拟数据
-            mock_data = {
-                "success": True,
-                "results": [
-                    {
-                        "source": "行业研究报告",
-                        "content": "科技服务行业近三年复合增长率18%，高于GDP增速",
-                        "type": "guide",
-                    },
-                    {
-                        "source": "政策文件",
-                        "content": "国家政策扶持科技服务行业发展，提供税收优惠和产业基金支持",
-                        "type": "regulation",
-                    },
-                    {
-                        "source": "行业研究报告",
-                        "content": "行业景气度78分，处于行业周期上升期",
-                        "type": "guide",
-                    },
-                ],
-            }
-
-            return json.dumps(mock_data, ensure_ascii=False)
+            return json.dumps({"success": False, "error": str(e), "results": []}, ensure_ascii=False)
 
 
 # 创建工具实例

@@ -8,6 +8,7 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 import httpx
 import json
+import re
 
 
 class FetchListedCompanyFinancialInput(BaseModel):
@@ -23,7 +24,29 @@ LISTED_COMPANY_MAP = {
     "比亚迪": {"stock_code": "002594", "stock_exchange": "SZ", "secu_code": "002594.SZ", "security_name": "比亚迪", "company_name": "比亚迪股份有限公司"},
     "宁德时代": {"stock_code": "300750", "stock_exchange": "SZ", "secu_code": "300750.SZ", "security_name": "宁德时代", "company_name": "宁德时代新能源科技股份有限公司"},
     "贵州茅台": {"stock_code": "600519", "stock_exchange": "SH", "secu_code": "600519.SH", "security_name": "贵州茅台", "company_name": "贵州茅台酒股份有限公司"},
+    "士兰微": {"stock_code": "600460", "stock_exchange": "SH", "secu_code": "600460.SH", "security_name": "士兰微", "company_name": "杭州士兰微电子股份有限公司"},
+    "杭州士兰微电子股份有限公司": {"stock_code": "600460", "stock_exchange": "SH", "secu_code": "600460.SH", "security_name": "士兰微", "company_name": "杭州士兰微电子股份有限公司"},
+    "闻泰科技": {"stock_code": "600745", "stock_exchange": "SH", "secu_code": "600745.SH", "security_name": "*ST闻泰", "company_name": "闻泰科技股份有限公司"},
+    "闻泰科技股份有限公司": {"stock_code": "600745", "stock_exchange": "SH", "secu_code": "600745.SH", "security_name": "*ST闻泰", "company_name": "闻泰科技股份有限公司"},
 }
+
+
+TASK_WORDS = [
+    "完成", "帮我", "请", "做一下", "做", "生成", "分析", "查看", "跑", "开展", "进行",
+    "完整尽调", "尽调", "贷前", "报告", "这个上市公司", "上市公司", "公司", "企业", "的",
+]
+
+
+def normalize_enterprise_name(text: str) -> str:
+    """Strip common task wording and keep the likely enterprise name."""
+    normalized = (text or "").strip()
+    if not normalized:
+        return normalized
+    normalized = re.sub(r"（.*?）|\(.*?\)", "", normalized).strip()
+    for word in TASK_WORDS:
+        normalized = normalized.replace(word, "")
+    normalized = re.sub(r"[，,。.!！?？：:\s]+", "", normalized).strip()
+    return normalized or (text or "").strip()
 
 
 INCOME_FIELD_MAP = {
@@ -84,9 +107,14 @@ REPORT_MAP = {
 
 def resolve_listed_company(enterprise_name: str, stock_code: str = "", stock_exchange: str = "") -> Optional[Dict[str, str]]:
     """根据输入企业名或股票代码解析上市公司证券信息。"""
-    if stock_code:
-        code = stock_code.split(".")[0]
+    enterprise_name = normalize_enterprise_name(enterprise_name)
+    code_match = re.search(r"(?<!\d)([036]\d{5})(?!\d)", stock_code or enterprise_name or "")
+    if stock_code or code_match:
+        code = (stock_code or code_match.group(1)).split(".")[0]
         exchange = stock_exchange or ("SH" if code.startswith("6") else "SZ")
+        for info in LISTED_COMPANY_MAP.values():
+            if info["stock_code"] == code:
+                return info
         return {
             "stock_code": code,
             "stock_exchange": exchange,
@@ -97,6 +125,48 @@ def resolve_listed_company(enterprise_name: str, stock_code: str = "", stock_exc
     for keyword, info in LISTED_COMPANY_MAP.items():
         if keyword in enterprise_name:
             return info
+    searched = _search_eastmoney_astock(enterprise_name)
+    if searched:
+        return searched
+    return None
+
+
+def _search_eastmoney_astock(keyword: str) -> Optional[Dict[str, str]]:
+    """Use Eastmoney's public suggest API to resolve an A-share code by name."""
+    text = (keyword or "").strip()
+    if not text:
+        return None
+    text = re.sub(r"（.*?）|\(.*?\)", "", text).strip()
+    params = {
+        "input": text,
+        "type": "14",
+        "token": "44c9d251add88e27b65ed86506f6e5da",
+        "count": "5",
+    }
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        response = httpx.get("https://searchapi.eastmoney.com/api/suggest/get", params=params, headers=headers, timeout=8)
+        response.raise_for_status()
+        rows = response.json().get("QuotationCodeTable", {}).get("Data", []) or []
+    except Exception:
+        return None
+
+    for row in rows:
+        code = str(row.get("Code") or row.get("UnifiedCode") or "")
+        if not re.fullmatch(r"[036]\d{5}", code):
+            continue
+        security_type = str(row.get("SecurityTypeName") or row.get("Classify") or "")
+        if "A" not in security_type and row.get("Classify") != "AStock":
+            continue
+        exchange = "SH" if code.startswith("6") else "SZ"
+        security_name = str(row.get("Name") or text)
+        return {
+            "stock_code": code,
+            "stock_exchange": exchange,
+            "secu_code": f"{code}.{exchange}",
+            "security_name": security_name,
+            "company_name": security_name,
+        }
     return None
 
 
@@ -124,7 +194,8 @@ def _fetch_eastmoney_report(secu_code: str, report_name: str) -> List[Dict[str, 
     )
     response.raise_for_status()
     payload = response.json()
-    rows = payload.get("result", {}).get("data", [])
+    result = payload.get("result") or {}
+    rows = result.get("data", []) if isinstance(result, dict) else []
     annual_rows = [row for row in rows if "年报" in str(row.get("REPORT_TYPE", ""))]
     return annual_rows[:3]
 

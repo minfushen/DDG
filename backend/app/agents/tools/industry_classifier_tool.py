@@ -14,6 +14,7 @@ import json
 import re
 
 from app.config import settings
+from app.agents.tools.industry_llm_classifier import adjudicate_industry_with_llm
 from app.agents.tools.listed_company_tool import resolve_listed_company
 
 
@@ -30,6 +31,7 @@ INDUSTRY_CODE_PATH = settings.BASE_DIR / "knowledge_base" / "industry_codes" / "
 
 GUIDE_MAP = {
     "new_energy": ["lithium_battery.md", "new_energy.md", "manufacturing.md"],
+    "semiconductor": ["technology.md", "manufacturing.md"],
     "construction": ["construction.md"],
     "manufacturing": ["manufacturing.md"],
     "technology": ["technology.md"],
@@ -48,6 +50,13 @@ GUIDE_MAP = {
 
 
 SEMANTIC_RULES = [
+    {
+        "semantic_industry_id": "semiconductor",
+        "semantic_industry_name": "半导体/集成电路产业链",
+        "keywords": ["半导体", "集成电路", "芯片", "电子器件", "功率器件", "分立器件", "硅片", "晶圆", "mems", "传感器", "led芯片"],
+        "preferred_codes": ["3973", "3972", "3971", "397", "39"],
+        "confidence_bonus": 0.22,
+    },
     {
         "semantic_industry_id": "new_energy",
         "semantic_industry_name": "新能源/锂电池产业链",
@@ -120,6 +129,16 @@ LISTED_COMPANY_INDUSTRY_HINTS = {
         "semantic_industry_id": "new_energy",
         "semantic_industry_name": "新能源汽车/动力电池",
     },
+    "士兰微": {
+        "extra_keywords": "半导体 集成电路 芯片 电子器件 功率器件 分立器件 led芯片 mems传感器",
+        "semantic_industry_id": "semiconductor",
+        "semantic_industry_name": "半导体/集成电路产业链",
+    },
+    "杭州士兰微电子股份有限公司": {
+        "extra_keywords": "半导体 集成电路 芯片 电子器件 功率器件 分立器件 led芯片 mems传感器",
+        "semantic_industry_id": "semiconductor",
+        "semantic_industry_name": "半导体/集成电路产业链",
+    },
 }
 
 
@@ -177,16 +196,23 @@ def _score_code(row: Dict[str, Any], context: str) -> tuple[float, List[str]]:
 
 
 def _semantic_match(context: str) -> Optional[Dict[str, Any]]:
-    best = None
+    candidates = []
     for rule in SEMANTIC_RULES:
         hits = [kw for kw in rule["keywords"] if kw.lower() in context]
         if not hits:
             continue
         score = min(0.35 + len(hits) * 0.08 + rule["confidence_bonus"], 0.92)
         candidate = {**rule, "hits": hits, "score": score}
-        if not best or candidate["score"] > best["score"]:
-            best = candidate
-    return best
+        candidates.append(candidate)
+    if not candidates:
+        return None
+    dominant_manufacturing = next(
+        (item for item in candidates if item["semantic_industry_id"] in {"semiconductor", "new_energy"}),
+        None,
+    )
+    if dominant_manufacturing:
+        return dominant_manufacturing
+    return max(candidates, key=lambda item: item["score"])
 
 
 def classify_industry(enterprise_name: str, business_scope: str = "", extra_context: str = "") -> Dict[str, Any]:
@@ -215,7 +241,7 @@ def classify_industry(enterprise_name: str, business_scope: str = "", extra_cont
     if semantic:
         for row in rows:
             if row["code"] in semantic["preferred_codes"]:
-                code_bonus = 0.08 if row["code"] in {"479", "471", "3841"} else 0
+                code_bonus = 0.08 if row["code"] in {"479", "471", "3841", "3973"} else 0
                 scored.append({
                     **row,
                     "score": min(semantic["score"] + code_bonus, 0.95),
@@ -223,11 +249,14 @@ def classify_industry(enterprise_name: str, business_scope: str = "", extra_cont
                 })
 
     if listed_hint:
+        preferred_codes = {"3841", "384", "38", "C"}
+        if listed_hint.get("semantic_industry_id") == "semiconductor":
+            preferred_codes = {"3973", "3972", "3971", "397", "39", "C"}
         for row in rows:
-            if row["code"] in {"3841", "384", "38", "C"}:
+            if row["code"] in preferred_codes:
                 scored.append({
                     **row,
-                    "score": 0.88,
+                    "score": 0.9 if listed_hint.get("semantic_industry_id") == "semiconductor" else 0.88,
                     "signals": [f"上市公司映射提示：{listed_hint['semantic_industry_name']}"],
                 })
 
@@ -268,7 +297,27 @@ def classify_industry(enterprise_name: str, business_scope: str = "", extra_cont
             "signals": item["signals"],
         })
 
+    llm_adjudication: Dict[str, Any] = {"success": False}
+    should_use_llm = bool(candidates) and (len(extra_context or "") > 50 or bool(listed_company) or len(candidates) >= 2)
+    if should_use_llm:
+        llm_adjudication = adjudicate_industry_with_llm(enterprise_name, business_scope, extra_context, candidates)
+        if llm_adjudication.get("success"):
+            selected_code = llm_adjudication.get("selected_code")
+            selected = next((item for item in scored if str(item.get("code")) == str(selected_code)), None)
+            if selected:
+                best = selected
+                if llm_adjudication.get("semantic_industry_id"):
+                    semantic_id = llm_adjudication.get("semantic_industry_id")
+                if llm_adjudication.get("semantic_industry_name"):
+                    semantic_name = llm_adjudication.get("semantic_industry_name")
+
     confidence = round(min(max(best["score"], 0.35), 0.95), 3)
+    if llm_adjudication.get("success") and llm_adjudication.get("confidence"):
+        confidence = round(min(max(float(llm_adjudication.get("confidence")), 0.35), 0.99), 3)
+    matched_signals = list(best["signals"])
+    if llm_adjudication.get("success") and llm_adjudication.get("reason"):
+        matched_signals = [f"LLM语义裁判：{llm_adjudication.get('reason')}"] + matched_signals
+
     return {
         "success": True,
         "enterprise_name": listed_company.get("company_name") if listed_company and listed_company.get("company_name") else enterprise_name,
@@ -280,8 +329,13 @@ def classify_industry(enterprise_name: str, business_scope: str = "", extra_cont
         "semantic_industry_name": semantic_name,
         "guide_files": GUIDE_MAP.get(semantic_id, _guide_files_from_code(best)),
         "confidence": confidence,
-        "matched_signals": best["signals"],
+        "matched_signals": matched_signals,
         "candidates": candidates,
+        "classification_source": "llm_adjudicated" if llm_adjudication.get("success") else "rule_fallback",
+        "llm_reason": llm_adjudication.get("reason") if llm_adjudication.get("success") else "",
+        "ignored_noise": llm_adjudication.get("ignored_noise") if llm_adjudication.get("success") else [],
+        "llm_elapsed_ms": llm_adjudication.get("elapsed_ms") if llm_adjudication.get("success") else None,
+        "llm_error": llm_adjudication.get("error") if should_use_llm and not llm_adjudication.get("success") else "",
     }
 
 
