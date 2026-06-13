@@ -26,3 +26,17 @@ __pycache__/
 
 # Playwright MCP temp files
 .playwright-mcp/
+
+# Screenshots / temp artifacts
+screenshot*.png
+screenshot*/
+
+# Claude/IDE temp
+.claude/
+
+# Runtime data
+backend/db/memory/long_term_memory.json
+backend/db/chroma/
+
+# Output uploads
+backend/output/uploads/
