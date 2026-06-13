@@ -61,9 +61,8 @@ async def run_legal_agent(enterprise_name: str) -> Dict[str, Any]:
             timeline[-1]["conclusion"] = "已生成结构化司法风险报告"
         else:
             timeline[-1]["status"] = "completed"
-            timeline[-1]["findings"] = [search_result.get("error", "公开搜索不可用，使用旧模拟工具兜底")]
-            mock_result = json.loads(search_legal_records._run(enterprise_name=enterprise_name))
-            report = _build_legacy_mock_report(enterprise_name, mock_result, authority_probe)
+            timeline[-1]["findings"] = [search_result.get("error", "公开搜索不可用，需人工复核权威司法渠道")]
+            report = _build_unavailable_legal_report(enterprise_name, authority_probe)
 
         summary = report.get("summary", {})
         timeline.append(_timeline(
@@ -137,6 +136,37 @@ def _build_legacy_mock_report(enterprise_name: str, mock_result: Dict[str, Any],
         "失信": len(mock_result.get("失信被执行人", [])),
         "行政处罚": len(mock_result.get("行政处罚", [])),
         "开庭公告": 0,
+    }
+
+
+def _build_unavailable_legal_report(enterprise_name: str, authority_probe: Dict[str, Any]) -> Dict[str, Any]:
+    summary = {
+        "裁判文书": 0,
+        "被执行": 0,
+        "失信": 0,
+        "行政处罚": 0,
+        "开庭公告": 0,
+    }
+    risk_summary = [
+        "司法公开搜索未取得稳定结果，当前不展示模拟案件或推断性结论。",
+        "正式授信前需人工复核裁判文书网、中国执行信息公开网、信用中国和市场监管处罚信息。",
+    ]
+    return {
+        "report_type": "legal_analysis",
+        "enterprise_name": enterprise_name,
+        "generated_from": "司法公开搜索不可用",
+        "risk_rating": "medium",
+        "risk_score": 55,
+        "recommendation": "司法数据源暂未形成可用证据链，需人工复核后再纳入正式授信判断。",
+        "summary": summary,
+        "legal_items": [],
+        "sections": [
+            {"title": "一、司法风险概览", "summary": [{"label": key, "value": value} for key, value in summary.items()]},
+            {"title": "二、权威源可用性", "attempts": authority_probe.get("attempts", [])},
+            {"title": "三、人工核验要求", "risks": risk_summary},
+        ],
+        "risk_summary": risk_summary,
+        "evidence": [{"label": "司法数据边界", "value": "公开搜索未取得稳定结果", "source": "系统判定"}],
     }
     return {
         "report_type": "legal_analysis",

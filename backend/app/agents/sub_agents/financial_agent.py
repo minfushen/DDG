@@ -10,6 +10,7 @@ import json
 
 from app.agents.tools.search_tool import search_financial_data
 from app.agents.tools.listed_company_tool import fetch_listed_company_financial, resolve_listed_company
+from app.agents.tools.bocha_search_tool import search_with_bocha
 from app.engines.rebecca.analyzers import FinancialDDAnalyzer
 from app.engines.rebecca.adapter import AnalyzerAdapter
 from app.agents.sub_agents.financial_report_builder import build_financial_analysis_report
@@ -73,6 +74,7 @@ def _run_rebecca_analysis(
     rebecca_data: Dict[str, Any],
     include_structured_report: bool = False,
     data_source: str = "用户上传财报",
+    public_context: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     timeline = []
     evidence = []
@@ -167,8 +169,24 @@ def _run_rebecca_analysis(
 
     result = {"success": True, "timeline": timeline, "evidence": evidence}
     if include_structured_report:
-        result["financial_analysis_report"] = build_financial_analysis_report(enterprise_name, rebecca_data)
+        result["financial_analysis_report"] = build_financial_analysis_report(enterprise_name, rebecca_data, public_context=public_context)
     return result
+
+
+def _fetch_financial_public_context(enterprise_name: str, listed_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    security_name = listed_data.get("security_name") or enterprise_name
+    stock_code = listed_data.get("stock_code") or ""
+    query = f"{enterprise_name} {security_name} {stock_code} 年报 业绩预告 财务报表 营业收入 净利润 经营现金流 巨潮资讯 东方财富"
+    result = search_with_bocha(
+        query=query,
+        max_results=6,
+        freshness="noLimit",
+        include="cninfo.com.cn|sse.com.cn|szse.cn|eastmoney.com|finance.eastmoney.com|data.eastmoney.com",
+        summary=True,
+    )
+    if not result.get("success"):
+        return []
+    return result.get("results", [])[:6]
 
 
 async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
@@ -214,11 +232,13 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
                 "balance_sheet": pd.DataFrame(financial_statements.get("balance_sheet", [])),
                 "cash_flow": pd.DataFrame(financial_statements.get("cash_flow", [])),
             }
+            public_context = _fetch_financial_public_context(enterprise_name, listed_data)
             result = _run_rebecca_analysis(
                 enterprise_name,
                 rebecca_data,
                 include_structured_report=True,
                 data_source="东方财富公开财报",
+                public_context=public_context,
             )
             result["timeline"] = [{
                 "id": str(uuid.uuid4()),
@@ -238,9 +258,55 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
                 "status": "completed",
                 "type": "analysis",
             }] + result.get("timeline", [])
+            if public_context:
+                result.setdefault("timeline", []).insert(2, {
+                    "id": str(uuid.uuid4()),
+                    "time": datetime.now().strftime("%H:%M:%S"),
+                    "agent": "财务Agent",
+                    "content": "检索公开财报与公告线索",
+                    "detail": "通过博查检索巨潮资讯、交易所和东方财富等公开来源",
+                    "status": "completed",
+                    "type": "discovery",
+                    "findings": [f"命中公开线索 {len(public_context)} 条"],
+                })
+                for item in public_context:
+                    result.setdefault("evidence", []).append({
+                        "label": "财报公告公开线索",
+                        "value": item.get("title") or item.get("content", "")[:80],
+                        "source": item.get("source") or item.get("url") or "Bocha Web Search",
+                        "source_name": item.get("site_name") or "Bocha Web Search",
+                        "source_url": item.get("url"),
+                        "source_type": "public_financial_report",
+                        "confidence": item.get("confidence", 0.72),
+                        "trust_level": item.get("trust_level", "medium"),
+                        "requires_manual_review": True,
+                        "metadata": item,
+                    })
             if result.get("financial_analysis_report"):
                 result["financial_analysis_report"]["generated_from"] = "东方财富公开财报"
                 result["financial_analysis_report"]["stock_code"] = listed_data.get("secu_code")
+                metrics = result["financial_analysis_report"].get("key_metrics") or {}
+                metric_labels = {
+                    "revenue": "营业收入",
+                    "net_profit": "净利润",
+                    "gross_margin": "毛利率",
+                    "net_margin": "净利率",
+                    "debt_ratio": "资产负债率",
+                    "operating_cash_flow": "经营活动现金流量净额",
+                    "receivable": "应收账款",
+                }
+                for key, label in metric_labels.items():
+                    value = metrics.get(key)
+                    if value and value != "数据不可用":
+                        result.setdefault("evidence", []).append({
+                            "label": label,
+                            "value": value,
+                            "source": "东方财富公开财报",
+                            "source_name": f"{listed_data.get('security_name')} {listed_data.get('secu_code')} 近三年年报财务数据",
+                            "source_type": "public_financial_report",
+                            "confidence": 0.88,
+                            "requires_manual_review": False,
+                        })
             return result
 
         result_json = search_financial_data._run(enterprise_name=enterprise_name)

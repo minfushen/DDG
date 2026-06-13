@@ -8,6 +8,9 @@ import re
 
 import pandas as pd
 
+from app.agents.sub_agents.financial_narrative_writer import build_financial_narrative
+from app.agents.sub_agents.financial_knowledge_context import build_financial_knowledge_context
+
 
 def _year_columns(df: Optional[pd.DataFrame]) -> List[str]:
     if df is None:
@@ -92,10 +95,39 @@ def _growth(current: Optional[float], previous: Optional[float]) -> Optional[flo
     return (current - previous) / abs(previous)
 
 
+def _cagr(values: Dict[str, Optional[float]], years: List[str]) -> Optional[float]:
+    available = [(year, values.get(year)) for year in years if values.get(year) not in (None, 0)]
+    if len(available) < 2:
+        return None
+    start_value = available[0][1]
+    end_value = available[-1][1]
+    periods = max(1, int(available[-1][0]) - int(available[0][0]))
+    if start_value is None or end_value is None or start_value <= 0 or end_value <= 0:
+        return None
+    return (end_value / start_value) ** (1 / periods) - 1
+
+
+def _pct_delta(current: Optional[float], previous: Optional[float]) -> Optional[float]:
+    if current is None or previous is None:
+        return None
+    return current - previous
+
+
 def _format_amount(value: Optional[float]) -> str:
     if value is None:
         return "数据不可用"
     return f"{value:,.2f}"
+
+
+def _format_amount_short(value: Optional[float]) -> str:
+    if value is None:
+        return "数据不可用"
+    abs_value = abs(value)
+    if abs_value >= 100000000:
+        return f"{value / 100000000:.2f}亿元"
+    if abs_value >= 10000:
+        return f"{value / 10000:.2f}万元"
+    return f"{value:.2f}元"
 
 
 def _format_percent(value: Optional[float]) -> str:
@@ -139,6 +171,7 @@ def _latest_growth_text(values: Dict[str, Optional[float]], years: List[str]) ->
 def build_financial_analysis_report(
     enterprise_name: str,
     financial_data: Dict[str, pd.DataFrame],
+    public_context: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """基于三大表生成银行财务状况分析报告结构。"""
     income = financial_data.get("income_statement")
@@ -190,6 +223,7 @@ def build_financial_analysis_report(
     profit_growth = {year: _growth(net_profit.get(year), net_profit.get(years[index - 1])) if index > 0 else None for index, year in enumerate(years)}
     capital_growth = {year: _growth(equity.get(year), equity.get(years[index - 1])) if index > 0 else None for index, year in enumerate(years)}
     interest_coverage = {year: _safe_div((total_profit.get(year) or operating_profit.get(year)), financial_expense.get(year)) for year in years}
+    receivable_to_revenue = {year: _safe_div(receivable.get(year), revenue.get(year)) for year in years}
 
     latest = years[-1] if years else "最新年度"
     risk_items: List[str] = []
@@ -206,9 +240,9 @@ def build_financial_analysis_report(
     if not risk_items:
         risk_items.append("未发现明显重大财务异常，但仍需结合审计意见、授信用途和行业景气度复核。")
 
-    risk_score = max(50, 100 - max(0, len(risk_items) - 1) * 10)
+    risk_score = max(50, 85 - max(0, len(risk_items) - 1) * 10)
     risk_rating = "low" if risk_score >= 80 else "medium" if risk_score >= 60 else "high"
-    recommendation = "建议授信，风险可控" if risk_rating == "low" else "建议谨慎授信，需补充核实重点科目" if risk_rating == "medium" else "建议暂缓授信，待重大风险排查后再议"
+    recommendation = "财务指标整体可接受，仍需结合审计意见、授信用途、担保结构和行业景气度综合判断。" if risk_rating == "low" else "财务指标存在需核实事项，应重点复核重点科目、现金流质量和偿债压力。" if risk_rating == "medium" else "财务风险较高，应待重大风险排查和关键科目核验后再形成授信意见。"
 
     cash_type = {
         year: "".join("正" if (value or 0) >= 0 else "负" for value in [operating_cf.get(year), investing_cf.get(year), financing_cf.get(year)])
@@ -367,6 +401,55 @@ def build_financial_analysis_report(
         },
     ]
 
+    key_metrics = {
+        "latest_year": latest,
+        "revenue": _format_amount_short(revenue.get(latest)),
+        "net_profit": _format_amount_short(net_profit.get(latest)),
+        "gross_margin": _format_percent(gross_margin.get(latest)),
+        "net_margin": _format_percent(net_margin.get(latest)),
+        "debt_ratio": _format_percent(debt_ratio.get(latest)),
+        "current_ratio": _format_ratio(current_ratio.get(latest)),
+        "operating_cash_flow": _format_amount_short(operating_cf.get(latest)),
+        "receivable": _format_amount_short(receivable.get(latest)),
+        "revenue_growth": _format_percent(revenue_growth.get(latest)),
+        "profit_growth": _format_percent(profit_growth.get(latest)),
+        "revenue_cagr": _format_percent(_cagr(revenue, years)),
+        "receivable_to_revenue": _format_percent(receivable_to_revenue.get(latest)),
+        "receivable_growth": _format_percent(_growth(receivable.get(latest), receivable.get(years[-2])) if len(years) >= 2 else None),
+        "debt_ratio_change": _format_percent(_pct_delta(debt_ratio.get(latest), debt_ratio.get(years[0])) if years else None),
+        "current_ratio_change": _format_ratio(_pct_delta(current_ratio.get(latest), current_ratio.get(years[0])) if years else None),
+        "operating_cf_to_net_profit": _format_ratio(_safe_div(operating_cf.get(latest), net_profit.get(latest))),
+    }
+    key_metric_series = {
+        "revenue": {year: _format_amount_short(revenue.get(year)) for year in years},
+        "net_profit": {year: _format_amount_short(net_profit.get(year)) for year in years},
+        "gross_margin": {year: _format_percent(gross_margin.get(year)) for year in years},
+        "net_margin": {year: _format_percent(net_margin.get(year)) for year in years},
+        "debt_ratio": {year: _format_percent(debt_ratio.get(year)) for year in years},
+        "current_ratio": {year: _format_ratio(current_ratio.get(year)) for year in years},
+        "operating_cash_flow": {year: _format_amount_short(operating_cf.get(year)) for year in years},
+        "receivable": {year: _format_amount_short(receivable.get(year)) for year in years},
+        "receivable_to_revenue": {year: _format_percent(receivable_to_revenue.get(year)) for year in years},
+    }
+    financial_knowledge_context = build_financial_knowledge_context(
+        enterprise_name=enterprise_name,
+        key_metrics=key_metrics,
+        risk_summary=risk_items,
+    )
+    narrative = build_financial_narrative(
+        enterprise_name=enterprise_name,
+        years=years,
+        key_metrics=key_metrics,
+        risk_summary=risk_items,
+        recommendation=recommendation,
+        risk_rating=risk_rating,
+        risk_score=risk_score,
+        data_boundary="已解析的三大财务报表数据",
+        key_metric_series=key_metric_series,
+        knowledge_context=financial_knowledge_context,
+        public_context=public_context,
+    )
+
     return {
         "report_type": "financial_analysis",
         "enterprise_name": enterprise_name,
@@ -375,6 +458,21 @@ def build_financial_analysis_report(
         "recommendation": recommendation,
         "years": years,
         "generated_from": "用户上传财报",
+        "key_metrics": key_metrics,
+        "key_metric_series": key_metric_series,
+        "narrative_summary": narrative.get("summary") or [],
+        "narrative_diagnostics": narrative.get("diagnostics") or {},
+        "narrative_source": narrative.get("source"),
+        "narrative_quality_warnings": narrative.get("quality_warnings") or [],
+        "narrative_elapsed_ms": narrative.get("llm_elapsed_ms"),
+        "narrative_provider": narrative.get("llm_provider"),
+        "financial_knowledge_context": {
+            "triggered_rules": financial_knowledge_context.get("triggered_rules") or [],
+            "knowledge_briefs": financial_knowledge_context.get("knowledge_briefs") or [],
+            "retrieval_mode": (financial_knowledge_context.get("retrieval") or {}).get("mode"),
+            "query": financial_knowledge_context.get("query"),
+        },
+        "public_context": public_context or [],
         "sections": sections,
         "risk_summary": risk_items,
     }

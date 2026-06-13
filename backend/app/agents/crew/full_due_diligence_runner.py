@@ -13,10 +13,14 @@ from typing import Any, Dict, List, Optional
 
 from app.agents.sub_agents.business_agent import run_business_agent
 from app.agents.sub_agents.financial_agent import run_financial_agent, run_financial_agent_with_uploaded_data
+from app.agents.sub_agents.public_financial_agent import run_public_financial_agent
 from app.agents.sub_agents.industry_agent import run_industry_agent
 from app.agents.sub_agents.legal_agent import run_legal_agent
 from app.agents.sub_agents.full_report_builder import build_full_due_diligence_report
+from app.agents.planning.report_mode_detector import detect_report_mode
+from app.agents.evidence import normalize_evidence_list
 from app.agents.tools.listed_company_tool import resolve_listed_company
+from app.agents.tools.listed_company_public_info_tool import fetch_listed_company_public_info_data
 
 
 def _timeline(agent: str, content: str, detail: str = "", status: str = "completed", event_type: str = "action") -> Dict[str, Any]:
@@ -127,7 +131,7 @@ def _merge_result(
     result: Dict[str, Any],
 ) -> None:
     bucket["timeline"].extend(result.get("timeline", []))
-    bucket["evidence"].extend(result.get("evidence", []))
+    bucket["evidence"].extend(normalize_evidence_list(result.get("evidence", []), agent=key))
     bucket["raw_results"][key] = result
     bucket["sub_reports"][key] = _extract_report(result, key)
     if not result.get("success"):
@@ -138,7 +142,7 @@ async def run_full_due_diligence(
     enterprise_name: str,
     parsed_financial_data: Optional[Dict[str, Any]] = None,
     existing_context: Optional[Dict[str, Any]] = None,
-    use_crew_review: bool = True,
+    use_crew_review: bool = False,
 ) -> Dict[str, Any]:
     """运行完整尽调。"""
     bucket: Dict[str, Any] = existing_context or {
@@ -156,6 +160,44 @@ async def run_full_due_diligence(
         event_type="action",
     ))
 
+    mode_info = detect_report_mode(enterprise_name, parsed_financial_data)
+    report_mode = mode_info["report_mode"]
+    bucket["report_mode"] = report_mode
+    bucket["financial_data_status"] = mode_info["financial_data_status"]
+    bucket["timeline"].append(_timeline(
+        "Plan Agent",
+        "判断尽调报告模式",
+        mode_info["reason"],
+        "completed",
+        "analysis",
+    ))
+
+    listed_info = mode_info.get("listed_info") or resolve_listed_company(enterprise_name)
+    public_info = bucket.get("listed_company_public_info")
+    if listed_info and not public_info:
+        bucket["timeline"].append(_timeline(
+            "公开资料Agent",
+            "采集上市公司公开资料包",
+            "获取年报经营讨论、主营构成、诉讼公告、担保质押、行业地位和研报摘要",
+            "completed",
+            "discovery",
+        ))
+        public_info = fetch_listed_company_public_info_data(
+            enterprise_name,
+            listed_info.get("stock_code", ""),
+            listed_info.get("stock_exchange", ""),
+        )
+        bucket["listed_company_public_info"] = public_info
+        if public_info.get("success"):
+            bucket["evidence"].extend(normalize_evidence_list(public_info.get("evidence", []), agent="public_info"))
+            bucket["timeline"][-1]["findings"] = [
+                f"主营构成 {len(public_info.get('main_business_composition', []))} 项",
+                f"年报经营讨论：{(public_info.get('annual_business_review') or {}).get('report_name') or '已获取'}",
+                f"公开搜索线索 {sum(len(items) for items in (public_info.get('search_clues') or {}).values())} 条",
+            ]
+        else:
+            bucket["timeline"][-1]["findings"] = [public_info.get("error", "公开资料包获取失败")]
+
     if not existing_context:
         for key, runner, label in [
             ("business", run_business_agent, "工商专项分析"),
@@ -163,7 +205,7 @@ async def run_full_due_diligence(
             ("legal", run_legal_agent, "司法专项分析"),
         ]:
             bucket["timeline"].append(_timeline("系统", f"执行{label}", "调用已验证的单Agent能力", "completed", "action"))
-            result = await runner(enterprise_name)
+            result = await runner(enterprise_name, public_info=public_info) if key == "industry" else await runner(enterprise_name)
             _merge_result(bucket, key, result)
 
     if parsed_financial_data:
@@ -171,47 +213,38 @@ async def run_full_due_diligence(
         financial_result = await run_financial_agent_with_uploaded_data(enterprise_name, parsed_financial_data)
         _merge_result(bucket, "financial", financial_result)
     elif not bucket["sub_reports"].get("financial"):
-        listed_info = resolve_listed_company(enterprise_name)
         if listed_info:
             bucket["timeline"].append(_timeline("系统", "执行财务专项分析", "已识别上市公司，自动获取公开财报", "completed", "action"))
             financial_result = await run_financial_agent(enterprise_name)
             _merge_result(bucket, "financial", financial_result)
         else:
-            report = build_full_due_diligence_report(
-                enterprise_name=enterprise_name,
-                sub_reports=bucket["sub_reports"],
-                evidence=bucket["evidence"],
-                pending_upload=True,
-            )
             bucket["timeline"].append(_timeline(
                 "财务Agent",
-                "等待上传近三年财务报表",
-                "完整尽调已暂存工商、司法、行业结果；上传财报后继续生成最终报告",
-                "running",
+                "执行公开资料财务预审",
+                "非上市企业未上传财报，先基于公开线索生成预尽调财务章节",
+                "completed",
                 "action",
             ))
-            return {
-                "success": False,
-                "fallback_to_upload": True,
-                "timeline": bucket["timeline"],
-                "evidence": bucket["evidence"],
-                "report": report,
-                "full_due_diligence_context": bucket,
-                "error": "非上市企业完整尽调需上传近三年三大财务报表",
-            }
+            financial_result = await run_public_financial_agent(enterprise_name, bucket["sub_reports"], bucket["evidence"])
+            _merge_result(bucket, "financial", financial_result)
 
-    crew_review = run_crew_credit_review(enterprise_name, bucket["sub_reports"]) if use_crew_review else None
+    crew_review = run_crew_credit_review(enterprise_name, bucket["sub_reports"]) if use_crew_review and report_mode != "public_pre_dd" else None
     report = build_full_due_diligence_report(
         enterprise_name=enterprise_name,
         sub_reports=bucket["sub_reports"],
         evidence=bucket["evidence"],
         crew_review=crew_review,
+        report_mode=report_mode,
+        financial_data_status=bucket.get("financial_data_status"),
     )
-    report["generated_from"] = "四个专项Agent + CrewAI综合审查" if crew_review else "四个专项Agent + 规则综合评分"
+    if report_mode == "public_pre_dd":
+        report["generated_from"] = "工商/司法/行业公开资料 + 公开财务线索预审"
+    else:
+        report["generated_from"] = "四个专项Agent + CrewAI综合审查" if crew_review else "四个专项Agent + 规则综合评分"
     bucket["timeline"].append(_timeline(
         "CrewAI 综合审查" if crew_review else "系统",
         "形成完整尽调综合结论",
-        "已汇总工商、财务、司法、行业专项结果并生成统一授信建议",
+        "已汇总工商、财务、司法、行业专项结果并生成统一授信建议" if report_mode != "public_pre_dd" else "已生成公开资料预尽调报告，财务结论待上传报表后增强",
         "completed",
         "conclusion",
     ))

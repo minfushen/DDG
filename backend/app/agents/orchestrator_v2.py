@@ -10,6 +10,7 @@ import uuid
 import json
 
 from app.agents.state import SSEEvent
+from app.agents.evidence import normalize_evidence_list
 from app.memory import ShortTermMemory, LongTermMemory
 
 
@@ -32,6 +33,7 @@ class OrchestratorState(TypedDict):
     crew_result: Optional[dict]
     context: Optional[str]  # 历史上下文（用于多轮对话）
     intent: Optional[Intent]  # 用户意图（用于路由）
+    input_parse: Optional[dict]  # 入口LLM抽取结果
     full_due_diligence_context: Optional[dict]  # 完整尽调阶段性上下文
 
 
@@ -95,7 +97,14 @@ async def run_node_with_rate_limit_retry(
 
 def create_task(state: OrchestratorState) -> OrchestratorState:
     """创建任务并解析用户意图"""
-    intent = parse_intent(state["enterprise_name"])
+    input_parse = state.get("input_parse") or {}
+    if input_parse.get("task_type"):
+        intent = {
+            "type": input_parse.get("task_type", "full"),
+            "target": input_parse.get("target_agent"),
+        }
+    else:
+        intent = parse_intent(state["enterprise_name"])
 
     short_term_memory.add(
         role="system",
@@ -388,7 +397,7 @@ def run_single_agent(state: OrchestratorState) -> OrchestratorState:
 
     result = asyncio.run(runner(state["enterprise_name"]))
     timeline = state["timeline"] + result.get("timeline", [])
-    evidence = state["evidence"] + result.get("evidence", [])
+    evidence = state["evidence"] + normalize_evidence_list(result.get("evidence", []), agent=target)
 
     if not result.get("success"):
         if target == "financial" and result.get("fallback_to_upload"):
@@ -553,6 +562,7 @@ async def run_orchestrator_v2(
     task_id: str,
     enterprise_name: str,
     template_name: str = "due_diligence_report_template",
+    input_parse: Optional[dict] = None,
 ) -> AsyncGenerator[SSEEvent, None]:
     """运行调度器 V2，实时生成SSE事件
 
@@ -574,6 +584,7 @@ async def run_orchestrator_v2(
         "execution_plan": None,
         "crew_result": None,
         "context": None,
+        "input_parse": input_parse,
         "full_due_diligence_context": None,
     }
 
@@ -586,6 +597,8 @@ async def run_orchestrator_v2(
             "evidence": s.get("evidence", []),
             "report": s.get("report"),
             "error": s.get("error"),
+            "enterprise_name": s.get("enterprise_name"),
+            "input_parse": s.get("input_parse"),
             "full_due_diligence_context": s.get("full_due_diligence_context"),
         }
 

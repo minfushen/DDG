@@ -3,7 +3,7 @@
 # 基于行业代码库 + 本地行业知识库生成行业分析 MVP
 # ========================================
 
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 import uuid
 import json
@@ -11,8 +11,9 @@ import json
 from app.agents.tools.authoritative_business_tool import fetch_authoritative_business_info
 from app.agents.tools.business_search_tool import tavily_business_search
 from app.agents.tools.industry_classifier_tool import classify_industry_tool
-from app.agents.tools.rag_tool import search_industry_knowledge
+from app.agents.sub_agents.industry_knowledge_context import build_industry_knowledge_context
 from app.agents.sub_agents.industry_report_builder import build_industry_analysis_report
+from app.rag.knowledge_retrieval_service import knowledge_hits_to_evidence, retrieve_knowledge
 
 
 def _now() -> str:
@@ -57,7 +58,49 @@ def _extract_business_context(enterprise_name: str) -> Tuple[str, str, Dict[str,
     return "", enterprise_name, registry_result, "企业名称"
 
 
-async def run_industry_agent(enterprise_name: str) -> Dict[str, Any]:
+def _public_info_context(public_info: Optional[Dict[str, Any]]) -> str:
+    if not public_info or not public_info.get("success"):
+        return ""
+    basic = public_info.get("basic_info") or {}
+    review = public_info.get("annual_business_review") or {}
+    main_business = public_info.get("main_business_composition") or []
+    clues = public_info.get("search_clues") or {}
+    clue_text = " ".join(
+        " ".join(str(item.get("content") or "")[:240] for item in items[:2])
+        for items in clues.values()
+    )
+    return " ".join([
+        str(basic.get("industry") or ""),
+        str(basic.get("concepts") or ""),
+        str(basic.get("main_business") or ""),
+        str(basic.get("profile") or "")[:600],
+        " ".join(f"{item.get('item_name')} {item.get('income')} {item.get('income_ratio')}" for item in main_business[:6]),
+        str(review.get("business_review") or "")[:900],
+        clue_text,
+    ])
+
+
+def _listed_company_business_scope(public_info: Optional[Dict[str, Any]]) -> str:
+    """Use listed-company public information as a stable business context.
+
+    For A-share companies we already fetch Eastmoney F10 and public clues. In
+    that case, going back to a generic工商/搜索 channel can be slower and less
+    precise than using the listed-company package directly.
+    """
+    if not public_info or not public_info.get("success"):
+        return ""
+    basic = public_info.get("basic_info") or {}
+    rows = public_info.get("main_business_composition") or []
+    parts = [
+        str(basic.get("main_business") or ""),
+        str(basic.get("industry") or ""),
+        str(basic.get("concepts") or ""),
+        " ".join(str(row.get("item_name") or "") for row in rows[:8] if isinstance(row, dict)),
+    ]
+    return " ".join(part for part in parts if part).strip()
+
+
+async def run_industry_agent(enterprise_name: str, public_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """运行行业分析Agent。"""
     try:
         timeline = []
@@ -69,7 +112,18 @@ async def run_industry_agent(enterprise_name: str) -> Dict[str, Any]:
             "优先使用工商专项 API 的经营范围，失败时回退公开搜索摘要",
             event_type="discovery",
         ))
-        business_scope, extra_context, context_result, context_source = _extract_business_context(enterprise_name)
+        listed_scope = _listed_company_business_scope(public_info)
+        if listed_scope:
+            business_scope = listed_scope
+            extra_context = _public_info_context(public_info)
+            context_result = {"success": True, "attempts": []}
+            context_source = "上市公司公开资料包（东方财富F10 + 公开线索）"
+        else:
+            business_scope, extra_context, context_result, context_source = _extract_business_context(enterprise_name)
+            listed_context = _public_info_context(public_info)
+            if listed_context:
+                extra_context = f"{extra_context} {listed_context}"
+                context_source = f"{context_source} + 上市公司公开资料包"
         timeline[-1]["status"] = "completed"
         timeline[-1]["detail"] = f"上下文来源：{context_source}"
         timeline[-1]["findings"] = [
@@ -115,7 +169,12 @@ async def run_industry_agent(enterprise_name: str) -> Dict[str, Any]:
             "source": "industry_code4 国民经济行业四级代码表",
         })
 
-        guide_query = " ".join([
+        industry_knowledge_context = build_industry_knowledge_context(
+            enterprise_name=classification.get("enterprise_name") or enterprise_name,
+            classification=classification,
+            public_info=public_info,
+        )
+        guide_query = industry_knowledge_context.get("query") or " ".join([
             enterprise_name,
             classification.get("semantic_industry_name") or "",
             classification.get("industry_name") or "",
@@ -127,11 +186,12 @@ async def run_industry_agent(enterprise_name: str) -> Dict[str, Any]:
             f"知识库文件：{', '.join(classification.get('guide_files', []))}",
             event_type="discovery",
         ))
-        retrieval_result = json.loads(search_industry_knowledge._run(query=guide_query, knowledge_type="guide"))
+        retrieval_result = industry_knowledge_context.get("retrieval") or retrieve_knowledge(query=guide_query, domain="industry", top_k=6)
         timeline[-1]["status"] = "completed"
         timeline[-1]["findings"] = [
-            "已检索本地行业指南",
+            f"已检索本地行业指南（{retrieval_result.get('mode')}）",
             f"映射知识库：{', '.join(classification.get('guide_files', []))}",
+            f"命中知识条目 {len(retrieval_result.get('results', []))} 条",
         ]
 
         timeline.append(_timeline(
@@ -144,12 +204,24 @@ async def run_industry_agent(enterprise_name: str) -> Dict[str, Any]:
             enterprise_name=classification.get("enterprise_name") or enterprise_name,
             classification=classification,
             retrieval_result=retrieval_result,
+            public_info=public_info,
+            industry_knowledge_context=industry_knowledge_context,
         )
         timeline[-1]["status"] = "completed"
         timeline[-1]["findings"] = report.get("risk_summary", [])
         timeline[-1]["conclusion"] = f"完成 {report.get('industry', {}).get('semantic_industry_name')} 行业知识库分析"
 
         evidence.extend(report.get("evidence", []))
+        if public_info and public_info.get("success"):
+            evidence.extend(public_info.get("evidence", []))
+        evidence.extend(knowledge_hits_to_evidence(retrieval_result.get("results", []), agent="industry", domain="行业"))
+        for rule in industry_knowledge_context.get("triggered_rules", []):
+            evidence.append({
+                "label": "行业分析触发规则",
+                "value": f"{rule.get('rule_id')} {rule.get('title')}",
+                "source": "industry_analysis_rules.json",
+                "confidence": rule.get("confidence", 0.78),
+            })
         if context_result.get("attempts"):
             evidence.append({
                 "label": "工商上下文通道",
