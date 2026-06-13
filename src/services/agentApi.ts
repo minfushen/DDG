@@ -7,6 +7,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 export interface CreateTaskRequest {
   enterprise_name: string;
   template_name?: string;
+  engine_mode?: 'deepresearch' | 'classic';
 }
 
 export interface CreateTaskResponse {
@@ -31,25 +32,111 @@ export interface PlanStep {
   id: string;
   name: string;
   status: 'completed' | 'running' | 'pending';
+  category?: string;
+  purpose?: string;
+  required_evidence?: string[];
+  tool_hints?: string[];
+  evidence_ids?: string[];
+  claim_ids?: string[];
+  planner_source?: string;
+  sequential_gap_notes?: string;
+  round?: number;
+  parent_task_id?: string;
+  generated_by?: string;
+  search_query?: string;
 }
 
 export interface EvidenceItem {
+  id?: string;
   label: string;
   value: string;
   source: string;
+  source_type?: string;
+  source_url?: string;
+  source_name?: string;
+  confidence?: number;
+  trust_level?: string;
+  reliability?: string;
+  requires_manual_review?: boolean;
+  claim?: string;
+  agent?: string;
+  domain?: string;
+}
+
+export interface ResearchClaim {
+  id: string;
+  task_id?: string;
+  text: string;
+  evidence_ids?: string[];
+  confidence?: number;
+  risk_level?: string;
+  missing_evidence?: string[];
+  requires_manual_review?: boolean;
+  round?: number;
+  parent_task_id?: string;
+}
+
+export interface ResearchGap {
+  id: string;
+  task_id?: string;
+  description: string;
+  why_it_matters?: string;
+  suggested_next_actions?: string[];
+  severity?: string;
 }
 
 export interface TaskStatus {
   task_id: string;
   enterprise_name: string;
+  original_input?: string;
+  input_parse?: any;
   agent_state: string;
   timeline: TimelineEntry[];
   plan: PlanStep[];
   evidence: EvidenceItem[];
   report: any;
+  engine_mode?: 'deepresearch' | 'classic';
+  research_plan?: PlanStep[];
+  research_claims?: ResearchClaim[];
+  research_gaps?: ResearchGap[];
+  planner?: any;
+  sequential_thinking?: any;
+  sequential_plan_review?: any;
+  follow_up_tasks?: PlanStep[];
+  research_rounds?: Array<{ round: number; task_count: number; description: string }>;
   enterprise_type?: string;
   need_user_upload?: boolean;
   upload_required?: boolean;
+  active_interrupt?: HumanInterrupt | null;
+  interrupts?: HumanInterrupt[];
+  human_actions?: HumanAction[];
+}
+
+export interface HumanInterrupt {
+  interrupt_id: string;
+  task_id: string;
+  type: 'confirm_entity' | 'upload_material' | 'approve_gap' | string;
+  // approve_plan is kept in the string union via fallback for compatibility.
+  title: string;
+  message: string;
+  context?: any;
+  options?: Array<{ action: string; label: string }>;
+  required_inputs?: Array<{ name: string; label: string; required?: boolean }>;
+  status: 'pending' | 'resolved' | 'skipped' | string;
+  resolution?: any;
+  created_at?: string;
+  resolved_at?: string | null;
+}
+
+export interface HumanAction {
+  action_id: string;
+  task_id: string;
+  interrupt_id: string;
+  type: string;
+  title?: string;
+  resolution?: any;
+  actor?: string;
+  created_at?: string;
 }
 
 export interface SSEEvent {
@@ -82,7 +169,8 @@ async function getErrorMessage(response: Response): Promise<string> {
  */
 export async function createTask(
   enterpriseName: string,
-  templateName?: string
+  templateName?: string,
+  engineMode: 'deepresearch' | 'classic' = 'deepresearch',
 ): Promise<CreateTaskResponse> {
   const response = await fetch(`${API_BASE_URL}/tasks`, {
     method: 'POST',
@@ -90,11 +178,12 @@ export async function createTask(
     body: JSON.stringify({
       enterprise_name: enterpriseName,
       template_name: templateName,
+      engine_mode: engineMode,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    throw new Error(await getErrorMessage(response));
   }
 
   return response.json();
@@ -228,6 +317,24 @@ export async function resumeTaskWithFinancialData(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parsed_financial_data: parsedFinancialData }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response));
+  }
+
+  return response.json();
+}
+
+export async function resumeInterrupt(
+  taskId: string,
+  interruptId: string,
+  resolution: any,
+): Promise<{ task_id: string; status: string; action?: string }> {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/interrupts/${interruptId}/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resolution }),
   });
 
   if (!response.ok) {
