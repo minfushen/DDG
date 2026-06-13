@@ -1,165 +1,267 @@
 .ddg-landing {
   min-height: 100vh;
-  overflow: hidden;
-  background: #ffffff;
-  color: #262626;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: "Inter", "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
-.ddg-landing-safe {
-  width: min(100%, 1200px);
-  margin: 0 auto;
-  padding-left: 24px;
-  padding-right: 24px;
+.ddg-saas-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
 }
 
-.ddg-landing-navbar {
+.ddg-saas-sidebar {
   position: sticky;
   top: 0;
-  z-index: 20;
-  height: 64px;
-  background: transparent;
+  height: 100vh;
+  border-right: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 18px 14px;
 }
 
-.ddg-landing-navbar-inner {
-  height: 64px;
+.ddg-landing-brand,
+.ddg-saas-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
 }
 
-.ddg-landing-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.ddg-saas-brand {
+  padding: 0 8px 18px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .ddg-landing-logo {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
-  background: #262626;
+  background: #2563eb;
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
 }
 
 .ddg-landing-logo-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .ddg-landing-brand-name {
-  font-size: 16px;
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
   line-height: 1.4;
-  font-weight: 500;
-  color: #262626;
-  letter-spacing: 0;
+  font-weight: 700;
 }
 
-.ddg-landing-nav {
+.ddg-saas-brand p {
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.ddg-saas-nav {
+  margin-top: 16px;
+  display: grid;
+  gap: 4px;
+}
+
+.ddg-saas-nav a {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: 10px;
+  color: #475569;
   font-size: 14px;
   line-height: 1.4;
-  font-weight: 400;
-  color: #595959;
-}
-
-.ddg-landing-nav a {
-  color: inherit;
+  font-weight: 500;
   text-decoration: none;
-  transition: color 0.15s ease;
+  cursor: default;
 }
 
-.ddg-landing-nav a:hover {
-  color: #d48806;
+.ddg-saas-nav a.active,
+.ddg-saas-nav a:hover {
+  background: #eff6ff;
+  color: #2563eb;
 }
 
-.ddg-landing-main {
-  min-height: calc(100vh - 64px);
+.ddg-saas-nav svg {
+  width: 17px;
+  height: 17px;
+}
+
+.ddg-saas-content {
+  min-width: 0;
+}
+
+.ddg-saas-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 56px;
+  border-bottom: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  padding: 0 24px;
   display: flex;
-  flex-direction: column;
-  padding-bottom: 60px;
-}
-
-.ddg-landing-hero {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  padding-top: 80px;
-  text-align: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.ddg-landing-badge {
-  display: inline-flex;
+.ddg-saas-topbar span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.ddg-saas-topbar strong {
+  display: block;
+  margin-top: 2px;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.ddg-saas-topbar-actions {
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  border-radius: 100px;
-  background: #fff7e6;
-  color: #d48806;
-  font-size: 14px;
-  line-height: 1;
+}
+
+.ddg-saas-topbar-actions button,
+.ddg-saas-section-head button {
+  height: 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
   font-weight: 500;
+  cursor: pointer;
 }
 
-.ddg-landing-badge span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #d48806;
+.ddg-saas-topbar-actions button:hover,
+.ddg-saas-section-head button:hover {
+  background: #f1f5f9;
 }
 
-.ddg-landing-title {
-  margin-top: 80px;
-  color: #000000;
-  font-size: 56px;
-  line-height: 1.2;
+.ddg-saas-topbar-actions svg,
+.ddg-saas-section-head button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ddg-saas-main {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.ddg-saas-launch-card,
+.ddg-saas-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.ddg-saas-launch-card {
+  padding: 24px;
+}
+
+.ddg-saas-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ddg-saas-section-head.compact {
+  align-items: center;
+}
+
+.ddg-saas-section-head p {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.ddg-saas-section-head h1,
+.ddg-saas-section-head h2 {
+  margin-top: 4px;
+  color: #0f172a;
+  line-height: 1.3;
   font-weight: 700;
   letter-spacing: 0;
 }
 
-.ddg-landing-subtitle {
-  margin-top: 24px;
-  max-width: 640px;
-  color: #595959;
+.ddg-saas-section-head h1 {
+  font-size: 28px;
+}
+
+.ddg-saas-section-head h2 {
   font-size: 16px;
-  line-height: 1.5;
-  font-weight: 400;
+}
+
+.ddg-saas-status-tag {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 700;
 }
 
 .ddg-landing-search-wrap {
-  width: 800px;
-  max-width: 100%;
-  margin-top: 48px;
+  margin-top: 22px;
+  max-width: 860px;
+}
+
+.ddg-saas-input-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
 }
 
 .ddg-landing-search {
   position: relative;
-  width: 800px;
-  max-width: 100%;
-  height: 60px;
-  border-radius: 16px;
-  border: 1px solid #e5e5e5;
+  height: 44px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .ddg-landing-search:focus-within {
-  border-color: #d48806;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px #eff6ff;
 }
 
 .ddg-landing-search-icon {
   position: absolute;
-  left: 24px;
+  left: 13px;
   top: 50%;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   transform: translateY(-50%);
-  color: #bfbfbf;
+  color: #94a3b8;
 }
 
 .ddg-landing-search-input {
@@ -167,84 +269,86 @@
   height: 100%;
   border: 0;
   outline: 0;
-  border-radius: 16px;
+  border-radius: 8px;
   background: transparent;
-  padding-left: 56px;
-  padding-right: 156px;
-  color: #262626;
-  font-size: 16px;
-  line-height: 1.5;
-  font-weight: 400;
+  padding-left: 42px;
+  padding-right: 132px;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .ddg-landing-search-input::placeholder {
-  color: #bfbfbf;
+  color: #94a3b8;
 }
 
 .ddg-landing-cta {
   position: absolute;
   right: 4px;
   top: 4px;
-  width: 132px;
-  height: 52px;
+  height: 34px;
+  min-width: 116px;
   border: 0;
-  border-radius: 12px;
-  background: #262626;
+  border-radius: 6px;
+  background: #2563eb;
   color: #ffffff;
-  font-size: 16px;
+  padding: 0 14px;
+  font-size: 14px;
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease;
 }
 
 .ddg-landing-cta:hover:not(:disabled) {
-  background: #000000;
+  background: #1d4ed8;
+}
+
+.ddg-landing-cta:active:not(:disabled) {
+  background: #1e40af;
 }
 
 .ddg-landing-cta:disabled {
   cursor: not-allowed;
-  background: #d9d9d9;
+  opacity: 0.55;
 }
 
 .ddg-landing-cta span {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
 }
 
 .ddg-landing-cta-icon {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .ddg-landing-hot-tags {
-  margin-top: 24px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
-  justify-content: center;
   flex-wrap: wrap;
-  gap: 12px;
-  color: #595959;
-  font-size: 14px;
-  line-height: 1.4;
-  font-weight: 400;
+  gap: 8px;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .ddg-landing-tag {
-  padding: 6px 16px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: #f5f5f5;
-  color: #595959;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
   font: inherit;
   cursor: pointer;
-  transition: border-color 0.15s ease;
 }
 
 .ddg-landing-tag:hover:not(:disabled) {
-  border-color: #d48806;
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
 }
 
 .ddg-landing-tag:disabled {
@@ -253,13 +357,10 @@
 }
 
 .ddg-landing-screening {
-  width: 800px;
-  max-width: 100%;
-  margin-top: 32px;
-  border: 1px solid #e5e5e5;
-  border-radius: 16px;
+  margin-top: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   background: #ffffff;
-  text-align: left;
 }
 
 .ddg-landing-screening-grid {
@@ -270,9 +371,9 @@
 .ddg-landing-screening-step {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  border-right: 1px solid #e5e5e5;
+  gap: 10px;
+  padding: 14px;
+  border-right: 1px solid #e2e8f0;
 }
 
 .ddg-landing-screening-step:last-child {
@@ -281,119 +382,250 @@
 
 .ddg-landing-step-icon {
   flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   margin-top: 2px;
 }
 
-.ddg-landing-step-icon.completed {
-  color: #0f8a7a;
-}
-
-.ddg-landing-step-icon.running {
-  color: #d48806;
-}
-
-.ddg-landing-step-icon.pending {
-  color: #cfc8bc;
-}
+.ddg-landing-step-icon.completed { color: #16a34a; }
+.ddg-landing-step-icon.running { color: #2563eb; }
+.ddg-landing-step-icon.pending { color: #94a3b8; }
+.ddg-landing-step-icon.failed { color: #dc2626; }
 
 .ddg-landing-screening-step p {
-  color: #262626;
-  font-size: 14px;
+  color: #0f172a;
+  font-size: 13px;
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .ddg-landing-screening-step span {
   display: block;
   margin-top: 4px;
-  color: #595959;
+  color: #64748b;
   font-size: 12px;
   line-height: 1.5;
-  font-weight: 400;
 }
 
-.ddg-landing-features {
-  margin: auto auto 0;
-  padding-top: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 120px;
+.ddg-landing-start-error {
+  margin: 0 14px 14px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.ddg-landing-feature {
-  display: flex;
-  flex-direction: column;
+.ddg-saas-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+}
+
+.ddg-saas-panel {
+  padding: 16px;
+}
+
+.ddg-saas-table {
+  margin-top: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ddg-saas-table-row {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.6fr) 120px 120px 92px 64px;
   align-items: center;
   gap: 12px;
+  padding: 0 14px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 13px;
 }
 
-.ddg-landing-feature svg {
+.ddg-saas-table-row:last-child {
+  border-bottom: 0;
+}
+
+.ddg-saas-table-row.header {
+  min-height: 38px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ddg-saas-table-row strong {
+  color: #0f172a;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ddg-saas-table-row em,
+.ddg-saas-table-row .warning {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.ddg-saas-table-row .warning {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.ddg-saas-table-row .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #64748b;
+}
+
+.ddg-saas-side-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.ddg-saas-source-row {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.ddg-saas-source-row svg {
   width: 32px;
   height: 32px;
-  color: #262626;
+  padding: 7px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #2563eb;
 }
 
-.ddg-landing-feature span {
-  color: #262626;
+.ddg-saas-source-row strong,
+.ddg-saas-source-row span {
+  display: block;
+}
+
+.ddg-saas-source-row strong {
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.ddg-saas-source-row span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ddg-saas-source-row em {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #16a34a;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.ddg-saas-source-row em.pending {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.ddg-saas-sla-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.ddg-saas-sla-panel svg {
+  width: 20px;
+  height: 20px;
+  color: #93c5fd;
+  flex: 0 0 auto;
+}
+
+.ddg-saas-sla-panel strong {
+  display: block;
+  color: #ffffff;
   font-size: 14px;
   line-height: 1.4;
-  font-weight: 500;
 }
 
-@media (min-width: 1280px) {
-  .ddg-landing-title {
-    font-size: 64px;
+.ddg-saas-sla-panel p {
+  margin-top: 4px;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1023px) {
+  .ddg-saas-shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .ddg-saas-brand div,
+  .ddg-saas-nav a:not(.active) {
+    display: none;
+  }
+
+  .ddg-saas-nav a.active {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .ddg-saas-grid {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 767px) {
-  .ddg-landing {
-    overflow-y: auto;
+  .ddg-saas-shell {
+    grid-template-columns: 1fr;
   }
 
-  .ddg-landing-safe {
-    padding-left: 20px;
-    padding-right: 20px;
-  }
-
-  .ddg-landing-nav {
+  .ddg-saas-sidebar {
     display: none;
   }
 
-  .ddg-landing-hero {
-    padding-top: 48px;
+  .ddg-saas-main,
+  .ddg-saas-topbar {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
-  .ddg-landing-title {
-    margin-top: 56px;
-    font-size: 40px;
-  }
-
-  .ddg-landing-subtitle {
-    font-size: 15px;
-  }
-
-  .ddg-landing-search-input {
-    padding-right: 24px;
-  }
-
-  .ddg-landing-cta {
-    position: static;
-    width: 100%;
-    margin-top: 12px;
+  .ddg-saas-section-head {
+    flex-direction: column;
   }
 
   .ddg-landing-search {
     height: auto;
-    padding-bottom: 12px;
+    padding-bottom: 8px;
   }
 
   .ddg-landing-search-input {
-    height: 60px;
+    height: 44px;
+    padding-right: 14px;
+  }
+
+  .ddg-landing-cta {
+    position: static;
+    width: calc(100% - 8px);
+    margin: 0 4px;
   }
 
   .ddg-landing-screening-grid {
@@ -402,15 +634,17 @@
 
   .ddg-landing-screening-step {
     border-right: 0;
-    border-bottom: 1px solid #e5e5e5;
+    border-bottom: 1px solid #e2e8f0;
   }
 
-  .ddg-landing-screening-step:last-child {
-    border-bottom: 0;
+  .ddg-saas-table-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 6px;
+    padding: 12px 14px;
   }
 
-  .ddg-landing-features {
-    padding-top: 96px;
-    gap: 48px;
+  .ddg-saas-table-row.header {
+    display: none;
   }
 }
