@@ -264,10 +264,10 @@ interface EvidenceDocItem {
 // ── 参考数据（行业基准，待后端丰富后替换）─────────────────────
 
 const RISK_DIMENSIONS = [
-  { name: '财务健康度', score: 78, maxScore: 100, status: 'low' as const, details: ['营收持续增长', '现金流覆盖率高于行业均值', '应收账款占比较高需关注'] },
-  { name: '司法合规', score: 65, maxScore: 100, status: 'medium' as const, details: ['2条行政处罚记录', '3份合同纠纷裁判文书', '无失信被执行记录'] },
-  { name: '行业前景', score: 82, maxScore: 100, status: 'low' as const, details: ['行业景气度78分', '政策环境支持', '行业排名前25%'] },
-  { name: '关联风险', score: 60, maxScore: 100, status: 'medium' as const, details: ['关联企业12家', '1家疑似关联方待确认', '实控人近6个月变更'] },
+  { name: '财务健康度', score: 78, maxScore: 100, weight: 0.35, status: 'low' as const, details: ['营收持续增长', '现金流覆盖率高于行业均值', '应收账款占比较高需关注'] },
+  { name: '司法合规', score: 65, maxScore: 100, weight: 0.25, status: 'medium' as const, details: ['2条行政处罚记录', '3份合同纠纷裁判文书', '无失信被执行记录'] },
+  { name: '行业前景', score: 82, maxScore: 100, weight: 0.20, status: 'low' as const, details: ['行业景气度78分', '政策环境支持', '行业排名前25%'] },
+  { name: '关联风险', score: 60, maxScore: 100, weight: 0.20, status: 'medium' as const, details: ['关联企业12家', '1家疑似关联方待确认', '实控人近6个月变更'] },
 ];
 
 const FINANCIAL_METRICS = [
@@ -914,27 +914,27 @@ function buildFallbackChapters(report: ReportData): ReportChapter[] {
       title: '报告导言与核心概要',
       subtitle: report.report_mode_label || (report.report_mode === 'public_pre_dd' ? '公开资料预尽调' : '财报增强尽调'),
       summary: report.executive_summary || [report.recommendation || '暂无核心概要'],
-      highlights: [report.data_boundary || '数据边界待后端补充'],
+      highlights: [report.data_boundary || '本报告基于当前可获取数据生成，需结合原始凭证和人工尽调复核。'],
     },
     {
       id: 'business',
       title: '企业基本情况与治理结构',
       subtitle: '工商登记、经营状态、股权治理与关联风险',
-      summary: subReports.business?.risk_summary || [subReports.business?.recommendation || '工商专项报告待补充'],
+      summary: subReports.business?.risk_summary || [subReports.business?.recommendation || '工商专项尚未取得可用数据，需人工复核国家企业信用信息公示系统。'],
       risks: subReports.business?.risk_summary || [],
     },
     {
       id: 'industry',
       title: '行业环境与经营分析',
       subtitle: '行业识别、景气度、竞争格局、政策环境与上下游',
-      summary: subReports.industry?.risk_summary || [subReports.industry?.recommendation || '行业专项报告待补充'],
+      summary: subReports.industry?.risk_summary || [subReports.industry?.recommendation || '行业专项尚未取得可用数据，需结合主营业务和行业知识库补充识别。'],
       risks: subReports.industry?.risk_summary || [],
     },
     {
       id: 'financial',
       title: '财务状况与偿债能力',
       subtitle: '收入利润、资产负债、现金流与还款来源',
-      summary: subReports.financial?.risk_summary || [subReports.financial?.recommendation || '财务专项报告待补充'],
+      summary: subReports.financial?.risk_summary || [subReports.financial?.recommendation || '财务专项尚未完成，非上市企业需上传近三年三大表。'],
       required_documents: report.required_documents,
       unavailable_metrics: report.unavailable_metrics,
     },
@@ -942,7 +942,7 @@ function buildFallbackChapters(report: ReportData): ReportChapter[] {
       id: 'legal',
       title: '司法与合规风险',
       subtitle: '裁判文书、执行、失信、处罚与负面线索',
-      summary: subReports.legal?.risk_summary || [subReports.legal?.recommendation || '司法专项报告待补充'],
+      summary: subReports.legal?.risk_summary || [subReports.legal?.recommendation || '司法专项尚未形成稳定结论，需人工复核权威司法渠道。'],
       risks: subReports.legal?.risk_summary || [],
     },
     {
@@ -973,7 +973,7 @@ function buildFallbackChapters(report: ReportData): ReportChapter[] {
       id: 'evidence',
       title: '数据来源、证据与待补充材料',
       subtitle: '证据链、置信度、人工复核项和资料清单',
-      summary: [report.data_boundary || '证据边界待后端补充'],
+      summary: [report.data_boundary || '证据链尚未完整归集，部分证据需人工复核，不作为最终审批依据。'],
       required_documents: report.required_documents,
       unavailable_metrics: report.unavailable_metrics,
     },
@@ -1182,7 +1182,7 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
                         <FileText size={20} />
                         <div>
                           <h3>{doc.name || doc.source_name || '证据项'}</h3>
-                          <p>{doc.claim || doc.value || '暂无证据值'}</p>
+                          <p>{doc.claim || doc.value || doc.name || '待补充证据详情'}</p>
                           <p>{doc.source_name || doc.source || '未识别来源'}</p>
                           <span>
                             {trustLabel(doc.reliability || doc.trust_level)} · {Math.round((doc.confidence ?? 0) * 100)}% · {doc.requires_manual_review || doc.status !== 'verified' ? '待复核' : '已验证'}
@@ -1411,37 +1411,34 @@ export function ReportPage() {
   }
 
   if (error) {
-    // 出错时使用 Mock 数据展示报告骨架，方便预览设计效果
+    // 出错时展示报告骨架，但使用通用占位符而非硬编码企业数据
+    const enterpriseName = '（企业名称待获取）';
     const mockReport: ReportData = {
-      enterprise_name: '华为技术有限公司',
-      risk_rating: 'low',
-      risk_score: 78,
-      recommendation: '华为技术有限公司作为全球 ICT 龙头企业，经营基本面稳健，财务健康度极高，研发壁垒深厚。近三年营收 CAGR 14.3%，经营现金流持续为正且覆盖能力强。建议给予较高授信额度，同时通过结构设计控制海外相关风险敞口。',
+      enterprise_name: enterpriseName,
+      risk_rating: 'medium',
+      risk_score: 70,
+      recommendation: '报告加载失败，以下为报告骨架预览。请检查后端服务状态或重新发起尽调任务。',
       report_type: 'full_due_diligence',
       risk_dimensions: RISK_DIMENSIONS,
       credit_decision: {
-        suggestion: '建议采纳',
-        risk_score: 78,
-        credit_limit_advice: '建议敞口 50-80 亿元',
-        term_advice: '1-3 年，建议 2 年期为主',
-        collateral_advice: '信用贷款为主（70%敞口），辅以应收账款质押或母公司保证（30%敞口）',
+        suggestion: '待审查',
+        risk_score: 70,
+        credit_limit_advice: '需补充财务数据后测算',
+        term_advice: '待审查',
+        collateral_advice: '需落实有效担保结构',
       },
       executive_summary: [
-        '营收规模 8,621 亿，净利润 872 亿，盈利能力行业领先',
-        '经营现金流 1,275 亿元，现金流覆盖能力极强',
-        '研发投入 1,620 亿元，占营收 19.1%，技术壁垒深厚',
+        '报告数据尚未加载完成，无法生成核心优势总结。',
+        '请确保后端服务正常运行，并已完成尽调任务执行。',
+        '非上市企业需上传近三年财务报表后形成最终财务判断。',
       ],
       cross_findings: [
-        { title: '海外合规', risk_level: 'medium', conclusion: '海外子公司数据合规罚款 120 万欧元，全球监管趋严', evidence_refs: [] },
-        { title: '应收账款', risk_level: 'medium', conclusion: '前五大客户应收账款集中度 38%，偏高', evidence_refs: [] },
-        { title: '回款周期', risk_level: 'medium', conclusion: '海外部分市场回款周期延长至 120 天以上', evidence_refs: [] },
+        { title: '财务与经营匹配度', risk_level: 'medium', conclusion: '财务专项尚未取得可用数据，需补充近三年财报后判断收入与经营的匹配度。', evidence_refs: [] },
+        { title: '司法风险影响', risk_level: 'medium', conclusion: '司法数据源暂未形成可用证据链，需人工复核后再纳入正式授信判断。', evidence_refs: [] },
+        { title: '行业环境韧性', risk_level: 'medium', conclusion: '行业专项尚未形成可用证据链，需结合主营业务和行业知识库补充识别。', evidence_refs: [] },
       ],
-      evidence_docs: [
-        { name: '2024年度财务审计报告', source: '企业提供', status: 'verified' },
-        { name: '企业信用信息公示报告', source: '国家企业信用信息公示系统', status: 'verified' },
-        { name: '裁判文书查询结果', source: '中国裁判文书网', status: 'verified' },
-        { name: '行业研究报告', source: '行业协会', status: 'verified' },
-      ],
+      evidence_docs: [],
+      data_boundary: '报告加载失败，当前数据不可用。请检查后端服务状态或重新发起尽调任务。',
     };
     return <FullDueDiligenceReport report={mockReport} />;
   }
