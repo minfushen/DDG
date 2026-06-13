@@ -1,0 +1,92 @@
+[
+  {
+    "rule_id": "FIN-CROSS-001",
+    "title": "应收增速高于营收增速",
+    "dimension": "资产真实性与营运效率风险",
+    "condition": "receivable_growth > revenue_growth",
+    "risk_label": "回款质量下降或收入质量不足",
+    "risk_level": "中风险",
+    "required_checks": ["经营现金流净额", "应收账款账龄", "期后回款", "前五大客户", "坏账计提", "信用政策变化"],
+    "prompt_hint": "当应收账款增速高于营业收入增速时，必须关联经营现金流、期后回款和坏账计提，不得只描述收入增长。"
+  },
+  {
+    "rule_id": "FIN-CROSS-002",
+    "title": "营收增速显著高于应收增速",
+    "dimension": "盈利质量与成长性风险",
+    "condition": "revenue_growth > receivable_growth * 1.5",
+    "risk_label": "收入确认激进或期末集中确认收入",
+    "risk_level": "中风险",
+    "required_checks": ["经营现金流/收入", "信用减值损失", "前五大客户变动", "合同发票流水", "期后退货"],
+    "prompt_hint": "当营收增速显著高于应收增速时，禁止简单评价增长良好，必须核查收入现金含量和收入确认时点。"
+  },
+  {
+    "rule_id": "FIN-CROSS-003",
+    "title": "应收账款占营收比例偏高",
+    "dimension": "资产真实性与营运效率风险",
+    "condition": "receivable_to_revenue > 0.2",
+    "risk_label": "营运资金占用和坏账风险",
+    "risk_level": "中风险",
+    "required_checks": ["账龄结构", "逾期客户", "前十大客户回款", "坏账计提充分性"],
+    "prompt_hint": "当应收账款占营收比例偏高时，必须提示回款周期和坏账准备核查。"
+  },
+  {
+    "rule_id": "FIN-CROSS-004",
+    "title": "经营现金流对净利润覆盖不足",
+    "dimension": "盈利质量与成长性风险",
+    "condition": "operating_cf_to_net_profit < 0.5",
+    "risk_label": "利润现金含量偏弱",
+    "risk_level": "中高风险",
+    "required_checks": ["经营现金流明细", "应收账款", "存货", "非经常性损益", "收入确认政策"],
+    "prompt_hint": "当经营现金流/净利润低于50%时，必须评价利润是否转化为现金，重点核查应收账款和收入真实性。"
+  },
+  {
+    "rule_id": "FIN-CROSS-005",
+    "title": "存货周转恶化但毛利率上升",
+    "dimension": "资产真实性与营运效率风险",
+    "condition": "inventory_turnover_declines and gross_margin_increases",
+    "risk_label": "成本结转不足或存货跌价准备不足",
+    "risk_level": "高风险",
+    "required_checks": ["生产成本", "存货库龄", "存货跌价准备", "应付账款", "同行业毛利率", "关联交易价格"],
+    "prompt_hint": "若存货周转恶化但毛利率逆势提升，应标记为高异常，并要求拆分料工费和可比公司毛利率区间。"
+  },
+  {
+    "rule_id": "FIN-CROSS-006",
+    "title": "在建工程占总资产比例较高",
+    "dimension": "资本结构与偿债能力风险",
+    "condition": "construction_to_total_assets > 0.15",
+    "risk_label": "资产虚增、产能过剩或转固时点不合理",
+    "risk_level": "中高风险",
+    "required_checks": ["购建固定资产现金流", "产能利用率", "转固时点", "折旧政策", "减值测试"],
+    "prompt_hint": "在建工程占总资产比超过15%时，必须评估转固时点合理性和减值测试充分性。"
+  },
+  {
+    "rule_id": "FIN-CROSS-007",
+    "title": "资产负债率上升且流动比率下降",
+    "dimension": "资本结构与偿债能力风险",
+    "condition": "debt_ratio_change > 0 and current_ratio_change < 0",
+    "risk_label": "短期偿债安全边际收窄",
+    "risk_level": "中风险",
+    "required_checks": ["短期借款", "应付票据", "应付账款", "或有负债", "未来12个月现金流预测"],
+    "prompt_hint": "当资产负债率上升且流动比率下降时，必须关联短债、应付款项、或有负债和未来12个月偿债压力。"
+  },
+  {
+    "rule_id": "FIN-IND-MFG-001",
+    "title": "制造业产能产量销量能耗四匹配",
+    "dimension": "行业特异性风险因子",
+    "condition": "industry == manufacturing",
+    "risk_label": "生产数据真实性或产能过剩风险",
+    "risk_level": "中风险",
+    "required_checks": ["产能利用率", "产销量", "单位产品能耗", "水电费", "出入库记录", "物流单据"],
+    "prompt_hint": "分析制造企业时，应要求补充产能、产量、销量和能耗数据，并与历史及同业比对。"
+  },
+  {
+    "rule_id": "FIN-IND-TRADE-001",
+    "title": "贸易供应链净额法与融资性贸易识别",
+    "dimension": "行业特异性风险因子",
+    "condition": "industry == trade",
+    "risk_label": "融资性贸易或收入虚增",
+    "risk_level": "中高风险",
+    "required_checks": ["合同流", "货物流", "票据流", "资金流", "真实货权", "客户供应商重合度"],
+    "prompt_hint": "分析贸易和供应链企业时，必须穿透合同、货物、票据和资金四流，识别净额法、总额法和融资性贸易。"
+  }
+]

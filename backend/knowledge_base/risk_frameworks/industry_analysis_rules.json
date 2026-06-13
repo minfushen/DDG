@@ -1,0 +1,83 @@
+[
+  {
+    "rule_id": "IND-LIFE-001",
+    "title": "高增长行业不能简单判定为市场空间广阔",
+    "dimension": "行业生命周期",
+    "condition": "industry_or_company_growth_high",
+    "risk_label": "跑输行业或份额获取成本偏高",
+    "required_checks": ["行业CAGR", "头部企业增速", "新增玩家数量", "融资活跃度", "客户获取成本"],
+    "prompt_hint": "若标的增速高但低于头部企业或行业基准，不能只写高增长，应判断是否跑输行业和份额是否被挤压。"
+  },
+  {
+    "rule_id": "IND-LIFE-002",
+    "title": "高集中度行业聚焦存量博弈",
+    "dimension": "竞争格局",
+    "condition": "cr5_gt_70",
+    "risk_label": "存量博弈和份额获取成本上升",
+    "required_checks": ["CR5", "头部企业份额", "价格竞争", "渠道壁垒", "客户锁定"],
+    "prompt_hint": "当行业CR5高于70%时，禁止使用市场空间广阔作为主结论，应聚焦存量博弈下的份额获取成本。"
+  },
+  {
+    "rule_id": "IND-CHAIN-001",
+    "title": "上游集中下游分散导致议价能力弱",
+    "dimension": "产业链议价能力",
+    "condition": "upstream_concentrated_downstream_fragmented",
+    "risk_label": "成本转嫁能力不足",
+    "required_checks": ["上游CR3", "原材料价格", "下游客户数量", "毛利率波动", "存货计价"],
+    "prompt_hint": "若上游集中且下游分散，毛利率应跟随原材料价格；原材料涨但毛利率也涨时，需警惕成本转嫁能力被高估或存货计价异常。"
+  },
+  {
+    "rule_id": "IND-CHAIN-002",
+    "title": "账期比值反映产业链权力",
+    "dimension": "产业链议价能力",
+    "condition": "payable_days_to_receivable_days_change",
+    "risk_label": "上下游资金占用能力变化",
+    "required_checks": ["应付账款周转天数", "应收账款周转天数", "核心客户账期", "供应商账期"],
+    "prompt_hint": "应付账款周转天数/应收账款周转天数大于1.5说明有净占用能力；若从大于1降至小于0.8，说明议价能力恶化或回款压力上升。"
+  },
+  {
+    "rule_id": "IND-KPI-MFG-001",
+    "title": "制造业产能产量销量能耗四匹配",
+    "dimension": "行业特有KPI",
+    "condition": "semantic_industry in manufacturing_or_semiconductor_or_new_energy",
+    "risk_label": "产能过剩或生产数据真实性风险",
+    "required_checks": ["产能利用率", "产量", "销量", "产销率", "单位能耗", "订单覆盖率"],
+    "prompt_hint": "制造业分析必须补充产能、产量、销量和能耗数据；产销率低于80%仍扩产时，应提示产能过剩和库存压力。"
+  },
+  {
+    "rule_id": "IND-KPI-SOFT-001",
+    "title": "SaaS订阅制关注经常性收入而非当期利润",
+    "dimension": "行业特有KPI",
+    "condition": "semantic_industry in software_or_saas",
+    "risk_label": "未来收入可持续性风险",
+    "required_checks": ["NDR", "ARR", "MRR", "CAC Payback Period", "Rule of 40", "客户留存率", "合同负债"],
+    "prompt_hint": "SaaS企业不能只看当期利润，必须分离经常性收入与非经常性收入，并关注NDR、CAC回收期和Rule of 40。"
+  },
+  {
+    "rule_id": "IND-KPI-TRADE-001",
+    "title": "贸易供应链识别净额法、总额法与融资性贸易",
+    "dimension": "行业特有KPI",
+    "condition": "semantic_industry in trade_or_supply_chain",
+    "risk_label": "融资性贸易或收入虚增",
+    "required_checks": ["合同流", "货物流", "票据流", "资金流", "客户供应商重合度", "真实货权"],
+    "prompt_hint": "贸易供应链企业必须穿透四流一致性，识别净额法、总额法和融资性贸易。"
+  },
+  {
+    "rule_id": "IND-POLICY-001",
+    "title": "政策利好不等于标的受益",
+    "dimension": "政策与技术拐点",
+    "condition": "policy_benefit_claimed",
+    "risk_label": "政策传导到企业订单存在不确定性",
+    "required_checks": ["资质门槛", "规模门槛", "技术路线", "订单转化", "补贴依赖"],
+    "prompt_hint": "行业政策利好必须核查是否真正利好标的；若企业不具备资质、规模或技术门槛，不得把政策利好直接写成授信正面因素。"
+  },
+  {
+    "rule_id": "IND-RISK-EXPORT-001",
+    "title": "出口依赖与地缘限制风险",
+    "dimension": "外部冲击",
+    "condition": "export_dependency_high",
+    "risk_label": "出口管制、汇率和供应链迁移风险",
+    "required_checks": ["海外收入占比", "主要出口地区", "东南亚产能", "替代市场", "汇率敞口"],
+    "prompt_hint": "出口依赖高且缺少海外产能或替代市场时，应提示高风险敞口并要求压力测试。"
+  }
+]
