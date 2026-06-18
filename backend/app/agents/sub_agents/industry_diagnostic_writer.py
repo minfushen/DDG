@@ -204,7 +204,11 @@ def _fallback_diagnostics(
         str(((public_info or {}).get("basic_info") or {}).get("main_business") or ""),
         str(((public_info or {}).get("basic_info") or {}).get("concepts") or ""),
     ])
-    is_semiconductor = any(keyword in context_text for keyword in ["半导体", "集成电路", "芯片", "电子器件"])
+    semantic_id = str(classification.get("semantic_industry_id") or "")
+    is_new_energy = semantic_id == "new_energy" or any(keyword in context_text for keyword in ["锂电", "锂离子电池", "动力电池", "储能", "电芯", "PACK", "BMS"])
+    is_semiconductor = (semantic_id == "semiconductor") or (
+        not is_new_energy and any(keyword in context_text for keyword in ["半导体", "集成电路", "芯片", "晶圆", "功率器件", "分立器件"])
+    )
     basic = (public_info or {}).get("basic_info") or {}
     main_business = basic.get("main_business") or "[需补充：主营收入构成、核心产品和核心客户]"
     rules = _rule_lines(knowledge_context)
@@ -213,7 +217,37 @@ def _fallback_diagnostics(
     def rule_ids(index: int) -> List[str]:
         return [rule.get("rule_id") for rule in rules[index:index + 3] if rule.get("rule_id")]
 
-    if is_semiconductor:
+    if is_new_energy:
+        diagnostic_items = [
+            {
+                "title": "产品结构、技术路线与需求周期风险",
+                "current_anchor": f"标的行业识别为{semantic_name}；标准路径为{path}；公开主营信息为{main_business}。当前仍需补充消费类电池、动力电池、储能、电芯/PACK/BMS等产品收入占比、毛利率和客户结构。",
+                "risk_substance": "锂电池企业授信风险应穿透到产品结构和技术路线：消费电子电池受终端换机周期影响，动力电池受整车厂定点和装车量影响，储能业务受项目交付、消防安全和海外认证影响。若收入增长来自低毛利扩产或价格竞争，现金流和利润修复可能不同步。",
+                "verification_actions": ["获取近三年按消费类电池、动力电池、储能等拆分的收入和毛利", "核验核心客户定点、订单覆盖率和装车/出货量数据", "对标宁德时代、亿纬锂能、国轩高科等同业产品结构和毛利率"],
+                "missing_items": ["主营构成", "出货量/装车量", "客户定点和订单覆盖率", "同业毛利率基准"],
+                "evidence_ids": source_ids[:3],
+                "rule_ids": rule_ids(0),
+            },
+            {
+                "title": "产业链价格、库存与回款质量风险",
+                "current_anchor": "锂电池产业链受锂盐、正负极材料价格、下游消费电子/新能源车/储能需求和库存周期共同影响；当前公开资料尚不足以完整判断原材料锁价、库存库龄和主要客户账期。",
+                "risk_substance": "若上游材料价格波动无法及时传导，或下游客户议价强、账期拉长，企业可能出现毛利率承压、存货跌价和应收占用并存。授信审查不能只看收入规模，应把库存、应收、经营现金流和客户集中度交叉验证。",
+                "verification_actions": ["获取前五大客户/供应商集中度和账期", "核查存货库龄、跌价准备和原材料价格传导机制", "比较应收增速、收入增速和经营现金流匹配度"],
+                "missing_items": ["客户/供应商集中度", "存货库龄", "跌价准备", "价格联动条款"],
+                "evidence_ids": source_ids[:3],
+                "rule_ids": rule_ids(2),
+            },
+            {
+                "title": "扩产投入、安全合规与授信边界风险",
+                "current_anchor": f"当前已触发{len(rules)}条行业动态规则，知识库命中{len(source_ids)}条片段；尚未取得产能利用率、CAPEX计划、海外认证、质量召回和储能安全事故相关核验材料。",
+                "risk_substance": "电池制造资本开支和研发投入较重，扩产、良率、质量安全和海外合规会直接影响现金流安全边界。若新增产能释放慢于订单兑现，或海外电池法规、碳足迹、召回责任带来额外成本，授信期限和额度释放应更保守。",
+                "verification_actions": ["编制产能、CAPEX、转固和新增折旧滚动表", "核查海外认证、欧盟电池法和碳足迹合规准备", "设置订单、回款、库存和安全事故的贷后监控指标"],
+                "missing_items": ["CAPEX和产能利用率", "海外认证/碳足迹资料", "质量召回和安全生产记录", "贷后监控阈值"],
+                "evidence_ids": source_ids[:3],
+                "rule_ids": rule_ids(4),
+            },
+        ]
+    elif is_semiconductor:
         diagnostic_items = [
             {
                 "title": "技术节点、产品结构与产能利用风险",
@@ -380,6 +414,23 @@ def _quality_warnings(diagnostics: Dict[str, Any]) -> List[str]:
     return warnings[:8]
 
 
+def _cross_industry_warnings(diagnostics: Dict[str, Any], classification: Dict[str, Any]) -> List[str]:
+    semantic_id = str(classification.get("semantic_industry_id") or "")
+    rendered = "\n".join(render_industry_diagnostics(diagnostics))
+    warnings: List[str] = []
+    if semantic_id == "new_energy":
+        forbidden = ["晶圆", "IDM", "集成电路", "半导体制造", "工艺节点", "流片", "制程", "EDA", "光刻", "封测"]
+        hits = [term for term in forbidden if term in rendered]
+        if hits:
+            warnings.append(f"新能源/锂电池行业诊断混入半导体术语：{', '.join(hits[:5])}")
+    if semantic_id == "semiconductor":
+        forbidden = ["动力电池装车量", "储能电站", "电芯", "PACK", "BMS", "欧盟电池法", "碳足迹"]
+        hits = [term for term in forbidden if term in rendered]
+        if hits:
+            warnings.append(f"半导体行业诊断混入锂电池术语：{', '.join(hits[:5])}")
+    return warnings
+
+
 def _prompt(
     enterprise_name: str,
     classification: Dict[str, Any],
@@ -416,6 +467,7 @@ def _prompt(
 4. 行业子赛道必须尽量精准，例如半导体需区分设计、制造、封测、设备材料；无法判断时写 [需补充：细分赛道]。
 5. 必须包含关键假设和数据边界，提醒公开资料只能用于初筛。
 6. 禁止空泛表达：{', '.join(BANNED_GENERIC_TERMS)}。如果需要表达类似含义，必须加事实锚点、对标对象、时间节点或 [需补充]。
+7. 若 semantic_industry_id=new_energy，只能围绕消费类电池、动力电池、储能、电芯/PACK/BMS、材料价格、装车量、出货量、客户定点、安全合规等锂电池KPI；禁止写晶圆、制程、IDM、流片、封测等半导体KPI。
 
 JSON格式：
 {{
@@ -501,7 +553,8 @@ def build_industry_diagnostic_narrative(
     started_at = time.monotonic()
     try:
         candidate = _invoke_llm(_prompt(enterprise_name, classification, public_info, knowledge_context), fallback)
-        warnings = candidate.get("quality_warnings") or []
+        diagnostics = candidate.get("diagnostics") or fallback
+        warnings = (candidate.get("quality_warnings") or []) + _cross_industry_warnings(diagnostics, classification)
         if warnings:
             return {
                 "success": False,
@@ -515,8 +568,8 @@ def build_industry_diagnostic_narrative(
         return {
             "success": True,
             "source": "llm",
-            "summary": candidate.get("summary") or render_industry_diagnostics(candidate.get("diagnostics") or fallback),
-            "diagnostics": candidate.get("diagnostics") or fallback,
+            "summary": candidate.get("summary") or render_industry_diagnostics(diagnostics),
+            "diagnostics": diagnostics,
             "quality_warnings": candidate.get("race_errors") or [],
             "llm_elapsed_ms": round((time.monotonic() - started_at) * 1000),
             "llm_provider": candidate.get("provider"),

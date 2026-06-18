@@ -407,7 +407,7 @@ def _build_report_chapters(
             "highlights": [item.get("title", "交叉发现") for item in cross_findings],
             "risks": [item.get("conclusion", "") for item in cross_findings if item.get("risk_level") != "low"],
             "findings": cross_findings,
-            "evidence_refs": ["专项报告摘要", "交叉风险规则", "CrewAI综合审查"],
+            "evidence_refs": ["专项报告摘要", "交叉风险规则"],
         },
         {
             "id": "credit",
@@ -446,30 +446,10 @@ def _build_report_chapters(
     ]
 
 
-def merge_crew_review(
-    report: Dict[str, Any],
-    crew_review: Optional[Dict[str, Any]],
-) -> Dict[str, Any]:
-    """将 CrewAI 综合审查结果合并到规则报告。"""
-    if not crew_review:
-        return report
-    # CrewAI review is advisory only for now. Earlier free-form generations
-    # polluted customer-facing text, so do not let it override deterministic
-    # report fields until a stricter schema and quality gate are in place.
-    report["crew_review"] = {
-        "status": "advisory_ignored",
-        "reviewer": "CrewAI 综合审查",
-        "reason": "综合审查结果暂不覆盖正式报告正文，避免生成文本污染授信结论。",
-    }
-    report["crew_review_advisory"] = crew_review
-    return report
-
-
 def build_full_due_diligence_report(
     enterprise_name: str,
     sub_reports: Dict[str, Optional[Dict[str, Any]]],
     evidence: Optional[List[Dict[str, Any]]] = None,
-    crew_review: Optional[Dict[str, Any]] = None,
     pending_upload: bool = False,
     report_mode: str = "financial_enhanced_dd",
     financial_data_status: Optional[str] = None,
@@ -558,11 +538,9 @@ def build_full_due_diligence_report(
                 chapter["highlights"] = ["初步谨慎准入"]
     if report_mode == "public_pre_dd":
         report["recommendation"] = "当前建议作为公开资料预尽调结论使用。目标企业具备进一步尽调价值时，应在补充近三年财报、银行流水、纳税资料、主要合同和担保明细后，再形成正式授信额度、期限和风险定价建议。"
-        report["crew_review"] = {"status": "skipped", "reason": "公开资料预尽调阶段不调用综合审查模型，避免基于缺失财务数据过度推断"}
         return report
     if pending_upload:
         report["upload_required"] = True
         report["recommendation"] = "完整尽调已完成工商、司法、行业初步分析；因目标企业未识别为上市公司，需上传近三年三大财务报表后形成最终授信建议。"
-        report["crew_review"] = {"status": "skipped", "reason": "等待财务报表上传"}
         return report
-    return merge_crew_review(report, crew_review)
+    return report

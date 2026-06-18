@@ -79,14 +79,27 @@ def _normalize_task(raw: Dict[str, Any], enterprise_name: str, index: int) -> Re
         "status": "pending",
         "tool_hints": tool_hints,
         "success_criteria": success_criteria,
+        "chapter_id": str(raw.get("chapter_id") or category).strip(),
+        "chapter_title": str(raw.get("chapter_title") or "").strip(),
+        "fallback_language": str(raw.get("fallback_language") or "").strip(),
+        "credit_action_when_missing": str(raw.get("credit_action_when_missing") or "").strip(),
         "planner_source": "llm",
     }
 
 
 def _normalize_plan(parsed: Dict[str, Any], enterprise_name: str, max_tasks: int) -> Tuple[List[ResearchTask], Dict[str, Any]]:
-    raw_tasks = parsed.get("tasks")
+    raw_tasks: Any = None
+    is_list_input = isinstance(parsed, list)
+    if is_list_input:
+        # 模型偶尔直接返回任务数组
+        raw_tasks = parsed
+    elif isinstance(parsed, dict):
+        raw_tasks = parsed.get("tasks")
+        if isinstance(raw_tasks, dict):
+            # 模型有时把 tasks 包装成对象，尝试取内部数组
+            raw_tasks = raw_tasks.get("tasks") or raw_tasks.get("items") or raw_tasks.get("list")
     if not isinstance(raw_tasks, list):
-        raise ValueError("planner JSON missing tasks array")
+        return [], {"normalize_error": "planner JSON missing tasks array", "raw_keys": list(parsed.keys()) if isinstance(parsed, dict) else type(parsed).__name__}
     tasks: List[ResearchTask] = []
     seen_ids: set[str] = set()
     for index, raw_task in enumerate(raw_tasks[:max_tasks], start=1):
@@ -97,12 +110,11 @@ def _normalize_plan(parsed: Dict[str, Any], enterprise_name: str, max_tasks: int
             continue
         tasks.append(task)
         seen_ids.add(task["id"])
-    if not tasks:
-        raise ValueError("planner returned no valid executable tasks")
+    parsed_dict = parsed if isinstance(parsed, dict) else {}
     metadata = {
-        "plan_summary": str(parsed.get("plan_summary") or "LLM Planner 已生成研究计划。"),
-        "planning_assumptions": _coerce_list(parsed.get("planning_assumptions"), limit=8),
-        "data_boundary": str(parsed.get("data_boundary") or "公开资料仅作为预尽调线索，正式授信前需权威来源复核。"),
+        "plan_summary": str(parsed_dict.get("plan_summary") or "LLM Planner 已生成研究计划。"),
+        "planning_assumptions": _coerce_list(parsed_dict.get("planning_assumptions"), limit=8),
+        "data_boundary": str(parsed_dict.get("data_boundary") or "公开资料仅作为预尽调线索，正式授信前需权威来源复核。"),
         "task_count": len(tasks),
     }
     return tasks, metadata
@@ -113,6 +125,8 @@ def create_llm_research_plan(
     objective: str,
     default_tasks: List[ResearchTask],
     max_tasks: int | None = None,
+    thought_loop_context: str = "",
+    skill_context: str = "",
 ) -> Dict[str, Any]:
     """Return an LLM-generated research plan or a structured failure."""
 
@@ -127,23 +141,41 @@ def create_llm_research_plan(
     max_tasks = max_tasks or settings.RESEARCH_PLANNER_MAX_TASKS
     started = time.time()
     try:
-        prompt = build_research_planner_prompt(enterprise_name, objective, list(default_tasks), max_tasks)
+        prompt = build_research_planner_prompt(
+            enterprise_name,
+            objective,
+            list(default_tasks),
+            max_tasks,
+            thought_loop_context=thought_loop_context,
+            skill_context=skill_context,
+        )
         llm = ChatOpenAI(
             model=model,
             api_key=api_key,
             base_url=base_url,
             temperature=0,
-            max_tokens=900,
+            max_tokens=8192,
             timeout=settings.RESEARCH_PLANNER_TIMEOUT_SECONDS,
             max_retries=0,
+            model_kwargs={"response_format": {"type": "json_object"}},
         )
         response = llm.invoke(prompt)
         content = str(getattr(response, "content", response))
         parsed = _json_from_text(content)
         tasks, metadata = _normalize_plan(parsed, enterprise_name, max_tasks)
+        if not tasks:
+            normalize_error = metadata.pop("normalize_error", "planner returned no valid executable tasks")
+            return {
+                "success": False,
+                "error": normalize_error,
+                "tasks": [],
+                "metadata": {**metadata, "latency_seconds": round(time.time() - started, 2), "raw_preview": content[:800]},
+            }
         metadata["latency_seconds"] = round(time.time() - started, 2)
         metadata["model"] = model
         metadata["provider_base_url"] = base_url
+        metadata["used_thought_loop_context"] = bool(thought_loop_context)
+        metadata["used_skill_context"] = bool(skill_context)
         return {"success": True, "tasks": tasks, "metadata": metadata, "raw_preview": content[:800]}
     except Exception as exc:
         return {

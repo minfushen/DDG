@@ -1,0 +1,104 @@
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "DDG Agent Search Gateway"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "zh-CN"
+  formats:
+    - html
+    - json
+
+server:
+  bind_address: "0.0.0.0"
+  port: 8080
+  base_url: "http://127.0.0.1:8080/"
+  secret_key: "ddg-agent-local-searxng-change-me"
+  limiter: false
+  image_proxy: false
+
+ui:
+  default_locale: ""
+
+outgoing:
+  request_timeout: 8.0
+  max_request_timeout: 15.0
+  useragent_suffix: "DDG-Agent"
+
+engines:
+  - name: baidu
+    engine: baidu
+    shortcut: bd
+    disabled: false
+
+  - name: sogou
+    engine: sogou
+    shortcut: sg
+    disabled: false
+
+  - name: 360 search
+    engine: 360search
+    shortcut: so
+    disabled: false
+
+  - name: chinaso news
+    engine: chinaso
+    shortcut: chinaso
+    categories:
+      - news
+    chinaso_category: news
+    chinaso_news_source: all
+    disabled: false
+
+  - name: sogou wechat
+    engine: sogou_wechat
+    shortcut: wx
+    categories:
+      - news
+    disabled: false
+
+  - name: bilibili
+    engine: bilibili
+    shortcut: bl
+    disabled: true
+
+  # 当前 SearXNG 镜像未内置新浪/腾讯通用网页搜索 engine。
+  # 后续如要接入，可新增自定义 engine，或在 Tool Router 层通过 site:finance.sina.com.cn、site:qq.com 做站内限定查询。
+
+  - name: bing
+    engine: bing
+    shortcut: bi
+    disabled: true
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    disabled: true
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: true
+
+  - name: google
+    engine: google
+    shortcut: go
+    disabled: true
+
+  - name: brave
+    engine: brave
+    shortcut: brave
+    disabled: true
+
+  - name: startpage
+    engine: startpage
+    shortcut: sp
+    disabled: true
+
+  - name: wikidata
+    engine: wikidata
+    shortcut: wd
+    disabled: true

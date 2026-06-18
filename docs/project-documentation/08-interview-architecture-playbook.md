@@ -39,6 +39,202 @@ SaaS 形态更适合评估 `Dify + 自研后端扩展层`：
 | 审计 | 强审计、日志留存在客户环境 | 平台审计、租户级日志 |
 | 成本 | 按客户自购接口和本地模型控制 | 按租户、模型、token、API 调用计费 |
 
+### Docker 化和微服务拆分怎么回答
+
+面试官可能继续追问：这个项目后续是否需要 Docker 化？是否一开始就应该拆微服务？
+
+推荐回答：
+
+Docker 化一定要做，但不应该一开始就为了架构复杂度拆成很多服务。当前项目更合理的演进路径是：
+
+```text
+MVP 单体 -> 模块化单体 -> Docker Compose 私有化交付 -> 服务化拆分 -> 多场景 Agent 平台
+```
+
+原因是 Agent 项目的难点首先不是部署，而是报告质量、证据可信度、工具稳定性和人机协同流程。如果这些输入输出还不稳定，过早拆服务只会增加联调和排障成本。
+
+当 Plan、Evidence、Tool Router、RAG、AI Writing、Task Orchestrator 的接口稳定后，再逐步拆成服务：
+
+- `planner-service`：研究计划生成、证据需求、HITL 节点。
+- `tool-gateway-service`：工商、司法、财报、公告、搜索、客户内网数据源。
+- `evidence-service`：证据模型、来源、置信度、正文级引用。
+- `knowledge-service`：知识库入库、检索、重排和知识域隔离。
+- `writing-service`：贷前、法律、投研、竞品等报告装配。
+- `orchestrator-service`：任务状态、checkpoint、resume、并发、重试和降级。
+
+Docker Compose 的价值是先固化私有化交付环境：frontend、backend、PostgreSQL/SQLite、Redis、向量库和可选浏览器运行时。等客户部署、演示和回归评测稳定后，再考虑 Kubernetes 和微服务治理。
+
+一句话总结：
+
+> 先把 DeepResearch Agent 做成可评测、可观测、可导出、可部署的模块化单体，再 Docker Compose 交付，最后按复用边界拆服务，扩展到贷前尽调、法律尽调、投研分析和竞品分析等多场景。
+
+### 如果项目变成重后台，为什么考虑 Spring Boot + FastAPI
+
+面试官可能问：如果这个项目要做成真正的企业级 AI 写作平台，后端技术栈会怎么演进？为什么不是把 FastAPI 改成 Django？
+
+推荐回答：
+
+我会采用 Spring Boot 企业后台 + FastAPI AI 能力服务的双后端分工，而不是把 FastAPI 迁移到 Django。
+
+原因是这两类服务解决的问题不同：
+
+| 服务 | 更适合承载 | 原因 |
+| --- | --- | --- |
+| Spring Boot / Spring Cloud Alibaba | 用户、租户、权限、任务中心、审批流、报告管理、审计、配置、WebSocket、第三方系统集成 | ToB 企业后台生态成熟，银行/政企客户接受度高，适合 MySQL、Redis、MQ、权限和系统集成 |
+| FastAPI AI Service | LangGraph Agent、RAG、文档解析、Evidence、报告生成、质量评测、财务计算 | Python 生态适合模型实验、数据处理、OCR、pandas、openpyxl、AKShare 和快速 AI 能力迭代 |
+| Spring AI Alibaba | Java 侧模型接入、Prompt、Embedding、向量库、轻量 RAG、Tool Calling | 让 Java 业务后台也能标准化接入模型和简单 AI 能力 |
+
+架构上，前端和第三方系统统一访问 Spring Boot；Spring Boot 负责权限、任务和报告管理；复杂 AI 能力通过 REST、MQ 和 WebSocket 事件调用 FastAPI AI Service。FastAPI 产生 Agent 执行事件后，可以通过 Redis Stream 或 MQ 交给 Spring Boot WebSocket Gateway，再统一推送给前端。
+
+一句话总结：
+
+> Spring Boot 负责企业级业务后台，FastAPI 负责复杂 AI 能力，Spring AI Alibaba 负责 Java 侧模型接入。这样既符合 ToB 系统工程习惯，也保留 Python 在 AI Agent 和数据处理上的效率。
+
+可写进简历的表达：
+
+- 规划 Spring Boot 企业后台 + FastAPI AI 能力服务的分层架构，将用户权限、租户管理、任务中心、报告管理、审计日志和配置管理等企业级后台能力，与 Agent 编排、RAG 检索、文档解析、Evidence 证据链、报告生成和质量评测等 AI 能力解耦。
+- 设计 REST / MQ / WebSocket 组合通信方式：同步接口处理任务创建和结果查询，异步队列处理长耗时报告生成，WebSocket 推送 Agent 执行日志和告警。
+- 结合 Spring AI Alibaba 规划 Java 侧模型接入层，统一管理模型 provider、Embedding、向量库、Prompt 模板和工具调用能力。
+
+## 1.1 为什么下一步不是先容器化或完整 LangGraph 迁移
+
+### 面试官可能问
+
+项目现在已经有 DeepResearch、Sequential Thinking 和 Tool Router，下一步为什么不直接做全服务容器化或完整 LangGraph 迁移？
+
+### 推荐回答
+
+我会把下一步优先级放在 Agent Capability Layer，而不是立刻容器化或完整 LangGraph 迁移。
+
+原因是三者解决的问题不同：
+
+| 方向 | 解决问题 | 当前优先级判断 |
+| --- | --- | --- |
+| Agent Capability Layer | Agent 是否懂业务、能否调用方法论、能否沉淀经验、RAG 是否准确 | 当前最优先 |
+| LangGraph 原生迁移 | checkpoint、interrupt、resume、节点状态机 | 等能力节点输入输出稳定后做 |
+| Docker/服务容器化 | 部署、交付、环境一致性、私有化打包 | 等模块边界稳定后做 |
+
+当前系统已经能跑通尽调闭环，但要让它更像专业 Agent 产品，关键不是先把流程装进 LangGraph，也不是先拆 Docker，而是让 Planner 和专项节点具备三类能力：
+
+- Runtime Skill：按任务动态加载 deep-research、贷前尽调、财务分析、行业分析等方法论。
+- Memory：沉淀用户偏好、历史 bad case、人工复核结论和同一公司的历史分析。
+- Enhanced RAG：支持查询改写、混合召回、重排、知识域隔离和 evidence-aware 引用。
+
+因此我的演进顺序是：
+
+```text
+Agent Capability Layer v1
+-> LangGraph interrupt/checkpoint/resume 原生迁移
+-> Docker Compose 私有化交付
+-> 服务化拆分
+```
+
+一句话总结：
+
+> LangGraph 让 Agent 流程更可靠，Docker 让系统更好交付，但 Skill、Memory 和 Enhanced RAG 决定 Agent 是否真正具备专业能力。因此我会先补能力层，再迁编排和交付形态。
+
+### 可写进简历的表达
+
+- 规划 Agent Capability Layer 演进路线，设计 Runtime Skill Registry、Memory Service 和 Enhanced RAG Service，将领域方法论、历史经验和知识检索统一注入 Planner 与专项分析节点。
+- 在 LangGraph 原生迁移前先稳定节点输入输出契约，避免将未成熟的业务能力过早固化到编排框架中。
+- 设计 SaaS/Dify 与私有化/LangGraph 两种形态下的能力层复用方案，兼顾快速配置、内网部署、数据隔离和审计追溯。
+
+## 1.2 Agent Capability Layer 怎么设计
+
+### 面试官可能问
+
+你说要做 Memory、Skill 和 RAG 增强，具体怎么落地？这和普通 Prompt 工程有什么区别？
+
+### 推荐回答
+
+我把这层抽象为 Agent Capability Layer，目标是让 Agent 的专业能力可配置、可记忆、可检索、可复用，而不是每个节点靠一段长 Prompt 临场发挥。
+
+架构上分四块：
+
+| 模块 | 职责 | 示例 |
+| --- | --- | --- |
+| Runtime Skill Registry | 管理任务方法论、证据 checklist、输出规范和质量规则 | `deep_research`、`loan_due_diligence`、`financial_analysis` |
+| Memory Service | 沉淀用户偏好、报告 bad case、人工复核和企业历史 | “不要展示内部工具名”“士兰微行业分类修正” |
+| Enhanced RAG Service | 做查询改写、混合召回、重排、知识域隔离和证据引用 | 财务任务优先召回 CPA 规则和异常信号 |
+| Capability Context Builder | 把 Skill、Memory、RAG、CodeAct 和 Evidence 组装成节点上下文 | Planner、财务 writer、行业 writer 分别消费不同上下文 |
+
+和普通 Prompt 工程的区别在于：
+
+- Skill 是结构化方法论资产，可以版本化、测试和复用。
+- Memory 是跨任务经验，不依赖单次会话上下文。
+- Enhanced RAG 提供可追溯知识证据，而不是把资料直接塞进 Prompt。
+- Context Builder 负责预算裁剪和冲突合并，避免 Prompt 无限膨胀。
+
+### Memory 怎么回答
+
+Memory 不只是聊天记忆，而是尽调工作台的组织经验沉淀。
+
+可沉淀内容：
+
+- 用户偏好：报告语气、工具名脱敏、是否展示过程信息。
+- 项目经验：行业识别错例、数据源优先级、报告 bad case。
+- 企业历史：同一主体历史任务、跨源数据差异、人工复核结论。
+- 质量反馈：报告质量评测低分项、用户修改意见、人工最终结论。
+
+实现上先抽象 `MemoryService`，不强绑定 mem0。PoC/SaaS 可评估 mem0，私有化可以替换为 PostgreSQL、向量库或客户内网知识平台。
+
+### Skill 怎么回答
+
+Skill 是专业工作流手册，不是外部数据源。Planner 生成计划前读取 Skill，专项节点生成报告前读取 Skill。
+
+示例：
+
+- 贷前尽调 Skill 定义报告章节、资料完整度和授信动作。
+- 财务 Skill 定义 CPA 利润现金流桥、扣非净利润、折旧摊销、资产减值和偿债核查。
+- 行业 Skill 定义行业生命周期、竞争格局、KPI、政策和授信关注点。
+
+这样 Planner 输出的不是泛泛的“分析财务风险”，而是：
+
+```text
+章节 -> 证据需求 -> 工具路线 -> 成功标准 -> 数据边界 -> 人工确认点
+```
+
+### Enhanced RAG 怎么回答
+
+普通 RAG 的问题是召回不稳定、知识域混杂、不能区分证据强弱。金融尽调需要更强控制：
+
+- Query Rewrite：把用户问题改写成专业检索 query。
+- Hybrid Retrieval：关键词 + 向量，避免专业术语、精确数字、条款号和公司名漏召回。
+- Rerank：先用 Bi-Encoder 快速召回，再用 Cross-Encoder 或规则重排选出高相关证据。
+- Rule Rerank：按领域、标签、来源、更新时间、资料口径和任务相关性加权。
+- Evidence-aware：每个知识片段带 source_id，可进入正文引用。
+- Domain Isolation：财务、行业、授信制度、案例复盘、用户记忆分域隔离。
+- RAG Eval：用 Context Recall、Context Precision、Faithfulness、Answer Relevance 评估优化效果。
+
+一句话总结：
+
+> Dify 或普通向量库能解决基础知识问答，但金融尽调报告需要可审计、可分域、可重排、可引用、可评估的增强 RAG。
+
+### 文档解析和生产级 RAG 怎么回答
+
+面试官可能问：你做 AI 写作平台或 Agent 项目，为什么一直强调文档解析和 RAG？现在模型上下文很长，直接把材料塞进去不行吗？
+
+推荐回答：
+
+大上下文不能替代生产级 RAG。企业资料规模远超模型上下文窗口，而且每次都携带大量资料会带来高成本和低稳定性。更重要的是，AI 写作平台要面对 PDF、Excel、扫描件、网页、公告、客户前置机数据包等异构资料，如果上游解析丢表格、丢单位、丢页码，后面再强的模型也只能基于错误输入生成错误报告。
+
+我会把这块拆成两层基础设施：
+
+1. Document Intelligence Pipeline：负责文件识别、Parser 路由、统一中间 Schema、表格整切、图片与 caption 绑定、OCR 置信度校验、低置信人工复核。
+2. Production RAG：负责语义切片、父子切片、向量 + BM25 混合检索、查询改写、重排序、正文级引用和 RAG 评估集。
+
+在金融尽调场景里，财务表格尤其关键。系统要识别合并报表和母公司报表、单位是元还是万元、年份列是否错位、三大表是否完整、巨潮/AKShare/东方财富数据是否一致。低置信或跨源冲突的数据不能直接写成结论，而应进入 Evidence Gap 或人工复核。
+
+一句话总结：
+
+> AI 写作平台的核心不是“让模型多写点”，而是先把资料解析成可信 block，再通过可评估的 RAG 找到正确证据，最后让模型基于证据写作。
+
+### 可写进简历的表达
+
+- 规划面向 RAG/Agent 的文档智能解析与生产级 RAG 能力，围绕 PDF、Excel、扫描件、网页和客户前置机数据包，设计 Parser 路由、统一中间 Schema、表格整切、置信度校验、混合检索、重排序、正文级引用和人工复核机制。
+- 针对金融 AI 写作场景，设计向量 + BM25 混合召回、Query Rewrite、Rerank、Evidence-aware 引用和 RAG 评估指标，提升知识入库质量、检索准确性和报告可审计性。
+- 将文档解析、RAG 检索、Evidence Store、质量评测和人工复核串成闭环，降低模型幻觉和资料解析错误对报告结论的影响。
+
 ## 2. 多租户和权限管理如何设计
 
 ### 面试官可能问
@@ -78,6 +274,38 @@ SaaS 形态更适合评估 `Dify + 自研后端扩展层`：
 - 内部统一认证网关。
 - 数据权限由客户组织架构和客户归属关系决定。
 - 操作日志写入客户审计系统。
+
+### 私有化环境不能使用公网搜索工具怎么办
+
+面试官可能问：你的 Agent 依赖搜索、MCP 和公开数据源，但银行私有化环境不能访问外网，这个系统怎么落地？
+
+推荐回答：
+
+私有化生产环境不能假设 Agent 可以直接调用公网搜索服务。更稳妥的交付形态是 T+1 数据前置机：客户或数据供应商每天把昨天的公开搜索结果、自购工商司法数据、公告舆情、上市公司财务和行业资讯推送到客户内网前置机，Agent 通过内网 MCP/Tools 拉取标准化数据包。
+
+架构如下：
+
+```text
+外部搜索/商业数据/客户自购数据
+-> T+1 推送任务
+-> 前置机 raw/standardized/index 三层目录
+-> 内网 Data Gateway 或 MCP Server
+-> Agent Tool Router
+-> Evidence Store
+-> 报告正文级引用
+```
+
+这个方案的关键点：
+
+- Agent 不直接出网，满足客户网络安全和审计要求。
+- 高成本工商、司法、公告、研报接口由前置机批处理和缓存，降低实时调用成本。
+- 数据包保留 `as_of_date`、`source_type`、`raw_refs`、`checksum`，满足审计追溯。
+- Tool Router 屏蔽数据源差异，同一套业务 Agent 在 SaaS/PoC 中可走公网搜索，在私有化中走前置机数据包。
+- 报告必须明确 T+1 数据边界；审批当天重大事项仍需人工补充、例外实时查询或审批前复核。
+
+一句话总结：
+
+> 私有化不是把公网搜索工具搬进内网，而是把外部数据采集前置为客户侧可审计的数据补给链，Agent 只消费标准化、可追溯、可授权的数据包。
 
 ## 3. Token 限流和成本控制如何设计
 
@@ -356,15 +584,44 @@ Dify Workflow -> HTTP Tool: /rag/retrieve
 
 ## 10. 如何讲这个项目的亮点
 
-面试时可以把亮点总结为五句话：
+面试时可以把亮点总结为七句话：
 
 1. 我没有把它做成单纯的 ChatGPT 包装，而是拆成工商、财务、司法、行业四个可独立测试的 Agent。
 2. 我把完整尽调做成双模式：上市/上传财报走财报增强，非上市缺财报走公开资料预尽调，避免编造数据。
-3. 我把 LLM 放在适合的位置：指标由代码算，诊断由 LLM 写，RAG 注入领域知识，质量闸门负责兜底。
-4. 我设计了 Evidence Store，让每个结论能追踪来源、置信度和人工复核状态。
-5. 我区分了私有化和 SaaS 架构：私有化重可控和内网数据源，SaaS 可评估 Dify，但核心证据、权限、RAG 和成本治理仍需要自研增强。
+3. 我把资料入口抽象为 Document Intelligence Pipeline，解决 PDF、Excel、扫描件和网页材料解析质量不稳定的问题。
+4. 我把 LLM 放在适合的位置：指标由代码算，诊断由 LLM 写，RAG 注入领域知识，质量闸门负责兜底。
+5. 我设计了 Evidence Store，让每个结论能追踪来源、置信度和人工复核状态。
+6. 我区分了私有化和 SaaS 架构：私有化重可控和内网数据源，SaaS 可评估 Dify，但核心证据、权限、RAG 和成本治理仍需要自研增强。
+7. 如果项目进入企业级重后台阶段，我会采用 Spring Boot 承接权限、租户、任务、报告和审计，FastAPI 保留为 AI Service，并通过 Spring AI Alibaba 接入 Java 侧模型能力。
 
-## 11. 面试回答中的风险意识
+## 11. CodeAct 如何使用且保证安全
+
+### 面试官可能问
+
+项目里有很多 Python 脚本，是否可以让 Agent 通过 CodeAct 自己写代码、跑代码？
+
+### 推荐回答
+
+我的设计不会直接开放任意代码执行，因为金融和银行私有化场景对安全、审计和数据边界非常敏感。更稳妥的方式是先做 Registered CodeAct：把已经验证过的 Python 脚本注册成白名单工具，由 Planner 或 Tool Router 调用。
+
+例如：
+
+- 报告质量评测工具：生成报告后自动输出评分、P0/P1/P2 问题和修复建议。
+- 财务指标计算工具：基于三大表稳定计算毛利率、净利率、资产负债率、现金流覆盖等指标。
+- 三大表勾稽校验工具：检查资产负债表平衡、现金流与利润匹配、异常科目波动。
+- 私有化 T+1 数据包校验工具：检查客户前置机推送的数据包 schema、日期、checksum 和证据覆盖。
+
+治理规则：
+
+- 只执行 registry 中登记的白名单工具。
+- 入参和出参都是 JSON schema。
+- 设置 timeout、输出大小限制和错误隔离。
+- 前端只展示“内部校验工具”“质量评测工具”等业务化名称，不暴露脚本和工具链。
+- 任意 LLM 生成代码执行默认关闭，只有在容器沙箱、只读挂载、禁网、资源限制和审计机制成熟后再评估。
+
+一句话总结：LLM 负责规划和解释，CodeAct 负责确定性计算和校验，Evidence Store 负责证据化和可追溯。
+
+## 12. 面试回答中的风险意识
 
 不要把项目说成已经完全生产可用。更成熟的回答是：
 
@@ -372,4 +629,3 @@ Dify Workflow -> HTTP Tool: /rag/retrieve
 - 当前最大不足是权威数据源和生产级权限/计费/审计尚未完全实现。
 - 已经通过架构预留解决方向：Data Source Gateway、LLM Gateway、Evidence Store、RAG Service、多租户隔离。
 - 后续根据私有化或 SaaS 方向选择不同演进路线。
-

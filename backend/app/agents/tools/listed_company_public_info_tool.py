@@ -7,24 +7,17 @@ clues, industry position and research-report summaries.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 import json
 import re
 
-from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
 import httpx
 
 from app.config import settings
 from app.agents.tools.listed_company_tool import resolve_listed_company
 from app.agents.tools.mcp_search_tool import search_with_mcp_providers
 from app.agents.tools.bocha_search_tool import search_with_bocha
-
-
-class FetchListedCompanyPublicInfoInput(BaseModel):
-    enterprise_name: str = Field(description="企业名称")
-    stock_code: str = Field(default="", description="股票代码")
-    stock_exchange: str = Field(default="", description="上市交易所")
+from app.agents.tools.cninfo_announcement_tool import search_cninfo_announcements
 
 
 EASTMONEY_F10_URL = "https://datacenter.eastmoney.com/securities/api/data/v1/get"
@@ -177,6 +170,52 @@ def _search_packages(company: Dict[str, str]) -> Dict[str, List[Dict[str, Any]]]
     return {key: _tavily_search(query) for key, query in queries.items()}
 
 
+def _merge_cninfo_annual_report(public_info: Dict[str, Any], cninfo_result: Dict[str, Any]) -> None:
+    """Merge CNINFO annual report PDF extraction into public_info in place."""
+    if not cninfo_result.get("success"):
+        return
+    extract_results = cninfo_result.get("pdf_extraction_results") or []
+    if not extract_results:
+        return
+    # Prefer the first (most recent) annual report extraction.
+    latest = extract_results[0]
+    if not latest.get("success"):
+        return
+
+    sections = latest.get("sections") or {}
+    business_review = public_info.setdefault("annual_business_review", {})
+    existing_review = str(business_review.get("business_review") or "")
+    cninfo_review = sections.get("business_review") or ""
+    if cninfo_review and cninfo_review not in existing_review:
+        combined = f"{existing_review}\n\n[巨潮年报补充]{cninfo_review}".strip()
+        business_review["business_review"] = combined[:2400]
+
+    cninfo_rows = latest.get("main_business_rows") or []
+    if cninfo_rows:
+        existing_rows = public_info.setdefault("main_business_composition", [])
+        existing_names = {row.get("item_name") for row in existing_rows if isinstance(row, dict)}
+        for row in cninfo_rows:
+            if row.get("item_name") not in existing_names:
+                existing_rows.append(row)
+        public_info["main_business_composition"] = existing_rows[:16]
+
+    search_clues = public_info.setdefault("search_clues", {})
+    section_clues = []
+    for section, text in sections.items():
+        if text:
+            section_clues.append({
+                "title": f"巨潮年报-{section}",
+                "content": text[:360],
+                "source": latest.get("pdf_url"),
+                "source_name": "巨潮资讯网",
+            })
+    if section_clues:
+        search_clues["annual_report_pdf_sections"] = section_clues
+
+    extracted_evidence = cninfo_result.get("extracted_evidence") or []
+    public_info.setdefault("evidence", []).extend(extracted_evidence)
+
+
 def fetch_listed_company_public_info_data(enterprise_name: str, stock_code: str = "", stock_exchange: str = "") -> Dict[str, Any]:
     company = resolve_listed_company(enterprise_name, stock_code, stock_exchange)
     if not company:
@@ -198,7 +237,7 @@ def fetch_listed_company_public_info_data(enterprise_name: str, stock_code: str 
         for key, items in searches.items():
             if items:
                 evidence.append({"label": key, "value": f"{len(items)}条公开线索", "source": "Tavily定向搜索"})
-        return {
+        public_info = {
             "success": True,
             "enterprise_name": enterprise_name,
             "security_name": company.get("security_name"),
@@ -206,13 +245,40 @@ def fetch_listed_company_public_info_data(enterprise_name: str, stock_code: str 
             "stock_code": company.get("stock_code"),
             "stock_exchange": company.get("stock_exchange"),
             "secu_code": company.get("secu_code"),
-            "data_source": "东方财富F10 + Tavily公开搜索",
+            "data_source": "东方财富F10 + Tavily公开搜索 + 巨潮年报PDF",
             "basic_info": basic,
             "main_business_composition": main_business,
             "annual_business_review": business_review,
             "search_clues": searches,
             "evidence": evidence,
         }
+
+        try:
+            cninfo_result = search_cninfo_announcements(
+                enterprise_name=enterprise_name,
+                stock_code=stock_code,
+                stock_exchange=stock_exchange,
+                keyword="年度报告",
+                max_results=6,
+                extract_pdf_content=True,
+                max_pdf_extract=1,
+            )
+            _merge_cninfo_annual_report(public_info, cninfo_result)
+            ingestion_gaps = cninfo_result.get("ingestion_gaps") or []
+            if ingestion_gaps:
+                public_info.setdefault("gaps", []).extend(ingestion_gaps)
+            ingestion_results = cninfo_result.get("ingestion_results") or []
+            if ingestion_results:
+                failed = [r for r in ingestion_results if not r.get("success")]
+                if failed:
+                    public_info.setdefault("warnings", []).append(
+                        f"巨潮年报自动入库失败：{failed[0].get('error')}"
+                    )
+        except Exception as exc:
+            # PDF extraction is optional; do not fail the whole public info package.
+            public_info.setdefault("warnings", []).append(f"巨潮年报解析降级：{exc}")
+
+        return public_info
     except Exception as exc:
         return {
             "success": False,
@@ -223,13 +289,3 @@ def fetch_listed_company_public_info_data(enterprise_name: str, stock_code: str 
         }
 
 
-class FetchListedCompanyPublicInfoTool(BaseTool):
-    name: str = "fetch_listed_company_public_info"
-    description: str = "获取上市公司公开资料包，包括年报经营讨论、主营构成、诉讼公告、担保质押、行业地位和研报摘要。"
-    args_schema: Type[BaseModel] = FetchListedCompanyPublicInfoInput
-
-    def _run(self, enterprise_name: str, stock_code: str = "", stock_exchange: str = "") -> str:
-        return json.dumps(fetch_listed_company_public_info_data(enterprise_name, stock_code, stock_exchange), ensure_ascii=False)
-
-
-fetch_listed_company_public_info = FetchListedCompanyPublicInfoTool()

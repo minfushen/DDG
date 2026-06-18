@@ -12,7 +12,6 @@ langchain-openai>=0.1.0  # OpenAI 兼容接口
 langchain-community>=0.2.0  # 社区集成
 langchain-text-splitters>=0.0.1  # 文本分割
 langchain-mcp-adapters>=0.1.0  # MCP 工具转 LangChain Tool（可选增强）
-crewai>=0.80.0         # 多 Agent 编排与工具封装
 
 # 向量库 - M3 阶段
 chromadb>=0.5.0
@@ -20,7 +19,9 @@ chromadb>=0.5.0
 # 数据处理（Rebecca 依赖）
 pandas>=2.0.0
 numpy>=1.24.0
+akshare==1.18.64
 pdfplumber>=0.10.0
+pymupdf>=1.23.0  # PDF 解析回退（复杂版式/快速纯文本）
 openpyxl>=3.1.0
 xlrd>=2.0.0
 python-docx>=1.0.0

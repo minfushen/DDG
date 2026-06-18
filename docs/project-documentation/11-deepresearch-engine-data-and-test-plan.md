@@ -83,11 +83,16 @@
 | --- | --- | --- |
 | `official_or_authoritative_public_source` | 高 | 交易所、巨潮、政府、法院、信用中国 |
 | `financial_statement` | 高 | 财报、审计报告、用户上传三大表 |
+| `institutional_financial_database` | 高 | Wind、CSMAR 等客户授权机构级数据库，需记录授权、取数日期和字段口径 |
 | `business_registry` | 高/中 | 国家工商、企查查/天眼查等商业数据 |
 | `internal_knowledge_base` | 中/高 | 内部授信制度、行业规则、案例 |
+| `open_quant_financial_data` | 中 | AKShare、Tushare 等开源量化数据包，适合开发、POC 和兜底校验 |
+| `investment_research_tool` | 中 | 萝卜投研、理杏仁、东方财富、同花顺等基本面/估值/可视化工具 |
 | `public_web_search_clue` | 中低 | 普通网页搜索结果 |
 | `low_reliability_public_source` | 低 | 文库、论坛、自媒体 |
 | `simulation_or_system_boundary` | 低 | 兜底或系统提示，不作为正式证据 |
+
+上市公司财务数据源优先级：巨潮/交易所原始披露 > Wind/CSMAR 等机构级数据库 > AKShare/Tushare 等开源量化包 > 东方财富/同花顺/萝卜投研/理杏仁等财经与投研工具。报告正文应优先引用原始披露或机构库证据；开源包和可视化工具主要用于快速取数、交叉验证和图表增强。
 
 ## 测试分层
 
@@ -145,4 +150,3 @@
 - 私有化部署可关闭公网搜索。
 - 用户上传材料 evidence 标记为 `uploaded_private_file`。
 - Claim 不得引用不存在的 evidence_id。
-

@@ -1,0 +1,101 @@
+"""Assemble specialist agent outputs into loan due-diligence chapters."""
+
+from __future__ import annotations
+
+from typing import Any, Dict, Iterable, List
+
+
+def evidence_map(evidence: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    return {str(item.get("id")): item for item in evidence if item.get("id")}
+
+
+def refs_for_category(evidence: List[Dict[str, Any]], category: str, limit: int = 5) -> List[str]:
+    refs: List[str] = []
+    for item in evidence:
+        if item.get("domain") == category or item.get("agent") == category or item.get("category") == category:
+            if item.get("id"):
+                refs.append(str(item["id"]))
+    return refs[:limit]
+
+
+def financial_findings(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    findings: List[Dict[str, Any]] = []
+    for item in evidence:
+        report = ((item.get("metadata") or {}).get("financial_analysis_report") or {})
+        if not report:
+            continue
+        report_refs = [item.get("id")] if item.get("id") else []
+        codeact_refs = [ref for ref in report.get("codeact_evidence_refs") or [] if ref]
+        refs = list(dict.fromkeys(codeact_refs[:8] + report_refs))
+        diagnostics = (report.get("narrative_diagnostics") or {}).get("diagnostics") or []
+        for row in diagnostics[:4]:
+            title = row.get("title") or row.get("dimension") or "财务诊断"
+            phenomenon = row.get("phenomenon") or row.get("current_anchor") or row.get("现象与归因") or ""
+            driver = row.get("driver") or row.get("risk_substance") or row.get("风险实质") or ""
+            actions = row.get("verification_actions") or row.get("verification_action") or row.get("核查要点") or []
+            if isinstance(actions, str):
+                actions = [actions]
+            findings.append({
+                "title": title,
+                "risk_level": row.get("risk_level") or row.get("risk_label") or report.get("risk_rating") or "medium",
+                "conclusion": " ".join(part for part in [phenomenon, driver] if part).strip() or title,
+                "verification_actions": actions[:4],
+                "missing_items": row.get("missing_items") or [],
+                "evidence_refs": refs[:6],
+            })
+        if findings:
+            return findings
+        for text in (report.get("narrative_summary") or [])[:4]:
+            findings.append({"title": "财务专项判断", "risk_level": report.get("risk_rating") or "medium", "conclusion": text, "evidence_refs": refs[:6]})
+    return findings
+
+
+def industry_findings(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    findings: List[Dict[str, Any]] = []
+    for item in evidence:
+        report = ((item.get("metadata") or {}).get("industry_analysis_report") or {})
+        if not report:
+            continue
+        refs = [item.get("id")] if item.get("id") else []
+        diagnostics = (report.get("industry_diagnostics") or {}).get("diagnostics") or []
+        overall = (report.get("industry_diagnostics") or {}).get("overall_position") or {}
+        if overall:
+            findings.append({
+                "title": "行业定位与周期判断",
+                "risk_level": overall.get("risk_level") or "medium",
+                "conclusion": overall.get("conclusion") or overall.get("position") or overall.get("summary") or "已形成行业定位判断。",
+                "verification_actions": overall.get("verification_actions") or [],
+                "evidence_refs": refs,
+            })
+        for index, row in enumerate(diagnostics[:4], 1):
+            actions = row.get("verification_actions") or row.get("核查要点") or []
+            if isinstance(actions, str):
+                actions = [actions]
+            findings.append({
+                "title": row.get("title") or ["竞争格局与行业周期", "产业链与议价能力", "授信审查关注点", "政策与合规环境"][min(index - 1, 3)],
+                "risk_level": row.get("risk_level") or "medium",
+                "conclusion": " ".join(str(row.get(key) or "") for key in ["current_anchor", "risk_substance", "现状锚定", "风险实质"]).strip() or row.get("title") or "行业专项判断",
+                "verification_actions": actions[:4],
+                "missing_items": row.get("missing_items") or [],
+                "evidence_refs": refs + [ref for ref in row.get("evidence_ids") or [] if ref][:3],
+            })
+        if findings:
+            return findings
+        for text in (report.get("industry_diagnostic_summary") or report.get("risk_summary") or [])[:4]:
+            findings.append({"title": "行业专项判断", "risk_level": "medium", "conclusion": text, "evidence_refs": refs})
+    return findings
+
+
+def claim_findings(claims: List[Dict[str, Any]], tasks: List[Dict[str, Any]], category: str, fallback: str) -> List[Dict[str, Any]]:
+    task_ids = {task.get("id") for task in tasks if task.get("category") == category}
+    rows = []
+    for claim in claims:
+        if claim.get("task_id") in task_ids and claim.get("text"):
+            rows.append({
+                "title": claim.get("text", "")[:28],
+                "risk_level": claim.get("risk_level") or "medium",
+                "conclusion": claim.get("text"),
+                "evidence_refs": claim.get("evidence_ids") or [],
+                "requires_manual_review": claim.get("requires_manual_review"),
+            })
+    return rows[:4] or [{"title": "证据边界", "risk_level": "medium", "conclusion": fallback, "evidence_refs": []}]

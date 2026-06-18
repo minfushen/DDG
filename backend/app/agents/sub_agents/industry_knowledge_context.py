@@ -83,7 +83,7 @@ def build_industry_knowledge_context(
 ) -> Dict[str, Any]:
     triggered = _triggered_rules(classification, public_info)
     query = _build_query(enterprise_name, classification, public_info, triggered)
-    retrieval = retrieve_knowledge(query=query, domain="industry", top_k=top_k)
+    retrieval = retrieve_knowledge(query=query, domain="industry", top_k=top_k, company_name=enterprise_name)
     hits = retrieval.get("results") or []
     knowledge_briefs = []
     for hit in hits[:top_k]:

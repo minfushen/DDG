@@ -10,16 +10,23 @@ from app.config import settings
 class VectorStoreManager:
     """向量存储管理器"""
 
-    def __init__(self, embedding_model, persist_dir: Optional[str] = None):
+    def __init__(
+        self,
+        embedding_model,
+        persist_dir: Optional[str] = None,
+        collection_name: Optional[str] = None,
+    ):
         """
         初始化向量存储管理器
 
         Args:
             embedding_model: Embedding 模型
             persist_dir: 持久化目录
+            collection_name: Chroma collection 名称；不同企业使用不同 collection 实现隔离
         """
         self.embedding = embedding_model
         self.persist_dir = persist_dir or str(settings.DB_DIR / "chroma")
+        self.collection_name = collection_name or "default"
         self.vectorstore: Optional[Chroma] = None
 
     def initialize(self) -> Chroma:
@@ -35,6 +42,7 @@ class VectorStoreManager:
         self.vectorstore = Chroma(
             persist_directory=self.persist_dir,
             embedding_function=self.embedding,
+            collection_name=self.collection_name,
         )
 
         return self.vectorstore

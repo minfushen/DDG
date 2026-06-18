@@ -43,6 +43,18 @@ def reflect_task_gaps(task: ResearchTask, evidence: List[Dict[str, Any]]) -> Lis
             "severity": "high",
         })
 
+    provider_diff_evidence = [item for item in evidence if item.get("source_type") == "financial_provider_reconciliation"]
+    if category == "financial" and provider_diff_evidence:
+        gaps.append({
+            "id": stable_id("gap", task_id, "financial_provider_reconciliation_mismatch"),
+            "task_id": task_id,
+            "description": f"公开结构化财报数据源之间存在{len(provider_diff_evidence)}项超阈值差异。",
+            "why_it_matters": "跨源财务数据不一致会影响偿债指标、利润质量和授信额度测算，需以巨潮/交易所原始公告或审计报告复核。",
+            "suggested_next_actions": ["回查巨潮/交易所原始年报PDF", "核对审计报告附注和财务报表项目口径", "必要时要求客户提供盖章版三大表"],
+            "severity": "medium",
+            "evidence_refs": [item.get("id") for item in provider_diff_evidence if item.get("id")][:8],
+        })
+
     if category == "legal" and not any(item.get("source_type") == "official_or_authoritative_public_source" for item in evidence):
         gaps.append({
             "id": stable_id("gap", task_id, "missing_legal_authority"),
@@ -53,4 +65,3 @@ def reflect_task_gaps(task: ResearchTask, evidence: List[Dict[str, Any]]) -> Lis
             "severity": "medium",
         })
     return gaps
-

@@ -6,12 +6,31 @@ imports lazy and returns structured fallback metadata instead of raising.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 import asyncio
 import json
 import shlex
 
+import httpx
+
 from app.config import settings
+
+
+_SEQUENTIAL_TOOLS_CACHE: Optional[Dict[str, Any]] = None
+_SEQUENTIAL_TOOLS_LOCK: Optional[asyncio.Lock] = None
+
+
+def _mcp_timeout() -> int:
+    # npx stdio MCP servers are usually fast after warm-up, but cold starts and
+    # npm cache checks can occasionally exceed 20-30 seconds on local networks.
+    return max(int(settings.SEQUENTIAL_THINKING_MCP_TIMEOUT_SECONDS or 20), 45)
+
+
+def _get_tools_lock() -> asyncio.Lock:
+    global _SEQUENTIAL_TOOLS_LOCK
+    if _SEQUENTIAL_TOOLS_LOCK is None:
+        _SEQUENTIAL_TOOLS_LOCK = asyncio.Lock()
+    return _SEQUENTIAL_TOOLS_LOCK
 
 
 def _split_args(args: str) -> List[str]:
@@ -45,6 +64,15 @@ def _tool_output_to_text(output: Any) -> str:
     if isinstance(output, str):
         return output
     if isinstance(output, dict):
+        content = output.get("content")
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict):
+                    parts.append(str(item.get("text") or item.get("content") or item))
+                else:
+                    parts.append(str(item))
+            return "\n".join(parts)
         for key in ["text", "content", "output", "result"]:
             if output.get(key):
                 return str(output[key])
@@ -67,6 +95,13 @@ def _tool_output_to_text(output: Any) -> str:
 
 
 def _build_server_config() -> Dict[str, Any]:
+    if str(settings.SEQUENTIAL_THINKING_TRANSPORT or "stdio").lower() in {"streamable_http", "streamable-http", "http"}:
+        return {
+            "sequential-thinking": {
+                "url": settings.SEQUENTIAL_THINKING_REMOTE_URL,
+                "transport": "streamable_http",
+            }
+        }
     return {
         "sequential-thinking": {
             "command": settings.SEQUENTIAL_THINKING_MCP_COMMAND,
@@ -86,23 +121,52 @@ async def load_sequential_thinking_tools() -> Dict[str, Any]:
     if not settings.ENABLE_SEQUENTIAL_THINKING:
         return {"available": False, "tools": [], "error": "disabled"}
 
-    try:
-        from langchain_mcp_adapters.client import MultiServerMCPClient
-    except Exception as exc:  # pragma: no cover - depends on optional package
-        return {"available": False, "tools": [], "error": f"import failed: {type(exc).__name__}: {exc}"}
+    transport = str(settings.SEQUENTIAL_THINKING_TRANSPORT or "stdio").lower()
+    if transport in {"streamable_http", "streamable-http", "http"}:
+        return {
+            "available": bool(settings.SEQUENTIAL_THINKING_REMOTE_URL),
+            "tools": [],
+            "tool_names": ["sequentialthinking"],
+            "transport": "streamable_http",
+            "remote_url": settings.SEQUENTIAL_THINKING_REMOTE_URL,
+            "error": "" if settings.SEQUENTIAL_THINKING_REMOTE_URL else "remote url not configured",
+        }
 
-    try:
-        client = MultiServerMCPClient(_build_server_config())
-        tools = await asyncio.wait_for(client.get_tools(), timeout=settings.SEQUENTIAL_THINKING_MCP_TIMEOUT_SECONDS)
-    except Exception as exc:  # pragma: no cover - depends on external MCP runtime
-        return {"available": False, "tools": [], "error": f"load failed: {type(exc).__name__}: {exc}"}
+    global _SEQUENTIAL_TOOLS_CACHE
+    if _SEQUENTIAL_TOOLS_CACHE and _SEQUENTIAL_TOOLS_CACHE.get("available"):
+        return _SEQUENTIAL_TOOLS_CACHE
 
-    return {
-        "available": bool(tools),
-        "tools": tools,
-        "tool_names": [getattr(tool, "name", "") for tool in tools],
-        "error": "" if tools else "no tools returned",
-    }
+    async with _get_tools_lock():
+        if _SEQUENTIAL_TOOLS_CACHE and _SEQUENTIAL_TOOLS_CACHE.get("available"):
+            return _SEQUENTIAL_TOOLS_CACHE
+
+        try:
+            from langchain_mcp_adapters.client import MultiServerMCPClient
+        except Exception as exc:  # pragma: no cover - depends on optional package
+            return {"available": False, "tools": [], "error": f"import failed: {type(exc).__name__}: {exc}"}
+
+        try:
+            client = MultiServerMCPClient(_build_server_config())
+            tools = await asyncio.wait_for(client.get_tools(), timeout=_mcp_timeout())
+        except asyncio.TimeoutError:  # pragma: no cover - depends on external MCP runtime
+            return {
+                "available": False,
+                "tools": [],
+                "error": f"load timeout after {_mcp_timeout()}s; MCP will be skipped for this task",
+            }
+        except Exception as exc:  # pragma: no cover - depends on external MCP runtime
+            return {"available": False, "tools": [], "error": f"load failed: {type(exc).__name__}: {exc}"}
+
+        status = {
+            "available": bool(tools),
+            "tools": tools,
+            "tool_names": [getattr(tool, "name", "") for tool in tools],
+            "transport": "stdio",
+            "error": "" if tools else "no tools returned",
+        }
+        if status.get("available"):
+            _SEQUENTIAL_TOOLS_CACHE = status
+        return status
 
 
 def _pick_sequential_tool(tools: List[Any]) -> Optional[Any]:
@@ -114,6 +178,15 @@ def _pick_sequential_tool(tools: List[Any]) -> Optional[Any]:
 
 
 async def call_sequential_thinking(prompt: str, tools: Optional[List[Any]] = None) -> Dict[str, Any]:
+    transport = str(settings.SEQUENTIAL_THINKING_TRANSPORT or "stdio").lower()
+    if transport in {"streamable_http", "streamable-http", "http"}:
+        return await call_sequential_thinking_step({
+            "thought": prompt,
+            "nextThoughtNeeded": False,
+            "thoughtNumber": 1,
+            "totalThoughts": 1,
+        })
+
     loaded: Dict[str, Any] = {"available": True, "tools": tools or []}
     if tools is None:
         loaded = await load_sequential_thinking_tools()
@@ -133,7 +206,7 @@ async def call_sequential_thinking(prompt: str, tools: Optional[List[Any]] = Non
     last_error = ""
     for payload in payload_variants:
         try:
-            output = await asyncio.wait_for(tool.ainvoke(payload), timeout=settings.SEQUENTIAL_THINKING_MCP_TIMEOUT_SECONDS)
+            output = await asyncio.wait_for(tool.ainvoke(payload), timeout=_mcp_timeout())
             text = _tool_output_to_text(output)
             return {
                 "success": True,
@@ -144,6 +217,128 @@ async def call_sequential_thinking(prompt: str, tools: Optional[List[Any]] = Non
         except Exception as exc:  # pragma: no cover - depends on external MCP runtime
             last_error = f"{type(exc).__name__}: {exc}"
     return {"success": False, "tool": getattr(tool, "name", ""), "error": last_error}
+
+
+async def call_sequential_thinking_step(payload: Dict[str, Any], tools: Optional[List[Any]] = None) -> Dict[str, Any]:
+    """Call Sequential Thinking with the official structured payload."""
+
+    transport = str(settings.SEQUENTIAL_THINKING_TRANSPORT or "stdio").lower()
+    if transport in {"streamable_http", "streamable-http", "http"}:
+        if not settings.ENABLE_SEQUENTIAL_THINKING:
+            return {"success": False, "error": "disabled"}
+        if not settings.SEQUENTIAL_THINKING_REMOTE_URL:
+            return {"success": False, "error": "remote url not configured"}
+        try:
+            async with httpx.AsyncClient(timeout=_mcp_timeout()) as client:
+                response = await client.post(settings.SEQUENTIAL_THINKING_REMOTE_URL, json=payload)
+                response.raise_for_status()
+                data = response.json()
+            text = _tool_output_to_text(data.get("result") if isinstance(data, dict) and data.get("result") else data)
+            return {
+                "success": True,
+                "tool": "sequentialthinking",
+                "transport": "streamable_http",
+                "text": text,
+                "json": _safe_json_loads(text),
+            }
+        except Exception as exc:  # pragma: no cover - depends on external service
+            return {"success": False, "tool": "sequentialthinking", "transport": "streamable_http", "error": f"{type(exc).__name__}: {exc}"}
+
+    loaded: Dict[str, Any] = {"available": True, "tools": tools or []}
+    if tools is None:
+        loaded = await load_sequential_thinking_tools()
+        tools = loaded.get("tools", [])
+    if not loaded.get("available") and not tools:
+        return {"success": False, "error": loaded.get("error") or "Sequential Thinking MCP unavailable"}
+
+    tool = _pick_sequential_tool(tools or [])
+    if not tool:
+        return {"success": False, "error": "No Sequential Thinking tool found"}
+    try:
+        output = await asyncio.wait_for(tool.ainvoke(payload), timeout=_mcp_timeout())
+        text = _tool_output_to_text(output)
+        return {
+            "success": True,
+            "tool": getattr(tool, "name", "sequential-thinking"),
+            "transport": "stdio",
+            "text": text,
+            "json": _safe_json_loads(text),
+        }
+    except Exception as exc:  # pragma: no cover - depends on external MCP runtime
+        return {"success": False, "tool": getattr(tool, "name", ""), "transport": "stdio", "error": f"{type(exc).__name__}: {exc}"}
+
+
+async def run_sequential_thought_loop(
+    enterprise_name: str,
+    objective: str,
+    default_tasks: List[Dict[str, Any]],
+    tools: Optional[List[Any]] = None,
+    session_id: Optional[str] = None,
+    on_step: Optional[Callable[[Dict[str, Any], List[Dict[str, Any]]], Awaitable[None]]] = None,
+) -> Dict[str, Any]:
+    """Record a short public research thought loop before LLM planning."""
+
+    if not settings.ENABLE_SEQUENTIAL_THINKING:
+        return {"success": False, "steps": [], "plan_context": "", "error": "disabled"}
+
+    task_categories = sorted({str(task.get("category") or "general") for task in default_tasks})
+    step_payloads = [
+        {
+            "thought": f"启动{enterprise_name}贷前尽调研究。先确认主体边界、研究目标和公开资料数据边界，避免简称、集团主体和上市主体混淆。目标：{objective}。",
+            "thoughtNumber": 1,
+            "totalThoughts": 3,
+            "nextThoughtNeeded": True,
+        },
+        {
+            "thought": "把研究拆成主体治理、近三年财务、司法合规、行业经营环境和授信边界五类证据需求，并优先调用权威数据、公开公告、RAG和客户上传材料。",
+            "thoughtNumber": 2,
+            "totalThoughts": 3,
+            "nextThoughtNeeded": True,
+        },
+        {
+            "thought": "形成计划生成上下文：每个研究任务必须可工具执行、可产生Evidence、可绑定Claim，并显式标注数据边界、人工确认点和二轮补证触发条件。",
+            "thoughtNumber": 3,
+            "totalThoughts": 3,
+            "nextThoughtNeeded": False,
+        },
+    ]
+
+    if session_id:
+        for payload in step_payloads:
+            payload["session_id"] = session_id
+
+    steps: List[Dict[str, Any]] = []
+    errors: List[str] = []
+    for payload in step_payloads:
+        result = await call_sequential_thinking_step(payload, tools=tools)
+        if result.get("success"):
+            parsed = result.get("json") if isinstance(result.get("json"), dict) else {}
+            steps.append({
+                "thoughtNumber": payload.get("thoughtNumber"),
+                "totalThoughts": parsed.get("totalThoughts", payload.get("totalThoughts")),
+                "nextThoughtNeeded": parsed.get("nextThoughtNeeded", payload.get("nextThoughtNeeded")),
+                "summary": payload.get("thought"),
+                "raw": parsed,
+            })
+            if on_step:
+                await on_step(steps[-1], list(steps))
+        else:
+            errors.append(str(result.get("error") or "Sequential Thinking call failed"))
+            break
+
+    if not steps:
+        return {"success": False, "steps": [], "plan_context": "", "error": "; ".join(errors) or "no steps recorded"}
+
+    plan_context = "\n".join([
+        f"研究思考链步骤{step['thoughtNumber']}：{step['summary']}" for step in steps
+    ])
+    plan_context += "\n覆盖风险域：" + "、".join(task_categories)
+    return {
+        "success": not errors,
+        "steps": steps,
+        "plan_context": plan_context,
+        "error": "; ".join(errors),
+    }
 
 
 async def sequential_plan_review(enterprise_name: str, objective: str, tasks: List[Dict[str, Any]], tools: Optional[List[Any]] = None) -> Dict[str, Any]:

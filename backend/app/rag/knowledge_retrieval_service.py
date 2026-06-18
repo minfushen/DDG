@@ -15,15 +15,16 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from app.agents.evidence import normalize_evidence
+from app.rag.collection_names import GENERAL_COLLECTION, company_collection_name
 from app.rag.knowledge_ingestion import build_documents_from_markdown
 
 
 DOMAIN_CATEGORIES = {
     "business": ["business_guide", "工商尽调", "peer_policy_reference", "同业制度参考", "credit_guide", "信贷尽调"],
-    "financial": ["financial_guide", "财务尽调", "framework", "风险框架", "credit_guide", "授信决策", "peer_policy_reference", "同业制度参考"],
+    "financial": ["financial_guide", "财务尽调", "framework", "风险框架", "credit_guide", "授信决策", "peer_policy_reference", "同业制度参考", "annual_report", "research_report"],
     "legal": ["legal_guide", "司法尽调", "peer_policy_reference", "同业制度参考", "case", "尽调案例"],
-    "industry": ["industry_guide", "行业指南", "peer_policy_reference", "同业制度参考", "credit_guide", "授信决策", "信贷尽调"],
-    "credit": ["credit_guide", "授信决策", "信贷尽调", "peer_policy_reference", "同业制度参考", "framework", "风险框架"],
+    "industry": ["industry_guide", "行业指南", "peer_policy_reference", "同业制度参考", "credit_guide", "授信决策", "信贷尽调", "annual_report", "research_report"],
+    "credit": ["credit_guide", "授信决策", "信贷尽调", "peer_policy_reference", "同业制度参考", "framework", "风险框架", "annual_report", "research_report"],
     "reporting": ["reporting_guide", "报告话术", "template", "报告模板", "尽调报告模板", "peer_policy_reference", "同业制度参考"],
     "all": [],
 }
@@ -126,12 +127,12 @@ def _local_keyword_search(query: str, domain: str, top_k: int) -> List[Dict[str,
     return [_format_hit(doc, score, "local_keyword") for doc, score in selected[:top_k]]
 
 
-def _vector_search(query: str, domain: str, top_k: int) -> List[Dict[str, Any]]:
+def _vector_search(query: str, domain: str, top_k: int, collection_name: str) -> List[Dict[str, Any]]:
     from app.config.embedding_config import get_embedding_model
     from app.rag.vector_store import VectorStoreManager
 
     embedding_model = get_embedding_model()
-    manager = VectorStoreManager(embedding_model)
+    manager = VectorStoreManager(embedding_model, collection_name=collection_name)
     vectorstore = manager.get_vectorstore()
     categories = DOMAIN_CATEGORIES.get(domain, [])
 
@@ -161,24 +162,67 @@ def _vector_search(query: str, domain: str, top_k: int) -> List[Dict[str, Any]]:
     return hits
 
 
-def retrieve_knowledge(query: str, domain: str = "all", top_k: int = 5) -> Dict[str, Any]:
-    """Retrieve knowledge hits for an agent domain."""
-    try:
-        hits = _vector_search(query, domain, top_k)
-        if hits:
-            return {"success": True, "query": query, "domain": domain, "mode": "vector", "results": hits}
-    except Exception as exc:
-        vector_error = str(exc)
-    else:
-        vector_error = "vector search returned no results"
+def _dedupe_and_merge_hits(hit_lists: List[List[Dict[str, Any]]], top_k: int) -> List[Dict[str, Any]]:
+    seen = set()
+    merged: List[Dict[str, Any]] = []
+    for hits in hit_lists:
+        for hit in hits:
+            key = (hit.get("source"), hit.get("chunk_index"), str(hit.get("content"))[:80])
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(hit)
+    merged.sort(key=lambda item: item.get("score", 0), reverse=True)
+    return merged[:top_k]
 
+
+def retrieve_knowledge(query: str, domain: str = "all", top_k: int = 5, company_name: Optional[str] = None) -> Dict[str, Any]:
+    """Retrieve knowledge hits for an agent domain.
+
+    When ``company_name`` is provided, the search spans both the company-specific
+    collection (annual reports / research reports) and the general knowledge base
+    collection (guides, policies, cases).
+    """
+    vector_error = ""
+    hit_lists: List[List[Dict[str, Any]]] = []
+
+    try:
+        if company_name:
+            company_hits = _vector_search(
+                query=query,
+                domain="all",
+                top_k=max(2, top_k // 2),
+                collection_name=company_collection_name(company_name),
+            )
+            if company_hits:
+                hit_lists.append(company_hits)
+    except Exception as exc:
+        vector_error = f"company collection search failed: {exc}"
+
+    try:
+        general_hits = _vector_search(
+            query=query,
+            domain=domain,
+            top_k=top_k,
+            collection_name=GENERAL_COLLECTION,
+        )
+        if general_hits:
+            hit_lists.append(general_hits)
+    except Exception as exc:
+        vector_error = f"{vector_error}; general collection search failed: {exc}".strip("; ")
+
+    if hit_lists:
+        hits = _dedupe_and_merge_hits(hit_lists, top_k)
+        return {"success": True, "query": query, "domain": domain, "mode": "vector", "results": hits}
+
+    # Fallback to local keyword search against general knowledge base markdown files.
     hits = _local_keyword_search(query, domain, top_k)
     return {
         "success": True,
         "query": query,
         "domain": domain,
         "mode": "local_keyword",
-        "vector_error": vector_error,
+        "vector_error": vector_error or "vector search returned no results",
         "results": hits,
     }
 

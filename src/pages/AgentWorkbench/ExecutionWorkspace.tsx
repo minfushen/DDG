@@ -8,9 +8,10 @@ import {
   Loader2, CheckCircle2, Circle, TrendingUp, AlertTriangle,
   Upload, ScrollText, Landmark, Scale, BadgeCheck,
   DraftingCompass, Lightbulb, Download, Search,
-  GitBranchPlus,
+  GitBranchPlus, BrainCircuit,
 } from 'lucide-react';
 import {
+  createTask,
   getTaskStatus,
   parseUploadedFiles,
   resumeInterrupt,
@@ -23,6 +24,9 @@ import {
   type ResearchClaim,
   type ResearchGap,
   type HumanInterrupt,
+  type ToolTrace,
+  type SequentialThoughtLoop,
+  type SequentialThoughtStep,
 } from '../../services/agentApi';
 import './ExecutionWorkspace.css';
 
@@ -52,6 +56,13 @@ type LocalProgressStep = {
   status: 'pending' | 'running' | 'completed';
 };
 
+const TYPEWRITER_CHAR_MS = 18;
+const TYPEWRITER_STEP_GAP_MS = 220;
+
+function typewriterKey(parts: Array<string | number | undefined>) {
+  return parts.filter((item) => item !== undefined && item !== '').join('|');
+}
+
 function applyTaskData(
   current: {
     taskId: string | null;
@@ -61,15 +72,18 @@ function applyTaskData(
     plan: PlanStep[];
     evidence: EvidenceItem[];
     report: any;
-    engineMode?: 'deepresearch' | 'classic';
+    engineMode?: 'deepresearch';
     researchPlan: PlanStep[];
     researchClaims: ResearchClaim[];
     researchGaps: ResearchGap[];
     planner: any;
     sequentialThinking: any;
+    sequentialThoughtLoop: SequentialThoughtLoop | null;
     sequentialPlanReview: any;
+    prepareStage: string | null;
     followUpTasks: PlanStep[];
     researchRounds: Array<{ round: number; task_count: number; description: string }>;
+    toolTraces: ToolTrace[];
     activeInterrupt: HumanInterrupt | null;
     interrupts: HumanInterrupt[];
     humanActions: any[];
@@ -79,6 +93,7 @@ function applyTaskData(
   data: any,
 ) {
   const nextAgentState = data.agent_state as AgentState | undefined;
+  const hasOwn = (key: string) => Object.prototype.hasOwnProperty.call(data, key);
 
   return {
     ...current,
@@ -87,20 +102,23 @@ function applyTaskData(
     timeline: data.timeline ?? current.timeline,
     plan: data.plan ?? current.plan,
     evidence: data.evidence ?? current.evidence,
-    report: data.report ?? current.report,
+    report: hasOwn('report') ? data.report : current.report,
     engineMode: data.engine_mode ?? current.engineMode,
     researchPlan: data.research_plan ?? data.report?.research_plan ?? current.researchPlan,
     researchClaims: data.research_claims ?? data.report?.claims ?? current.researchClaims,
     researchGaps: data.research_gaps ?? data.report?.gaps ?? current.researchGaps,
     planner: data.planner ?? current.planner,
     sequentialThinking: data.sequential_thinking ?? current.sequentialThinking,
+    sequentialThoughtLoop: data.sequential_thought_loop ?? data.report?.sequential_thought_loop ?? current.sequentialThoughtLoop,
     sequentialPlanReview: data.sequential_plan_review ?? current.sequentialPlanReview,
+    prepareStage: data.prepare_stage ?? current.prepareStage,
     followUpTasks: data.follow_up_tasks ?? data.report?.follow_up_tasks ?? current.followUpTasks,
     researchRounds: data.research_rounds ?? data.report?.research_rounds ?? current.researchRounds,
-    activeInterrupt: data.active_interrupt ?? current.activeInterrupt,
-    interrupts: data.interrupts ?? current.interrupts,
-    humanActions: data.human_actions ?? current.humanActions,
-    error: data.error ?? current.error,
+    toolTraces: data.tool_traces ?? data.report?.tool_traces ?? current.toolTraces,
+    activeInterrupt: hasOwn('active_interrupt') ? data.active_interrupt : current.activeInterrupt,
+    interrupts: hasOwn('interrupts') ? data.interrupts : current.interrupts,
+    humanActions: hasOwn('human_actions') ? data.human_actions : current.humanActions,
+    error: hasOwn('error') ? data.error : current.error,
     isRunning: data.error
       ? false
       : nextAgentState
@@ -111,11 +129,11 @@ function applyTaskData(
 
 const AGENT_FLOW = [
   { label: '规划Agent', icon: DraftingCompass, agents: ['Plan Agent', '规划Agent', '系统'] },
-  { label: '研究计划', icon: DraftingCompass, agents: ['LLM Planner', 'Research Planner', 'DeepResearch Engine'] },
+  { label: '研究计划', icon: DraftingCompass, agents: ['研究计划生成器', '研究计划复核', 'DeepResearch Engine'] },
   { label: '工商Agent', icon: Landmark, agents: ['工商Agent'] },
   { label: '财务Agent', icon: TrendingUp, agents: ['财务Agent'] },
   { label: '司法Agent', icon: Scale, agents: ['司法Agent'] },
-  { label: '授信Agent', icon: BadgeCheck, agents: ['CrewAI 综合审查'] },
+  { label: '授信Agent', icon: BadgeCheck, agents: ['综合授信审查'] },
 ];
 
 function completedAgents(timeline: TimelineEntry[]) {
@@ -150,15 +168,18 @@ export function ExecutionWorkspace() {
     plan: [] as PlanStep[],
     evidence: [] as EvidenceItem[],
     report: null as any,
-    engineMode: undefined as 'deepresearch' | 'classic' | undefined,
+    engineMode: undefined as 'deepresearch' | undefined,
     researchPlan: [] as PlanStep[],
     researchClaims: [] as ResearchClaim[],
     researchGaps: [] as ResearchGap[],
     planner: null as any,
     sequentialThinking: null as any,
+    sequentialThoughtLoop: null as SequentialThoughtLoop | null,
     sequentialPlanReview: null as any,
+    prepareStage: null as string | null,
     followUpTasks: [] as PlanStep[],
     researchRounds: [] as Array<{ round: number; task_count: number; description: string }>,
+    toolTraces: [] as ToolTrace[],
     activeInterrupt: null as HumanInterrupt | null,
     interrupts: [] as HumanInterrupt[],
     humanActions: [] as any[],
@@ -174,11 +195,18 @@ export function ExecutionWorkspace() {
   const [humanComment, setHumanComment] = useState('');
   const [humanActionLoading, setHumanActionLoading] = useState<string | null>(null);
   const [streamVersion, setStreamVersion] = useState(0);
+  const [visibleThoughtCount, setVisibleThoughtCount] = useState(0);
+  const [typedThoughtText, setTypedThoughtText] = useState<Record<number, string>>({});
+  const [visiblePlanCount, setVisiblePlanCount] = useState(0);
+  const [typedPlanText, setTypedPlanText] = useState<Record<string, string>>({});
+  const typedThoughtKeyRef = useRef('');
+  const typedPlanKeyRef = useRef('');
 
   const {
     taskId, enterpriseName, agentState, timeline, evidence, report, isRunning, error,
     engineMode, researchPlan, researchClaims, researchGaps, planner,
-    sequentialThinking, sequentialPlanReview, followUpTasks, researchRounds,
+    sequentialThinking, sequentialThoughtLoop, sequentialPlanReview, prepareStage, followUpTasks, researchRounds,
+    toolTraces,
     activeInterrupt,
   } = taskState;
   const timelineEndRef = useRef<HTMLDivElement>(null);
@@ -187,7 +215,9 @@ export function ExecutionWorkspace() {
   const isWaitingUpload = agentState === 'waiting_upload' || (isWaitingHuman && activeInterrupt?.type === 'upload_material');
   const isDone = Boolean(report) && !isRunning && !isWaitingUpload;
   const hasPlanWaitingTimeline = timeline.some((entry) => entry.content?.includes('等待确认研究计划') || entry.detail?.includes('确认后才会执行工具调用'));
-  const fallbackPlanInterrupt = isWaitingHuman && !activeInterrupt && (
+  const fallbackPlanInterrupt = !activeInterrupt && (
+    isWaitingHuman || hasPlanWaitingTimeline
+  ) && (
     taskState.researchPlan.length > 0 || taskState.plan.length > 0 || hasPlanWaitingTimeline
   );
 
@@ -213,9 +243,12 @@ export function ExecutionWorkspace() {
       researchGaps: [],
       planner: null,
       sequentialThinking: null,
+      sequentialThoughtLoop: null,
       sequentialPlanReview: null,
+      prepareStage: null,
       followUpTasks: [],
       researchRounds: [],
+      toolTraces: [],
       activeInterrupt: null,
       interrupts: [],
       humanActions: [],
@@ -255,48 +288,56 @@ export function ExecutionWorkspace() {
         }
       } catch (err) {
         if (cancelled || (err as any)?.name === 'AbortError') return;
-        // 演示模式：API 不可用时使用 Mock 数据展示完整效果
+        // API 不可用时只展示故障状态，避免用演示数据冒充真实尽调结果。
         const errMsg = err instanceof Error ? err.message : '启动任务失败';
+        if (errMsg.includes('404') && initialEnterpriseName && initialEnterpriseName !== 'XX科技有限公司') {
+          setTaskState((current) => ({
+            ...current,
+            error: '原任务已失效，正在重新创建执行任务...',
+            isRunning: true,
+            timeline: [
+              { id: 'recover', time: new Date().toLocaleTimeString('zh-CN', { hour12: false }), agent: '系统', status: 'running', content: '原任务状态已失效，正在根据企业名称重新创建任务', detail: initialEnterpriseName, type: 'action', findings: [] },
+            ],
+          }));
+          try {
+            const recreated = await createTask(initialEnterpriseName, undefined, 'deepresearch');
+            if (!cancelled) {
+              navigate(`/execution/${recreated.task_id}?name=${encodeURIComponent(initialEnterpriseName)}`, { replace: true });
+            }
+          } catch (createErr) {
+            const createMsg = createErr instanceof Error ? createErr.message : '重新创建任务失败';
+            if (!cancelled) setTaskState((current) => ({ ...current, error: createMsg, isRunning: false }));
+          }
+          return;
+        }
         if (errMsg.includes('404') || routeTaskId?.startsWith('demo-')) {
           setTaskState({
             taskId: routeTaskId ?? null,
             enterpriseName: initialEnterpriseName,
             agentState: 'completed',
             timeline: [
-              { id: 't1', time: '10:25:00', agent: '规划Agent', status: 'completed', content: '正在制定尽调计划...根据企业类型（科技制造）匹配尽调模板，确定四大维度：工商信息、财务分析、司法风险、行业对标。各 Agent 将并行启动数据采集。', detail: '', type: 'action', findings: ['尽调计划已生成', '确定四大尽调维度，采用 T+0 实时数据采集模式，预计耗时 3-5 分钟', '4 分析维度'] },
-              { id: 't2', time: '10:25:12', agent: '工商Agent', status: 'completed', content: '正在查询工商登记信息...调用国家企业信用信息公示系统接口，获取企业基础档案。', detail: '', type: 'action', findings: [] },
-              { id: 't3', time: '10:25:18', agent: '工商Agent', status: 'completed', content: '已获取工商信息。企业成立于 1987 年 9 月 15 日，注册资本 403.41 亿元人民币，法定代表人任正非。经营范围涵盖通信设备、智能终端、云计算、半导体等。', detail: '', type: 'action', findings: [] },
-              { id: 't4', time: '10:25:35', agent: '财务Agent', status: 'completed', content: '正在分析财务数据...已获取近三年财务报表，正在进行横向对比和趋势分析。', detail: '', type: 'action', findings: ['营收强劲增长 8,621亿 2024营收', '盈利能力大幅提升 1,275亿 经营现金流', '研发投入行业领先 19.1% 研发投入占比'] },
-              { id: 't5', time: '10:26:02', agent: '司法Agent', status: 'completed', content: '正在查询司法风险...已检索裁判文书网、执行信息公开网等权威渠道。', detail: '', type: 'action', findings: ['股权结构稳定 99.35% 工会持股比例'] },
-              { id: 't6', time: '10:26:15', agent: '司法Agent', status: 'completed', content: '司法风险扫描完成。未发现重大诉讼纠纷，无失信被执行记录，企业司法合规状况良好。', detail: '', type: 'action', findings: [] },
-              { id: 't7', time: '10:26:30', agent: '授信Agent', status: 'completed', content: '正在生成综合授信建议...基于工商、财务、司法、行业四维度分析结果，综合评估企业授信资质。', detail: '', type: 'action', findings: ['应收账款集中度偏高 38% 前五客户集中度', '海外合规风险需关注 2 项海外罚款'] },
-              { id: 't8', time: '10:26:45', agent: '系统', status: 'completed', content: '尽调报告已生成。综合评级 AAA-，建议给予 50-80 亿元授信额度。', detail: '', type: 'action', findings: [] },
+              { id: 't1', time: new Date().toLocaleTimeString('zh-CN', { hour12: false }), agent: '系统', status: 'completed', content: `未能获取任务状态：${errMsg}`, detail: '当前未生成可信尽调结论，请检查后端服务或重新发起任务。', type: 'action', findings: [] },
             ],
             plan: [],
-            evidence: [
-              { label: '股权结构稳定', value: '99.35%', source: '工会持股比例' },
-              { label: '知识产权壁垒深厚', value: '14万+', source: '有效专利数' },
-              { label: '营收强劲增长', value: '8,621亿', source: '2024营收' },
-              { label: '盈利能力大幅提升', value: '1,275亿', source: '经营现金流' },
-              { label: '应收账款集中度偏高', value: '38%', source: '前五客户集中度' },
-              { label: '研发投入行业领先', value: '19.1%', source: '研发投入占比' },
-              { label: '海外合规风险需关注', value: '2', source: '项海外罚款' },
-            ],
+            evidence: [],
             report: { task_id: routeTaskId },
-            engineMode: 'classic',
+            engineMode: 'deepresearch',
             researchPlan: [],
             researchClaims: [],
             researchGaps: [],
             planner: null,
             sequentialThinking: null,
+            sequentialThoughtLoop: null,
             sequentialPlanReview: null,
+            prepareStage: null,
             followUpTasks: [],
             researchRounds: [],
+            toolTraces: [],
             activeInterrupt: null,
             interrupts: [],
             humanActions: [],
             isRunning: false,
-            error: null,
+            error: errMsg,
           });
           return;
         }
@@ -309,7 +350,7 @@ export function ExecutionWorkspace() {
       cancelled = true;
       controller.abort();
     };
-  }, [routeTaskId, streamVersion]);
+  }, [routeTaskId, streamVersion, initialEnterpriseName, navigate]);
 
   const refreshAfterHumanAction = async () => {
     if (!taskId) return;
@@ -387,6 +428,122 @@ export function ExecutionWorkspace() {
   const roundTwoPlan = followUpTasks.length ? followUpTasks : fullResearchPlan.filter((step) => step.round === 2);
   const roundTwoClaims = researchClaims.filter((claim) => claim.round === 2 || claim.text?.startsWith('二轮补证')).slice(0, 3);
   const hasRoundTwo = roundTwoPlan.length > 0 || timeline.some((entry) => entry.agent.includes('二轮补证') || entry.content.includes('二轮补证'));
+  const visibleToolTraces = toolTraces.slice(-8).reverse();
+  const sequentialSteps = (sequentialThoughtLoop?.steps || []) as SequentialThoughtStep[];
+  const hasSequentialSteps = sequentialSteps.length > 0;
+  const planReviewItems = (activeInterrupt?.context?.tasks || researchPlan || taskState.plan || []).slice(0, 8);
+  const thoughtAnimationKey = typewriterKey(sequentialSteps.map((step) => `${step.thoughtNumber || ''}:${step.summary || ''}`));
+  const planAnimationKey = typewriterKey(planReviewItems.map((step: any, index: number) => `${step.id || index}:${step.question || step.name || step.id || ''}`));
+  const showPlanReviewPanel = (isWaitingHuman || fallbackPlanInterrupt)
+    && (activeInterrupt?.type === 'approve_plan' || fallbackPlanInterrupt);
+  const showPlanningPreviewPanel = !showPlanReviewPanel && agentState === 'planning' && (planReviewItems.length > 0 || hasSequentialSteps);
+  const planningPreviewMessage = prepareStage === 'plan_task'
+    ? `正在生成第 ${Math.max(visiblePlanCount, 1)} 个研究问题`
+    : prepareStage === 'plan_generation_start'
+      ? '正在根据思考链生成研究计划'
+      : '研究引擎正在把思考链转成可执行研究问题，生成完成后会进入人工确认。';
+  const thoughtLoopSource = sequentialThinking?.transport === 'streamable_http'
+    ? '远程 MCP'
+    : sequentialThinking?.transport === 'stdio'
+      ? '本地 MCP'
+      : '研究规划引擎';
+
+  useEffect(() => {
+    if (!sequentialSteps.length) {
+      setVisibleThoughtCount(0);
+      setTypedThoughtText({});
+      return;
+    }
+
+    let cancelled = false;
+    const timers: number[] = [];
+    const previousKey = typedThoughtKeyRef.current;
+    typedThoughtKeyRef.current = thoughtAnimationKey;
+    setVisibleThoughtCount(sequentialSteps.length);
+
+    if (!previousKey) {
+      setTypedThoughtText({});
+    } else {
+      setTypedThoughtText((current) => {
+        const next = { ...current };
+        sequentialSteps.slice(0, -1).forEach((step, index) => {
+          next[index] = step.summary || '已记录研究步骤。';
+        });
+        return next;
+      });
+    }
+
+    const lastIndex = sequentialSteps.length - 1;
+    const fullText = sequentialSteps[lastIndex]?.summary || '已记录研究步骤。';
+    const alreadyTyped = typedThoughtText[lastIndex] === fullText;
+    if (!alreadyTyped) {
+      let cursor = 0;
+      const tick = () => {
+        if (cancelled) return;
+        cursor += 1;
+        setTypedThoughtText((current) => ({ ...current, [lastIndex]: fullText.slice(0, cursor) }));
+        if (cursor < fullText.length) {
+          timers.push(window.setTimeout(tick, TYPEWRITER_CHAR_MS));
+        }
+      };
+      timers.push(window.setTimeout(tick, 80));
+      timers.push(window.setTimeout(tick, TYPEWRITER_STEP_GAP_MS));
+    }
+
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [thoughtAnimationKey]);
+
+  useEffect(() => {
+    if (!planReviewItems.length) {
+      setVisiblePlanCount(0);
+      setTypedPlanText({});
+      return;
+    }
+
+    let cancelled = false;
+    const timers: number[] = [];
+    const previousKey = typedPlanKeyRef.current;
+    typedPlanKeyRef.current = planAnimationKey;
+    setVisiblePlanCount(planReviewItems.length);
+
+    if (!previousKey) {
+      setTypedPlanText({});
+    } else {
+      setTypedPlanText((current) => {
+        const next = { ...current };
+        planReviewItems.slice(0, -1).forEach((item: any, index: number) => {
+          next[String(item.id || index)] = String(item.question || item.name || item.id || '研究问题');
+        });
+        return next;
+      });
+    }
+
+    const lastIndex = planReviewItems.length - 1;
+    const item = planReviewItems[lastIndex] as any;
+    const itemKey = String(item.id || lastIndex);
+    const fullText = String(item.question || item.name || item.id || '研究问题');
+    const alreadyTyped = typedPlanText[itemKey] === fullText;
+    if (!alreadyTyped) {
+      let cursor = 0;
+      const tick = () => {
+        if (cancelled) return;
+        cursor += 1;
+        setTypedPlanText((current) => ({ ...current, [itemKey]: fullText.slice(0, cursor) }));
+        if (cursor < fullText.length) {
+          timers.push(window.setTimeout(tick, TYPEWRITER_CHAR_MS));
+        }
+      };
+      timers.push(window.setTimeout(tick, TYPEWRITER_STEP_GAP_MS));
+    }
+
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [planAnimationKey]);
 
   return (
     <div className="ddg-execution-page">
@@ -456,10 +613,53 @@ export function ExecutionWorkspace() {
             </h1>
             <p>
               {engineMode === 'deepresearch'
-                ? 'LLM Planner 将先生成研究计划，再按证据需求调用工商、财务、司法、行业、RAG 与公开数据源工具。'
+                ? '研究计划生成器将先拆解尽调问题，再按证据需求调用工商、财务、司法、行业、内部知识库与公开资料采集能力。'
                 : '工商、财务、司法、授信四大 Agent 将依次启动，每个 Agent 会实时展示其思考过程和分析结论。'}
             </p>
           </div>
+
+          {hasSequentialSteps && (
+            <section className="ddg-thought-chain-panel" aria-label="研究思考链">
+              <div className="ddg-thought-chain-header">
+                <div>
+                  <span className="ddg-thought-chain-kicker"><BrainCircuit size={14} />研究思考链</span>
+                  <h2>先形成研究判断路径，再生成执行计划</h2>
+                </div>
+                <div className="ddg-thought-chain-meta">
+                  <span>{thoughtLoopSource}</span>
+                  <strong>{sequentialSteps.length} 步</strong>
+                </div>
+              </div>
+              <div className="ddg-thought-chain-list">
+                {sequentialSteps.slice(0, visibleThoughtCount).map((step, index) => {
+                  const isLast = index === sequentialSteps.length - 1;
+                  const historyLength = step.raw?.thoughtHistoryLength;
+                  const isTyping = (typedThoughtText[index] || '') !== (step.summary || '已记录研究步骤。');
+                  return (
+                    <article key={`${step.thoughtNumber || index}-${step.summary || index}`} className={`ddg-thought-chain-step ${isLast ? 'final' : ''} ${isTyping ? 'typing' : ''}`}>
+                      <div className="ddg-thought-chain-node">
+                        <span>{step.thoughtNumber || index + 1}</span>
+                      </div>
+                      <div className="ddg-thought-chain-content">
+                        <div className="ddg-thought-chain-topline">
+                          <strong>{index === 0 ? '确认主体与数据边界' : index === 1 ? '拆分证据需求' : '形成计划上下文'}</strong>
+                          <em>{step.nextThoughtNeeded ? '继续思考' : '进入计划生成'}</em>
+                        </div>
+                        <p>{typedThoughtText[index] || ''}<span className="ddg-typewriter-caret" /></p>
+                        <div className="ddg-thought-chain-tags">
+                          <span>Step {step.thoughtNumber || index + 1}/{step.totalThoughts || sequentialSteps.length}</span>
+                          {historyLength !== undefined && <span>History {historyLength}</span>}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              {sequentialThoughtLoop?.error && !sequentialThoughtLoop?.success && (
+                <p className="ddg-thought-chain-error">研究思考链降级：{sequentialThoughtLoop.error}</p>
+              )}
+            </section>
+          )}
 
           {isWaitingHuman && activeInterrupt?.type === 'confirm_entity' && (
             <div className="ddg-hitl-panel">
@@ -484,38 +684,47 @@ export function ExecutionWorkspace() {
             </div>
           )}
 
-          {isWaitingHuman && (activeInterrupt?.type === 'approve_plan' || fallbackPlanInterrupt) && (
-            <div className="ddg-hitl-panel plan-review">
+          {(showPlanReviewPanel || showPlanningPreviewPanel) && (
+            <div className={`ddg-hitl-panel plan-review ${showPlanningPreviewPanel ? 'planning-preview' : ''}`}>
               <div className="ddg-hitl-heading">
-                <DraftingCompass />
+                {showPlanningPreviewPanel ? <Loader2 className="animate-spin" /> : <DraftingCompass />}
                 <div>
-                  <h2>{activeInterrupt?.title || '请确认研究计划'}</h2>
-                  <p>{activeInterrupt?.message || '研究计划已生成。请确认研究问题、证据需求和工具路线，再允许 Agent 执行外部检索和专项分析。'}</p>
+                  <h2>{showPlanningPreviewPanel ? '正在生成研究计划' : activeInterrupt?.title || '请确认研究计划'}</h2>
+                  <p>{showPlanningPreviewPanel ? planningPreviewMessage : activeInterrupt?.message || '研究计划已生成。请确认研究问题、证据需求和工具路线，再允许 Agent 执行外部检索和专项分析。'}</p>
                 </div>
               </div>
               <div className="ddg-plan-review-meta">
-                <div><span>Planner</span><strong>{(activeInterrupt?.context?.planner || planner)?.source === 'llm' ? 'LLM Planner' : '规则计划'}</strong></div>
-                <div><span>Sequential Thinking</span><strong>{(activeInterrupt?.context?.sequential_thinking || sequentialThinking)?.enabled ? '已复核' : '未启用'}</strong></div>
+                <div><span>计划来源</span><strong>{(activeInterrupt?.context?.planner || planner)?.source === 'llm' ? '动态计划' : '规则计划'}</strong></div>
+                <div><span>研究思考链</span><strong>{(activeInterrupt?.context?.sequential_thought_loop || sequentialThoughtLoop)?.steps?.length ? `${(activeInterrupt?.context?.sequential_thought_loop || sequentialThoughtLoop).steps.length} 步` : '未启用'}</strong></div>
                 <div><span>研究问题</span><strong>{activeInterrupt?.context?.task_count || (researchPlan.length ? researchPlan.length : taskState.plan.length)} 个</strong></div>
               </div>
               <div className="ddg-plan-review-list">
-                {(activeInterrupt?.context?.tasks || researchPlan || taskState.plan || []).slice(0, 8).map((step: any, index: number) => (
-                  <div key={step.id || index} className="ddg-plan-review-item">
+                {planReviewItems.slice(0, visiblePlanCount).map((step: any, index: number) => {
+                  const itemKey = String(step.id || index);
+                  const fullText = String(step.question || step.name || step.id || '研究问题');
+                  const isTyping = (typedPlanText[itemKey] || '') !== fullText;
+                  return (
+                  <div key={step.id || index} className={`ddg-plan-review-item ${isTyping ? 'typing' : ''}`}>
                     <div>
                       <span>{step.category || 'research'} · priority {step.priority || '-'}</span>
-                      <strong>{step.question || step.name || step.id}</strong>
+                      <strong>{typedPlanText[itemKey] || ''}<span className="ddg-typewriter-caret" /></strong>
                       {step.purpose && <p>{step.purpose}</p>}
                     </div>
                     <em>{(step.required_evidence || []).slice(0, 2).join(' / ') || '证据需求待执行时确认'}</em>
                   </div>
-                ))}
+                  );
+                })}
               </div>
-              <textarea value={humanComment} onChange={(event) => setHumanComment(event.target.value)} placeholder="可补充研究要求，例如：重点核查近三年诉讼公告、应收账款回款质量、半导体周期和客户集中度。" />
-              <div className="ddg-hitl-actions">
-                <button disabled={!!humanActionLoading} onClick={() => handleResumeInterrupt('approve_plan', { comment: humanComment })}>确认计划并执行</button>
-                <button disabled={!!humanActionLoading} onClick={() => handleResumeInterrupt('revise_plan', { comment: humanComment })}>带补充要求执行</button>
-                <button disabled={!!humanActionLoading} className="secondary" onClick={() => handleResumeInterrupt('cancel_task', { comment: humanComment })}>暂不执行</button>
-              </div>
+              {showPlanReviewPanel && (
+                <>
+                  <textarea value={humanComment} onChange={(event) => setHumanComment(event.target.value)} placeholder="可补充研究要求，例如：重点核查近三年诉讼公告、应收账款回款质量、半导体周期和客户集中度。" />
+                  <div className="ddg-hitl-actions">
+                    <button disabled={!!humanActionLoading} onClick={() => handleResumeInterrupt('approve_plan', { comment: humanComment })}>确认计划并执行</button>
+                    <button disabled={!!humanActionLoading} onClick={() => handleResumeInterrupt('revise_plan', { comment: humanComment })}>带补充要求执行</button>
+                    <button disabled={!!humanActionLoading} className="secondary" onClick={() => handleResumeInterrupt('cancel_task', { comment: humanComment })}>暂不执行</button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -660,16 +869,16 @@ export function ExecutionWorkspace() {
               </div>
               {planner?.source && (
                 <div className="ddg-planner-source">
-                  <strong>{planner.source === 'llm' ? 'LLM Planner' : '规则计划'}</strong>
-                  <span>{planner.metadata?.model || planner.metadata?.reason || 'Plan-Execute'}</span>
+                  <strong>{planner.source === 'llm' ? '动态研究计划' : '规则研究计划'}</strong>
+                  <span>{planner.metadata?.plan_summary || planner.metadata?.reason || 'Plan-Execute'}</span>
                 </div>
               )}
               {sequentialThinking?.enabled && (
                 <div className="ddg-sequential-status">
                   <GitBranchPlus size={15} />
                   <div>
-                    <strong>Sequential Thinking 已接入</strong>
-                    <span>{sequentialPlanReview?.plan_notes || `${sequentialThinking.tool_names?.join('、') || 'sequentialthinking'} 正在做计划与缺口复核`}</span>
+                    <strong>研究思考链已接入</strong>
+                    <span>{hasSequentialSteps ? `已完成 ${sequentialSteps.length} 步计划前思考` : sequentialPlanReview?.plan_notes || '正在做计划与证据缺口复核'}</span>
                   </div>
                 </div>
               )}
@@ -698,7 +907,7 @@ export function ExecutionWorkspace() {
                 <div className="ddg-follow-up-block">
                   <h4><GitBranchPlus size={14} />二轮补证</h4>
                   {roundTwoPlan.length === 0 ? (
-                    <p className="ddg-follow-up-empty">等待 Sequential Thinking 识别高价值缺口。</p>
+                    <p className="ddg-follow-up-empty">等待研究计划复核识别高价值缺口。</p>
                   ) : roundTwoPlan.map((step) => (
                     <div key={step.id} className={`ddg-follow-up-item ${step.status || 'pending'}`}>
                       <div className="ddg-follow-up-topline">
@@ -737,6 +946,26 @@ export function ExecutionWorkspace() {
                     <div key={gap.id} className="ddg-gap-item">
                       <AlertTriangle size={14} />
                       <span>{gap.description}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {visibleToolTraces.length > 0 && (
+                <div className="ddg-tool-trace-list">
+                  <h4>证据采集调用记录</h4>
+                  {visibleToolTraces.map((trace) => (
+                    <div key={trace.tool_call_id || `${trace.display_tool_name}-${trace.started_at}`} className={`ddg-tool-trace-item ${trace.status || 'empty'}`}>
+                      <div className="ddg-tool-trace-topline">
+                        <strong>{trace.display_tool_name || '专项工具调用'}</strong>
+                        <span>{trace.status === 'success' ? '完成' : trace.status === 'failed' ? '失败' : trace.status === 'running' ? '进行中' : '无结果'}</span>
+                      </div>
+                      <p>{trace.query_summary || '执行证据采集任务'}</p>
+                      <div className="ddg-tool-trace-meta">
+                        <em>{trace.display_provider || '内部服务'}</em>
+                        <em>{trace.result_count || 0} 条结果</em>
+                        <em>{trace.evidence_ids?.length || 0} 项证据</em>
+                        {trace.elapsed_ms !== undefined && trace.elapsed_ms !== null && <em>{trace.elapsed_ms >= 1000 ? `${(trace.elapsed_ms / 1000).toFixed(1)}秒` : `${trace.elapsed_ms}毫秒`}</em>}
+                      </div>
                     </div>
                   ))}
                 </div>

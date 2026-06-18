@@ -1,8 +1,7 @@
 """Optional MCP search providers for public due-diligence signals.
 
 The project can run without these MCP servers. When configured through env,
-Exa and DuckDuckGo MCP results are normalized into the same shape used by
-Tavily-backed tools.
+Exa MCP results are normalized into the same shape used by Tavily-backed tools.
 """
 
 from __future__ import annotations
@@ -33,11 +32,6 @@ def _provider_config(provider: str) -> Optional[Dict[str, str]]:
         command = settings.EXA_MCP_COMMAND
         args = settings.EXA_MCP_ARGS
         tool = settings.EXA_MCP_TOOL
-    elif provider == "duckduckgo":
-        url = settings.DUCKDUCKGO_MCP_URL
-        command = settings.DUCKDUCKGO_MCP_COMMAND
-        args = settings.DUCKDUCKGO_MCP_ARGS
-        tool = settings.DUCKDUCKGO_MCP_TOOL
     else:
         return None
     if not command and not url:
@@ -46,7 +40,7 @@ def _provider_config(provider: str) -> Optional[Dict[str, str]]:
 
 
 def configured_mcp_search_providers() -> List[str]:
-    return [provider for provider in ["exa", "duckduckgo"] if _provider_config(provider)]
+    return [provider for provider in ["exa"] if _provider_config(provider)]
 
 
 def _content_to_text(content: Any) -> str:

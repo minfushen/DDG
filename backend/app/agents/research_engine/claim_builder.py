@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from app.agents.evidence.source_intelligence import summarize_extracted_fields
+
 from .state import ResearchClaim, ResearchTask, stable_id
 
 
@@ -85,12 +87,65 @@ def _industry_claim_text(task: ResearchTask, evidence: List[Dict[str, Any]]) -> 
     return None
 
 
+def _business_claim_text(task: ResearchTask, evidence: List[Dict[str, Any]]) -> str | None:
+    field_evidence = [
+        item for item in evidence
+        if item.get("trust_level") in {"high", "medium"}
+        or item.get("source_type") in {"official_business_registry", "official_credit_publicity", "commercial_business_data", "official_named_source"}
+    ]
+    extracted = summarize_extracted_fields(field_evidence, "business_fields")
+    fields = extracted.get("fields") or {}
+    if fields:
+        parts = []
+        for field in ["统一社会信用代码", "法定代表人", "注册资本", "经营状态", "成立日期", "经营范围"]:
+            if fields.get(field):
+                parts.append(f"{field}：{fields[field]}")
+        high_count = len([item for item in field_evidence if item.get("trust_level") == "high"])
+        prefix = "工商专项已从工商/信用类公开来源抽取" if high_count else "工商专项仅从中可信工商类来源抽取"
+        return f"{prefix}{len(fields)}个主体字段，其中高可信来源{high_count}项；" + "；".join(parts[:6]) + "。"
+    high = [item for item in evidence if item.get("trust_level") == "high"]
+    if high:
+        top = high[0]
+        return f"工商专项命中高可信公开来源：{top.get('claim') or top.get('value') or top.get('source_name')}，但结构化字段仍需进一步核验。"
+    return None
+
+
+def _legal_claim_text(task: ResearchTask, evidence: List[Dict[str, Any]]) -> str | None:
+    signal_counts: Dict[str, int] = {}
+    case_numbers: List[str] = []
+    amounts: List[str] = []
+    high_count = 0
+    for item in evidence:
+        if item.get("trust_level") == "high":
+            high_count += 1
+        signals = (((item.get("metadata") or {}).get("extracted_fields") or {}).get("legal_signals") or {})
+        for signal in signals.get("signal_types") or []:
+            signal_counts[signal] = signal_counts.get(signal, 0) + 1
+        case_numbers.extend(signals.get("case_numbers") or [])
+        amounts.extend(signals.get("amounts") or [])
+    case_numbers = list(dict.fromkeys(case_numbers))[:3]
+    amounts = list(dict.fromkeys(amounts))[:3]
+    if signal_counts or case_numbers:
+        signal_text = "、".join(f"{key}{value}条" for key, value in signal_counts.items()) or "司法线索待分类"
+        extras = []
+        if case_numbers:
+            extras.append(f"案号示例：{'、'.join(case_numbers)}")
+        if amounts:
+            extras.append(f"金额线索：{'、'.join(amounts)}")
+        return f"司法专项检索形成{len(evidence)}项证据，其中高可信来源{high_count}项，识别到{signal_text}。{'；'.join(extras)}"
+    return None
+
+
 def _evidence_based_claim_text(task: ResearchTask, evidence: List[Dict[str, Any]]) -> str | None:
     category = task.get("category", "general")
     if category == "financial":
         return _financial_claim_text(task, evidence)
     if category == "industry":
         return _industry_claim_text(task, evidence)
+    if category == "business":
+        return _business_claim_text(task, evidence)
+    if category == "legal":
+        return _legal_claim_text(task, evidence)
     authoritative = [item for item in evidence if item.get("trust_level") == "high" or item.get("reliability") == "high"]
     top = authoritative[0] if authoritative else (evidence[0] if evidence else None)
     if not top:

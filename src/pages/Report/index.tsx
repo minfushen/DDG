@@ -6,13 +6,14 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import ReactECharts from 'echarts-for-react';
 import {
-  ArrowLeft, Download, FileText, Shield, TrendingUp,
+  ArrowLeft, Download, FileText, Shield,
   CheckCircle2, AlertTriangle, ExternalLink, Loader2,
   Share2, CreditCard, BarChart3, Scale, Globe2, Folder,
-  Search, DraftingCompass,
+  Search, Gauge, X,
 } from 'lucide-react';
-import { getTaskReport } from '../../services/agentApi';
+import { evaluateReportQuality, getTaskReport, type ReportQualityResult } from '../../services/agentApi';
 import './Report.css';
 
 // ── 类型 ──────────────────────────────────────────
@@ -38,6 +39,7 @@ interface ReportData {
   narrative_elapsed_ms?: number;
   narrative_provider?: string;
   sections?: Array<FinancialReportSection | BusinessReportSection | IndustryReportSection | LegalReportSection>;
+  financial_dashboard?: FinancialDashboard;
   risk_summary?: string[];
   basic_info?: Record<string, BusinessInfoItem>;
   raw_answer?: string;
@@ -57,9 +59,24 @@ interface ReportData {
   research_plan?: ResearchTaskItem[];
   claims?: ResearchClaimItem[];
   evidence?: EvidenceDocItem[];
+  codeact_evidence?: EvidenceDocItem[];
   gaps?: ResearchGapItem[];
+  tool_traces?: ToolTraceItem[];
   source_reliability_summary?: Record<string, number>;
   objective?: string;
+}
+
+interface ToolTraceItem {
+  tool_call_id?: string;
+  research_task_id?: string;
+  category?: string;
+  display_tool_name?: string;
+  display_provider?: string;
+  query_summary?: string;
+  status?: string;
+  elapsed_ms?: number | null;
+  result_count?: number;
+  evidence_ids?: string[];
 }
 
 interface ResearchTaskItem {
@@ -102,6 +119,8 @@ interface ReportChapter {
   title: string;
   subtitle?: string;
   summary?: string[];
+  summary_citations?: Array<{ text?: string; evidence_refs?: string[] }>;
+  subsections?: Array<{ title?: string; items?: string[]; evidence_refs?: string[] }>;
   highlights?: string[];
   risks?: string[];
   findings?: CrossFinding[];
@@ -134,6 +153,38 @@ interface FinancialReportSubsection {
 interface FinancialReportSection {
   title: string;
   subsections: FinancialReportSubsection[];
+}
+
+interface FinancialDashboardSeries {
+  name: string;
+  data: Array<number | null>;
+  unit?: string;
+}
+
+interface FinancialDashboardThreshold {
+  name: string;
+  value: number;
+  unit?: string;
+  color?: string;
+}
+
+interface FinancialDashboardChart {
+  id: string;
+  title: string;
+  chart_type: 'bar' | 'line' | 'bar_line' | string;
+  years: string[];
+  unit?: string;
+  series: FinancialDashboardSeries[];
+  threshold_lines?: FinancialDashboardThreshold[];
+  diagnosis?: string;
+  evidence_refs?: string[];
+}
+
+interface FinancialDashboard {
+  title: string;
+  years: string[];
+  charts: FinancialDashboardChart[];
+  data_boundary?: string;
 }
 
 interface BusinessInfoItem {
@@ -232,6 +283,9 @@ interface CrossFinding {
   risk_level?: string;
   conclusion: string;
   evidence_refs?: string[];
+  verification_actions?: string[];
+  missing_items?: string[];
+  requires_manual_review?: boolean;
 }
 
 interface CreditDecision {
@@ -245,6 +299,7 @@ interface CreditDecision {
 
 interface EvidenceDocItem {
   id?: string;
+  label?: string;
   name?: string;
   source?: string;
   source_name?: string;
@@ -259,39 +314,11 @@ interface EvidenceDocItem {
   agent?: string;
   domain?: string;
   status?: string;
+  tool_call_id?: string;
+  display_tool_name?: string;
+  display_provider?: string;
+  metadata?: Record<string, unknown>;
 }
-
-// ── 参考数据（行业基准，待后端丰富后替换）─────────────────────
-
-const RISK_DIMENSIONS = [
-  { name: '财务健康度', score: 78, maxScore: 100, weight: 0.35, status: 'low' as const, details: ['营收持续增长', '现金流覆盖率高于行业均值', '应收账款占比较高需关注'] },
-  { name: '司法合规', score: 65, maxScore: 100, weight: 0.25, status: 'medium' as const, details: ['2条行政处罚记录', '3份合同纠纷裁判文书', '无失信被执行记录'] },
-  { name: '行业前景', score: 82, maxScore: 100, weight: 0.20, status: 'low' as const, details: ['行业景气度78分', '政策环境支持', '行业排名前25%'] },
-  { name: '关联风险', score: 60, maxScore: 100, weight: 0.20, status: 'medium' as const, details: ['关联企业12家', '1家疑似关联方待确认', '实控人近6个月变更'] },
-];
-
-const FINANCIAL_METRICS = [
-  { label: '营业收入', year2024: '8.2亿', year2023: '6.8亿', year2022: '5.2亿', industryAvg: '6.5亿', assessment: '良好' },
-  { label: '净利润率', year2024: '12.5%', year2023: '11.8%', year2022: '10.2%', industryAvg: '10.0%', assessment: '良好' },
-  { label: '资产负债率', year2024: '42%', year2023: '45%', year2022: '48%', industryAvg: '50%', assessment: '良好' },
-  { label: '现金流覆盖率', year2024: '2.8', year2023: '2.3', year2022: '2.0', industryAvg: '1.5', assessment: '优秀' },
-  { label: '应收账款周转', year2024: '45天', year2023: '40天', year2022: '35天', industryAvg: '42天', assessment: '需关注' },
-  { label: '存货周转率', year2024: '6.2次', year2023: '5.8次', year2022: '5.5次', industryAvg: '5.0次', assessment: '良好' },
-];
-
-const LEGAL_ITEMS = [
-  { type: '裁判文书', count: 3, description: '合同纠纷案件，均已结案，企业作为被告承担次要责任', severity: 'low' },
-  { type: '行政处罚', count: 2, description: '2024年环保处罚85万元，2025年税务处罚12万元', severity: 'medium' },
-  { type: '失信被执行人', count: 0, description: '无失信被执行记录', severity: 'low' },
-  { type: '股权出质', count: 1, description: '实控人部分股权质押，质押比例15%', severity: 'low' },
-];
-
-const EVIDENCE_DOCS = [
-  { name: '2024年度财务审计报告', source: '企业提供', status: 'verified' as const, date: '2025-03-15' },
-  { name: '企业信用信息公示报告', source: '国家企业信用信息公示系统', status: 'verified' as const, date: '2025-06-01' },
-  { name: '裁判文书查询结果', source: '中国裁判文书网', status: 'verified' as const, date: '2025-06-01' },
-  { name: '行业研究报告', source: '行业协会', status: 'verified' as const, date: '2025-05-20' },
-];
 
 // ── 辅助函数 ──────────────────────────────────────
 
@@ -322,8 +349,14 @@ function riskBgClass(rating: string): string {
   return map[rating] || 'bg-[#F9FAFB]';
 }
 
-function dimStatusColor(status: 'low' | 'medium' | 'high'): string {
-  return status === 'low' ? '#22C55E' : status === 'medium' ? '#F59E0B' : '#DC2626';
+function dimensionWeight(dim: FullRiskDimension): number {
+  if (typeof dim.weight === 'number' && dim.weight > 0) return dim.weight;
+  const name = dim.name || '';
+  if (name.includes('财务')) return 0.35;
+  if (name.includes('司法') || name.includes('合规')) return 0.25;
+  if (name.includes('行业') || name.includes('经营')) return 0.2;
+  if (name.includes('工商') || name.includes('治理') || name.includes('关联')) return 0.2;
+  return 0;
 }
 
 function trustLabel(level?: string): string {
@@ -346,29 +379,188 @@ function trustClass(level?: string): string {
   return map[level || 'unknown'] || map.unknown;
 }
 
-function FinancialReportTableView({ table }: { table: FinancialReportTable }) {
+type ParsedFinancialCell = { value: number | null; unit: string; raw: string };
+
+function parseFinancialCell(rawValue?: string): ParsedFinancialCell {
+  const raw = String(rawValue || '').trim();
+  if (!raw || raw === '数据不可用') return { value: null, unit: '', raw: raw || '数据不可用' };
+  const number = Number(raw.replace(/,/g, '').match(/-?\d+(?:\.\d+)?/)?.[0]);
+  if (!Number.isFinite(number)) return { value: null, unit: '', raw };
+  if (raw.includes('亿元')) return { value: number * 100000000, unit: '元', raw };
+  if (raw.includes('万元')) return { value: number * 10000, unit: '元', raw };
+  if (raw.includes('元')) return { value: number, unit: '元', raw };
+  if (raw.includes('%')) return { value: number, unit: '%', raw };
+  if (raw.includes('天')) return { value: number, unit: '天', raw };
+  return { value: number, unit: '', raw };
+}
+
+function inferredRowUnit(rowName: string, defaultUnit?: string): string {
+  if (defaultUnit === '元') return '元';
+  if (/收入|成本|利润|EBITDA|资产|负债|借款|资金|现金|账款|存货|票据|权益|资本|公积|费用/.test(rowName)) return '元';
+  if (/周转天数/.test(rowName)) return '天';
+  if (/比率|倍数|周转率/.test(rowName)) return '倍';
+  return defaultUnit || '';
+}
+
+function rowDisplayUnit(rowName: string, cells: ParsedFinancialCell[], defaultUnit?: string): string {
+  const units = cells.map((cell) => cell.unit).filter(Boolean);
+  if (!units.length) {
+    const inferred = inferredRowUnit(rowName, defaultUnit);
+    if (!inferred) return '';
+    if (inferred === '元') {
+      const max = Math.max(...cells.map((cell) => Math.abs(cell.value || 0)));
+      if (max >= 100000000) return '亿元';
+      if (max >= 10000) return '万元';
+      return '元';
+    }
+    return inferred;
+  }
+  if (units.every((unit) => unit === '%')) return '%';
+  if (units.every((unit) => unit === '天')) return '天';
+  if (units.every((unit) => unit === '元')) {
+    const max = Math.max(...cells.map((cell) => Math.abs(cell.value || 0)));
+    if (max >= 100000000) return '亿元';
+    if (max >= 10000) return '万元';
+    return '元';
+  }
+  return units[0] || '';
+}
+
+function formatFinancialCell(cell: ParsedFinancialCell, displayUnit: string): string {
+  if (cell.value === null) return cell.raw || '数据不可用';
+  if (displayUnit === '亿元') return (cell.value / 100000000).toFixed(2);
+  if (displayUnit === '万元') return (cell.value / 10000).toFixed(2);
+  if (displayUnit === '元') return cell.value.toFixed(2);
+  if (displayUnit === '%') return cell.value.toFixed(2);
+  if (displayUnit === '天') return cell.value.toFixed(1);
+  if (displayUnit === '倍') return cell.value.toFixed(2);
+  return Number.isInteger(cell.value) ? String(cell.value) : cell.value.toFixed(2);
+}
+
+function financialTrendLabel(rowName: string, cells: ParsedFinancialCell[]): string {
+  const values = cells.map((cell) => cell.value).filter((value): value is number => value !== null);
+  if (values.length < 2) return '数据不足';
+  const deltas = values.slice(1).map((value, index) => value - values[index]);
+  const allUp = deltas.every((delta) => delta > 0);
+  const allDown = deltas.every((delta) => delta < 0);
+  const allFlat = deltas.every((delta) => Math.abs(delta) < 1e-9);
+  const isProfit = /净利润|利润/.test(rowName);
+  if (isProfit && values.every((value) => value < 0)) {
+    if (Math.abs(values[values.length - 1]) > Math.abs(values[0])) return '亏损扩大';
+    if (Math.abs(values[values.length - 1]) < Math.abs(values[0])) return '亏损收窄';
+  }
+  if (allFlat) return '基本稳定';
+  if (allUp) return '持续增长';
+  if (allDown) return '持续下降';
+  if (values.length >= 3 && values[1] < values[0] && values[values.length - 1] > values[1]) return '先降后升';
+  if (values.length >= 3 && values[1] > values[0] && values[values.length - 1] < values[1]) return '先升后降';
+  return values[values.length - 1] > values[0] ? '波动上升' : '波动下降';
+}
+
+function financialRowByName(rows: ReturnType<typeof normalizedFinancialRows>, keywords: string[]) {
+  return rows.find((row) => keywords.some((keyword) => row.item.includes(keyword)));
+}
+
+function financialSeriesText(row: ReturnType<typeof normalizedFinancialRows>[number] | undefined, columns: string[], label: string): string {
+  if (!row) return `近三年${label}数据暂未稳定取得`;
+  const parts = columns.map((column, index) => {
+    const value = formatFinancialCell(row.cells[index], row.unit);
+    return value === '数据不可用' ? '' : `${column}年${value}${row.unit}`;
+  }).filter(Boolean);
+  return parts.length ? `近三年${label}分别为${parts.join('、')}` : `近三年${label}数据暂未稳定取得`;
+}
+
+function financialCagr(row: ReturnType<typeof normalizedFinancialRows>[number] | undefined): string {
+  if (!row) return '数据不足';
+  const values = row.cells.map((cell) => cell.value).filter((value): value is number => value !== null && value > 0);
+  if (values.length < 2) return '数据不足';
+  const periods = values.length - 1;
+  return `${(((values[values.length - 1] / values[0]) ** (1 / periods) - 1) * 100).toFixed(1)}%`;
+}
+
+function financialLatestGrowth(row: ReturnType<typeof normalizedFinancialRows>[number] | undefined): string {
+  if (!row) return '数据不足';
+  const values = row.cells.map((cell) => cell.value);
+  const latest = values[values.length - 1];
+  const previous = values[values.length - 2];
+  if (latest === null || previous === null || previous === 0) return '数据不足';
+  return `${(((latest - previous) / Math.abs(previous)) * 100).toFixed(1)}%`;
+}
+
+function financialProfitChange(row: ReturnType<typeof normalizedFinancialRows>[number] | undefined, label: string, columns: string[]): string {
+  if (!row) return `${label}数据暂未稳定取得，需结合年报明细进一步核验。`;
+  const firstIndex = row.cells.findIndex((cell) => cell.value !== null);
+  const lastIndex = row.cells.map((cell) => cell.value).lastIndexOf(row.cells.slice().reverse().find((cell) => cell.value !== null)?.value ?? null);
+  if (firstIndex < 0 || lastIndex < 0 || firstIndex === lastIndex) return `${label}趋势数据不足，需补充完整利润表后判断。`;
+  const first = row.cells[firstIndex].value as number;
+  const last = row.cells[lastIndex].value as number;
+  let trend = row.trend;
+  if (first >= 0 && last < 0) trend = '由盈转亏';
+  if (first < 0 && last < 0) trend = Math.abs(last) > Math.abs(first) ? '亏损扩大' : '亏损收窄';
+  return `${label}从${columns[firstIndex]}年的${formatFinancialCell(row.cells[firstIndex], row.unit)}${row.unit}变化至${columns[lastIndex]}年的${formatFinancialCell(row.cells[lastIndex], row.unit)}${row.unit}，呈${trend}。`;
+}
+
+function incomeStatementAnalysisFromTable(subsection: FinancialReportSubsection): string[] | undefined {
+  if (subsection.title !== '利润表分析' || !subsection.table) return undefined;
+  const rows = normalizedFinancialRows(subsection.table, subsection.unit);
+  const columns = subsection.table.columns;
+  const revenue = financialRowByName(rows, ['营业收入']);
+  const cost = financialRowByName(rows, ['营业成本']);
+  const netProfit = financialRowByName(rows, ['净利润']);
+  const deducted = financialRowByName(rows, ['扣非净利润']);
+  const grossMargin = financialRowByName(rows, ['毛利率']);
+  const latest = columns[columns.length - 1] || '最新年度';
+  const revenueTrend = revenue?.trend || '趋势待判断';
+  const latestGrowth = financialLatestGrowth(revenue);
+  const cagr = financialCagr(revenue);
+  const latestCost = cost ? `${formatFinancialCell(cost.cells[cost.cells.length - 1], cost.unit)}${cost.unit}` : '数据不可用';
+  const latestRevenue = revenue ? `${formatFinancialCell(revenue.cells[revenue.cells.length - 1], revenue.unit)}${revenue.unit}` : '数据不可用';
+  const latestNetMargin = revenue?.cells.at(-1)?.value && netProfit?.cells.at(-1)?.value !== null
+    ? `${(((netProfit?.cells.at(-1)?.value || 0) / (revenue.cells.at(-1)?.value || 1)) * 100).toFixed(2)}%`
+    : '数据不可用';
+  return [
+    `公司近三年营业收入${revenueTrend}。${financialSeriesText(revenue, columns, '营业收入')}，年复合增长率约${cagr}；${latest}年营收同比增长${latestGrowth}，营业收入为${latestRevenue}，营业成本为${latestCost}。`,
+    `盈利能力方面，${financialProfitChange(netProfit, '净利润', columns)}${deducted ? financialProfitChange(deducted, '扣非净利润', columns) : '扣非净利润数据暂未稳定取得，需结合年报非经常性损益明细判断主营盈利质量。'}若扣非利润弱于净利润或持续为负，说明主营业务盈利修复基础仍需进一步核实。`,
+    `毛利率方面，${financialSeriesText(grossMargin, columns, '毛利率')}；${latest}年销售净利率为${latestNetMargin}。毛利率和净利率变化需结合产品结构、价格周期、产能利用率、折旧摊销、政府补助和费用资本化影响复核。`,
+  ];
+}
+
+function normalizedFinancialRows(table: FinancialReportTable, defaultUnit?: string) {
+  return table.rows.map((row) => {
+    const cells = table.columns.map((column) => parseFinancialCell(row.values[column]));
+    const unit = rowDisplayUnit(row.item, cells, defaultUnit);
+    const cleanItem = row.item === '亿元' ? '净利润' : row.item;
+    const label = unit ? `${cleanItem}(${unit})` : cleanItem;
+    return { ...row, item: cleanItem, cells, unit, label, trend: financialTrendLabel(cleanItem, cells) };
+  });
+}
+
+function FinancialReportTableView({ table, unit }: { table: FinancialReportTable; unit?: string }) {
+  const rows = normalizedFinancialRows(table, unit);
   return (
-    <div className="overflow-x-auto border border-[#E5E7EB] rounded-lg bg-white">
-      <table className="w-full min-w-[560px]">
+    <div className="ddg-financial-table-wrap overflow-x-auto border border-[#E5E7EB] rounded-lg bg-white">
+      <table className="ddg-financial-table w-full min-w-[560px]">
         <thead>
           <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
-            <th className="px-4 py-3 text-left text-xs font-semibold text-[#667085]">科目</th>
+            <th className="ddg-financial-table-metric px-4 py-3 text-xs font-semibold text-[#667085]">指标</th>
             {table.columns.map((column) => (
-              <th key={column} className="px-4 py-3 text-right text-xs font-semibold text-[#667085]">
+              <th key={column} className="px-4 py-3 text-xs font-semibold text-[#667085]">
                 {column}年
               </th>
             ))}
+            <th className="ddg-financial-table-trend px-4 py-3 text-xs font-semibold text-[#667085]">波动趋势</th>
           </tr>
         </thead>
         <tbody>
-          {table.rows.map((row) => (
+          {rows.map((row) => (
             <tr key={row.item} className="border-b border-[#F3F4F6] last:border-0">
-              <td className="px-4 py-3 text-sm font-medium text-[#101828] whitespace-nowrap">{row.item}</td>
-              {table.columns.map((column) => (
-                <td key={column} className="px-4 py-3 text-sm text-right text-[#374151] font-mono whitespace-nowrap">
-                  {row.values[column] ?? '数据不可用'}
+              <td className="ddg-financial-table-metric px-4 py-3 text-sm font-medium text-[#101828] whitespace-nowrap">{row.label}</td>
+              {table.columns.map((column, index) => (
+                <td key={column} className="px-4 py-3 text-sm text-[#374151] whitespace-nowrap">
+                  {formatFinancialCell(row.cells[index], row.unit)}
                 </td>
               ))}
+              <td className="ddg-financial-table-trend px-4 py-3 text-sm whitespace-nowrap"><span>{row.trend}</span></td>
             </tr>
           ))}
         </tbody>
@@ -400,27 +592,7 @@ function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskI
           </div>
         </header>
 
-        {report.narrative_source && (
-          <div className={`ddg-narrative-source ${narrativeSourceClass(report.narrative_source)} mb-6`}>
-            <div>
-              <strong>
-                财务分析文本生成方式：{narrativeSourceLabel(report.narrative_source)}
-                {report.narrative_provider ? ` · ${report.narrative_provider}` : ''}
-                {formatElapsed(report.narrative_elapsed_ms) ? ` · ${formatElapsed(report.narrative_elapsed_ms)}` : ''}
-              </strong>
-              <p>
-                {report.narrative_source === 'llm'
-                  ? '本报告摘要由 LLM 基于代码抽取的财务指标生成，并已通过质量闸门。'
-                  : '本报告摘要使用专业兜底模板生成，通常由 LLM 超时、格式异常或质量闸门未通过触发。'}
-              </p>
-            </div>
-            {report.narrative_quality_warnings?.length ? (
-              <ul>
-                {report.narrative_quality_warnings.slice(0, 4).map((warning) => <li key={warning}>{warning}</li>)}
-              </ul>
-            ) : null}
-          </div>
-        )}
+        <FinancialDashboardGrid dashboard={report.financial_dashboard} />
 
         <div className="space-y-8">
           {financialSections.map((section) => (
@@ -433,10 +605,9 @@ function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskI
                   <div key={subsection.title}>
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-base font-semibold text-[#101828]">{subsection.title}</h3>
-                      {subsection.unit && <span className="text-xs text-[#9CA3AF]">单位：{subsection.unit}</span>}
                     </div>
 
-                    {subsection.table && <FinancialReportTableView table={subsection.table} />}
+                    {subsection.table && <FinancialReportTableView table={subsection.table} unit={subsection.unit} />}
 
                     {subsection.analysis && subsection.analysis.length > 0 && (
                       <div className="mt-4 space-y-2">
@@ -477,6 +648,93 @@ function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskI
           </p>
         </footer>
       </div>
+    </div>
+  );
+}
+
+function findFinancialSubsection(report: ReportData | undefined, title: string): FinancialReportSubsection | undefined {
+  const sections = (report?.sections || []) as FinancialReportSection[];
+  for (const section of sections) {
+    const hit = section.subsections?.find((item) => item.title === title);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+function FinancialSpecialistAnalysis({ report }: { report?: ReportData }) {
+  if (!report?.sections?.length) return null;
+  const groups = [
+    {
+      title: '3.1 收入与利润分析',
+      subtitle: '判断收入增长是否转化为利润，利润是否依赖非经常性因素。',
+      subsections: ['利润表分析', '盈利能力分析'],
+    },
+    {
+      title: '3.2 资产负债分析',
+      subtitle: '拆分资产沉淀位置、负债期限结构和资本实力变化。',
+      subsections: ['资产分析', '负债分析', '所有者权益分析'],
+    },
+    {
+      title: '3.3 盈利质量与营运效率',
+      subtitle: '交叉验证应收、存货、周转效率和现金含量是否支撑收入真实性。',
+      subsections: ['营运能力分析', '现金流量表分析'],
+    },
+    {
+      title: '3.4 偿债能力与财务信号异常',
+      subtitle: '评估短债压力、流动性安全边际、现金流覆盖和异常信号。',
+      subsections: ['偿债能力分析', '主要潜在风险提示'],
+    },
+  ];
+
+  return (
+    <div className="ddg-financial-methodology">
+      <div className="ddg-financial-methodology-head">
+        <BarChart3 size={16} />
+        <div>
+          <h3>财务分析方法论框架</h3>
+          <p>按银行贷前审查习惯组织财务专项结论：先看增长与利润，再看资产负债，随后交叉验证营运效率、现金流与偿债安全边际。</p>
+        </div>
+      </div>
+      {groups.map((group) => {
+        const subsections = group.subsections
+          .map((title) => findFinancialSubsection(report, title))
+          .filter(Boolean) as FinancialReportSubsection[];
+        if (!subsections.length) return null;
+        return (
+          <section key={group.title} className="ddg-financial-methodology-section">
+            <div className="ddg-financial-methodology-title">
+              <h4>{group.title}</h4>
+              <span>{group.subtitle}</span>
+            </div>
+            <div className="ddg-financial-methodology-body">
+              {subsections.map((subsection) => (
+                <article key={subsection.title} className="ddg-financial-methodology-block">
+                  <div className="ddg-financial-methodology-block-title">
+                    <strong>{subsection.title}</strong>
+                  </div>
+                  {subsection.table && <FinancialReportTableView table={subsection.table} unit={subsection.unit} />}
+                  {subsection.title === '利润表分析' && subsection.table && (
+                    <div className="ddg-financial-methodology-analysis">
+                      {incomeStatementAnalysisFromTable(subsection)?.map((text, index) => <p key={index}>{text}</p>)}
+                    </div>
+                  )}
+                  {!(subsection.title === '利润表分析' && subsection.table) && subsection.analysis?.length ? (
+                    <div className="ddg-financial-methodology-analysis">
+                      {subsection.analysis.slice(0, 3).map((text, index) => <p key={index}>{text}</p>)}
+                    </div>
+                  ) : null}
+                  {subsection.risk提示 && <p className="ddg-financial-methodology-risk">{subsection.risk提示}</p>}
+                  {subsection.risks?.length ? (
+                    <div className="ddg-financial-methodology-risk-list">
+                      {subsection.risks.slice(0, 5).map((risk) => <span key={risk}>{risk}</span>)}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -888,21 +1146,423 @@ function chapterRiskLabel(level?: string) {
   return riskLabel(level);
 }
 
-function narrativeSourceLabel(source?: string) {
-  if (source === 'llm') return 'LLM生成';
-  if (source === 'fallback') return '兜底模板';
-  return '未标记';
+function evidenceDisplaySource(doc: EvidenceDocItem): string {
+  if (doc.source_type === 'codeact_financial_metric') return '财务指标计算';
+  if (doc.source_type === 'codeact_financial_validation') return '三大表勾稽校验';
+  return doc.display_tool_name || doc.source_name || doc.source || doc.source_type || '未知来源';
 }
 
-function narrativeSourceClass(source?: string) {
-  if (source === 'llm') return 'llm';
-  if (source === 'fallback') return 'fallback';
-  return 'unknown';
+function chartDisplayData(series: FinancialDashboardSeries): Array<number | null> {
+  if (series.unit === '%') return series.data.map((value) => value === null ? null : Number((value * 100).toFixed(4)));
+  if (series.unit === '元') return series.data.map((value) => value === null ? null : Number((value / 100000000).toFixed(4)));
+  return series.data;
 }
 
-function formatElapsed(ms?: number) {
-  if (ms === undefined || ms === null) return '';
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}秒` : `${ms}毫秒`;
+function chartAxisUnit(unit?: string) {
+  if (unit === '元') return '亿元';
+  return unit || '';
+}
+
+function formatChartLabel(value: number | string, unit?: string) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return String(value);
+  const axisUnit = chartAxisUnit(unit);
+  if (axisUnit === '%') return `${number.toFixed(2)}%`;
+  if (axisUnit === '亿元') return number.toFixed(1);
+  if (axisUnit === '倍') return number.toFixed(2);
+  if (axisUnit === '天') return number.toFixed(1);
+  return Math.abs(number) >= 100 ? number.toFixed(0) : number.toFixed(2);
+}
+
+function dashboardChartOption(chart: FinancialDashboardChart) {
+  const isLine = chart.chart_type === 'line';
+  const isMixed = chart.chart_type === 'bar_line';
+  const amountChart = chart.unit === '元';
+  const unit = chartAxisUnit(chart.unit);
+  return {
+    color: ['#5B8BD9', '#F28E45', '#80B86F', '#7C8DB5', '#D87445'],
+    animation: false,
+    grid: { left: amountChart ? 48 : 40, right: 18, top: 38, bottom: 34, containLabel: false },
+    tooltip: {
+      trigger: 'axis',
+      valueFormatter: (value: number | string) => `${formatChartLabel(value, chart.unit)}${unit}`,
+    },
+    legend: {
+      top: 2,
+      right: 0,
+      itemWidth: 8,
+      itemHeight: 8,
+      textStyle: { color: '#334155', fontSize: 10 },
+    },
+    xAxis: {
+      type: 'category',
+      data: chart.years,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: '#DCE3EE' } },
+      axisLabel: { color: '#334155', fontSize: 10 },
+    },
+    yAxis: {
+      type: 'value',
+      name: unit,
+      nameTextStyle: { color: '#64748B', fontSize: 10 },
+      splitLine: { lineStyle: { color: '#EDF1F7' } },
+      axisLabel: {
+        color: '#334155',
+        fontSize: 10,
+        formatter: (value: number) => amountChart ? value.toFixed(0) : value,
+      },
+    },
+    series: chart.series.map((item, index) => ({
+      name: item.name,
+      type: isLine || (isMixed && index > 0) ? 'line' : 'bar',
+      smooth: false,
+      barMaxWidth: 28,
+      data: chartDisplayData(item),
+      connectNulls: false,
+      symbolSize: 6,
+      lineStyle: { width: 2 },
+      label: {
+        show: true,
+        position: isLine || (isMixed && index > 0) ? 'top' : 'top',
+        color: '#1F2937',
+        fontSize: 9,
+        formatter: (params: { value: number | string }) => formatChartLabel(params.value, item.unit || chart.unit),
+      },
+      markLine: index === 0 && chart.threshold_lines?.length ? {
+        symbol: 'none',
+        label: { formatter: '{b}', color: '#64748B', fontSize: 9, position: 'end' },
+        lineStyle: { type: 'dashed', color: chart.threshold_lines[0].color || '#D97706', width: 1.2 },
+        data: chart.threshold_lines.map((line) => ({
+          name: line.name,
+          yAxis: line.unit === '%' ? Number((line.value * 100).toFixed(4)) : line.value,
+        })),
+      } : undefined,
+    })),
+  };
+}
+
+function FinancialDashboardGrid({ dashboard }: { dashboard?: FinancialDashboard }) {
+  if (!dashboard?.charts?.length) return null;
+  return (
+    <section className="ddg-financial-dashboard">
+      <div className="ddg-financial-dashboard-head">
+        <div>
+          <h3>{dashboard.title || '近三年财务数据分析'}</h3>
+        </div>
+      </div>
+      <div className="ddg-financial-chart-grid">
+        {dashboard.charts.slice(0, 9).map((chart) => (
+          <article key={chart.id} className="ddg-financial-chart-card">
+            <div className="ddg-financial-chart-title">
+              <h4>{chart.title}</h4>
+            </div>
+            <ReactECharts option={dashboardChartOption(chart)} style={{ height: 230, width: '100%' }} notMerge lazyUpdate />
+          </article>
+        ))}
+      </div>
+      <p className="ddg-financial-dashboard-note">{dashboard.data_boundary || '图表基于已解析财务数据生成。'}</p>
+    </section>
+  );
+}
+
+function EvidenceReferenceList({
+  refs,
+  evidenceById,
+  title = '支撑证据',
+  limit = 5,
+}: {
+  refs?: string[];
+  evidenceById: Map<string, EvidenceDocItem>;
+  title?: string;
+  limit?: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const docs = (refs || []).map((ref) => evidenceById.get(ref)).filter(Boolean) as EvidenceDocItem[];
+  if (!docs.length) return null;
+  if (!expanded) {
+    return (
+      <button type="button" className="ddg-inline-evidence-toggle" onClick={() => setExpanded(true)}>
+        <Shield size={13} />
+        <span>查看依据</span>
+        <em>{docs.length}项</em>
+      </button>
+    );
+  }
+  return (
+    <div className="ddg-inline-evidence-list">
+      <div className="ddg-inline-evidence-title">
+        <Shield size={13} />
+        <span>{title}</span>
+        <button type="button" onClick={() => setExpanded(false)}>收起</button>
+      </div>
+      {docs.slice(0, limit).map((doc) => (
+        <a key={doc.id || doc.source_url || doc.name} href={doc.source_url} target="_blank" rel="noreferrer" className="ddg-inline-evidence-item">
+          <FileText size={14} />
+          <div>
+            <strong>{doc.name || doc.label || doc.source_name || '证据项'}</strong>
+            <p>
+              {evidenceDisplaySource(doc)}
+              {doc.display_provider ? ` · ${doc.display_provider}` : ''}
+              {' · '}{trustLabel(doc.trust_level || doc.reliability)} · {Math.round((doc.confidence ?? 0) * 100)}%
+              {doc.requires_manual_review || doc.status !== 'verified' ? ' · 待复核' : ' · 已验证'}
+            </p>
+          </div>
+          {doc.source_url && <ExternalLink size={13} />}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function refsForSummaryLine(chapter: ReportChapter, index: number): string[] {
+  const citationRefs = chapter.summary_citations?.[index]?.evidence_refs || [];
+  if (citationRefs.length) return citationRefs;
+  const findingRefs = chapter.findings?.[index]?.evidence_refs || [];
+  if (findingRefs.length) return findingRefs;
+  return chapter.evidence_refs || [];
+}
+
+function ChapterSummaryList({ chapter, evidenceById }: { chapter: ReportChapter; evidenceById: Map<string, EvidenceDocItem> }) {
+  if (!chapter.summary?.length) return null;
+  return (
+    <div className="ddg-chapter-summary cited">
+      {chapter.summary.slice(0, 8).map((item, index) => (
+        <div key={`${chapter.id}-summary-${index}`} className="ddg-cited-paragraph">
+          <p>{item}</p>
+          <EvidenceReferenceList
+            refs={refsForSummaryLine(chapter, index)}
+            evidenceById={evidenceById}
+            title="支撑这句话的证据"
+            limit={3}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChapterSubsectionList({ chapter, evidenceById }: { chapter: ReportChapter; evidenceById: Map<string, EvidenceDocItem> }) {
+  if (!chapter.subsections?.length) return null;
+  return (
+    <div className="ddg-chapter-subsections">
+      {chapter.subsections.map((subsection, index) => {
+        const refs = subsection.evidence_refs?.length ? subsection.evidence_refs : refsForSummaryLine(chapter, index);
+        return (
+          <article key={`${chapter.id}-subsection-${subsection.title || index}`} className="ddg-chapter-subsection-card">
+            <h3>{subsection.title || `要点 ${index + 1}`}</h3>
+            <ul>
+              {(subsection.items || []).slice(0, 6).map((item) => <li key={item}>{item}</li>)}
+            </ul>
+            <EvidenceReferenceList refs={refs} evidenceById={evidenceById} title="本小节证据" limit={3} />
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function dimensionEvidenceRefs(dim: FullRiskDimension, chapters: ReportChapter[]): string[] {
+  const name = dim.name || '';
+  const chapterId = name.includes('财务')
+    ? 'financial'
+    : name.includes('司法') || name.includes('合规')
+      ? 'legal'
+      : name.includes('行业') || name.includes('经营')
+        ? 'industry'
+        : 'business';
+  const chapter = chapters.find((item) => item.id === chapterId);
+  return chapter?.evidence_refs || chapter?.findings?.flatMap((finding) => finding.evidence_refs || []) || [];
+}
+
+function ChapterFindingList({ findings, evidenceById }: { findings?: CrossFinding[]; evidenceById: Map<string, EvidenceDocItem> }) {
+  if (!findings?.length) return null;
+  return (
+    <div className="ddg-chapter-findings">
+      {findings.map((finding, index) => (
+        <article key={`${finding.title}-${index}`} className="ddg-chapter-finding-card">
+          <div className="ddg-chapter-finding-head">
+            <strong>{finding.title}</strong>
+            <span className={riskColorClass(finding.risk_level || 'medium')}>{riskLabel(finding.risk_level || 'medium')}</span>
+          </div>
+          <p>{finding.conclusion}</p>
+          <EvidenceReferenceList refs={finding.evidence_refs} evidenceById={evidenceById} />
+          {finding.verification_actions?.length ? (
+            <div className="ddg-finding-actions">
+              <span>核查要点</span>
+              {finding.verification_actions.slice(0, 3).map((item) => <em key={item}>{item}</em>)}
+            </div>
+          ) : null}
+          {finding.missing_items?.length ? (
+            <div className="ddg-finding-missing">
+              <span>待补充</span>
+              {finding.missing_items.slice(0, 3).map((item) => <em key={item}>{item}</em>)}
+            </div>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+const QUALITY_DIMENSION_LABELS: Record<string, string> = {
+  subject_identity: '主体识别',
+  report_structure: '报告结构',
+  evidence_depth: '证据深度',
+  inline_citations: '正文级引用',
+  financial_depth: '财务分析深度',
+  industry_depth: '行业分析深度',
+  legal_business_coverage: '工商司法覆盖',
+  credit_coherence: '授信建议一致性',
+  language_quality: '语言质量',
+};
+
+function qualityScoreClass(score: number) {
+  if (score >= 80) return 'good';
+  if (score >= 60) return 'warn';
+  return 'bad';
+}
+
+function qualitySeverityClass(severity: string) {
+  if (severity === 'P0') return 'critical';
+  if (severity === 'P1') return 'high';
+  return 'medium';
+}
+
+function ReportQualityDrawer({
+  report,
+  open,
+  onClose,
+}: {
+  report: ReportData;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [quality, setQuality] = useState<ReportQualityResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || quality || loading) return;
+    const runEvaluation = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await evaluateReportQuality(report);
+        setQuality(result);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '质量评测失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+    runEvaluation();
+  }, [open, quality, loading, report]);
+
+  const issueCounts = { P0: 0, P1: 0, P2: 0 };
+  for (const issue of quality?.issues || []) {
+    if (issue.severity === 'P0') issueCounts.P0 += 1;
+    if (issue.severity === 'P1') issueCounts.P1 += 1;
+    if (issue.severity === 'P2') issueCounts.P2 += 1;
+  }
+
+  return (
+    <>
+      <div className={`ddg-quality-drawer-mask ${open ? 'open' : ''}`} onClick={onClose} />
+      <aside className={`ddg-quality-drawer ${open ? 'open' : ''}`} aria-hidden={!open}>
+        <div className="ddg-quality-drawer-header">
+          <div>
+            <span>内部质检</span>
+            <h2>报告质量评测</h2>
+          </div>
+          <button onClick={onClose} title="关闭"><X size={16} /></button>
+        </div>
+
+        {loading && (
+          <div className="ddg-quality-drawer-loading">
+            <Loader2 className="animate-spin" />
+            <span>正在评测当前报告...</span>
+          </div>
+        )}
+
+        {error && <div className="ddg-quality-drawer-error"><AlertTriangle size={15} />{error}</div>}
+
+        {quality && (
+          <div className="ddg-quality-drawer-body">
+            <section className="ddg-quality-drawer-score-card">
+              <div className={`ddg-quality-drawer-score ${qualityScoreClass(quality.overall_score)}`}>
+                <span>总分</span>
+                <strong>{quality.overall_score}</strong>
+                <em>{quality.grade}</em>
+              </div>
+              <div>
+                <div className="ddg-quality-drawer-status">
+                  {quality.passed ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+                  <strong>{quality.passed ? '通过当前质量门' : '未通过当前质量门'}</strong>
+                </div>
+                <p>{report.enterprise_name || '未知企业'} · 证据 {quality.metrics?.evidence_count ?? 0} 项</p>
+                <div className="ddg-quality-drawer-issue-strip">
+                  <span className="critical">P0 {issueCounts.P0}</span>
+                  <span className="high">P1 {issueCounts.P1}</span>
+                  <span className="medium">P2 {issueCounts.P2}</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="ddg-quality-drawer-section">
+              <h3>维度得分</h3>
+              <div className="ddg-quality-drawer-dimensions">
+                {Object.entries(quality.dimension_scores || {}).map(([key, value]) => (
+                  <div key={key}>
+                    <span>{QUALITY_DIMENSION_LABELS[key] || key}</span>
+                    <i><b style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></i>
+                    <strong className={qualityScoreClass(value)}>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="ddg-quality-drawer-section">
+              <h3>Top 问题</h3>
+              {quality.issues.length === 0 ? (
+                <p className="ddg-quality-drawer-muted">未发现质量问题。</p>
+              ) : (
+                <div className="ddg-quality-drawer-issues">
+                  {quality.issues.slice(0, 5).map((issue, index) => (
+                    <article key={`${issue.dimension}-${index}`} className={qualitySeverityClass(issue.severity)}>
+                      <div><span>{issue.severity}</span><em>{QUALITY_DIMENSION_LABELS[issue.dimension] || issue.dimension}</em></div>
+                      <strong>{issue.message}</strong>
+                      <p>{issue.recommendation}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="ddg-quality-drawer-section">
+              <h3>优先修复建议</h3>
+              <ol className="ddg-quality-drawer-recommendations">
+                {quality.recommendations.slice(0, 5).map((item) => <li key={item}>{item}</li>)}
+              </ol>
+            </section>
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
+
+function ReportWithQualityDrawer({ report, children }: { report: ReportData; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      {children}
+      <button className="ddg-report-quality-fab" onClick={() => setOpen(true)}>
+        <Gauge size={16} />
+        质量评测
+      </button>
+      <ReportQualityDrawer report={report} open={open} onClose={() => setOpen(false)} />
+    </>
+  );
 }
 
 function buildFallbackChapters(report: ReportData): ReportChapter[] {
@@ -980,24 +1640,42 @@ function buildFallbackChapters(report: ReportData): ReportChapter[] {
   ];
 }
 
+function extractFinancialReport(report: ReportData): ReportData | undefined {
+  if (report.sub_reports?.financial) return report.sub_reports.financial;
+  const evidencePool = [...(report.evidence || []), ...(report.evidence_docs || [])];
+  for (const item of evidencePool) {
+    const metadata = item.metadata as { financial_analysis_report?: ReportData } | undefined;
+    if (metadata?.financial_analysis_report) return metadata.financial_analysis_report;
+  }
+  return undefined;
+}
+
 function FullDueDiligenceReport({ report }: { report: ReportData }) {
   const rating = report.risk_rating || 'medium';
   const score = report.risk_score ?? 0;
   const isPublicPreDd = report.report_mode === 'public_pre_dd';
   const dimensions = report.risk_dimensions || [];
   const decision = report.credit_decision || {};
-  const evidenceDocs = report.evidence_docs || [];
+  const financialReport = extractFinancialReport(report);
+  const evidenceDocs = [
+    ...(report.evidence_docs || report.evidence || []),
+    ...(financialReport?.codeact_evidence || []),
+  ];
+  const evidenceById = new Map(evidenceDocs.map((item) => [item.id || '', item]));
   const chapters = report.report_chapters?.length ? report.report_chapters : buildFallbackChapters(report);
   const ratingText = rating === 'low' ? 'AAA-' : rating === 'medium' ? 'A' : 'BBB-';
   const ratingClass = rating === 'low' ? 'low' : rating === 'high' ? 'high' : 'medium';
   const modeLabel = report.report_mode_label || (isPublicPreDd ? '公开资料预尽调' : '财报增强尽调');
   const overviewChapter = chapters.find((chapter) => chapter.id === 'overview');
   const creditChapter = chapters.find((chapter) => chapter.id === 'credit');
-  const financialReport = report.sub_reports?.financial;
-  const financialNarrativeSource = financialReport?.narrative_source;
-  const financialNarrativeWarnings = financialReport?.narrative_quality_warnings || [];
-  const financialNarrativeElapsed = formatElapsed(financialReport?.narrative_elapsed_ms);
-  const financialNarrativeProvider = financialReport?.narrative_provider;
+  const overviewSubsections = overviewChapter?.subsections || [];
+  const overviewItems = (title: string, fallback: string[] = []) => (
+    overviewSubsections.find((item) => item.title === title)?.items || fallback
+  );
+  const coreRisks = overviewItems('核心风险', report.risk_summary || []).filter(Boolean);
+  const creditBoundary = overviewItems('授信边界', [decision.credit_limit_advice || '额度、期限和提款条件需结合证据缺口补齐情况审慎确定。']);
+  const dataBoundaryItems = overviewItems('数据边界', [report.data_boundary || '本报告需结合原始凭证和人工尽调复核。']);
+  const financialDataStatus = financialReport?.financial_dashboard?.charts?.length || financialReport?.sections?.length ? '已形成专项' : '待补充';
 
   return (
     <div className="ddg-report-page">
@@ -1039,35 +1717,52 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
         </aside>
 
         <main className="ddg-report-main">
-          <section id="overview" className="ddg-report-hero-card ddg-report-hero-wide">
-            <div className="ddg-report-score-card">
-              <div className="score-label">综合评级</div>
-              <div className="score-value">{ratingText}</div>
-              <p>{score}分 · {riskLabel(rating)}</p>
-            </div>
-            <div className="ddg-report-credit-content">
-              <div className="ddg-report-section-heading inline">
-                <h2>报告导言与核心概要</h2>
-                <span>{decision.suggestion || (isPublicPreDd ? '有条件初步准入' : '待审查')}</span>
+          <section id="overview" className="ddg-report-cover-card">
+            <div className="ddg-report-cover-header">
+              <div>
+                <span>贷前尽职调查报告</span>
+                <h2>{report.enterprise_name}</h2>
+                <p>{modeLabel} · 客户经理初审底稿 · 结论需按授信流程复核</p>
               </div>
-              <p>{report.recommendation || creditChapter?.summary?.[0] || '暂无授信建议'}</p>
-              <div className="ddg-report-metrics-grid">
-                {[
-                  { label: '报告模式', value: modeLabel },
-                  { label: '综合评分', value: `${score}分` },
-                  { label: '准入意见', value: decision.suggestion || '待审查' },
-                  { label: '财务文本', value: narrativeSourceLabel(financialNarrativeSource) },
-                ].map((item) => (
-                  <div key={item.label} className="ddg-report-mini-metric">
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </div>
-                ))}
+              <div className={`ddg-report-cover-mode ${ratingClass}`}>{riskLabel(rating)}</div>
+            </div>
+
+            <div className="ddg-report-cover-grid">
+              <div className="ddg-report-cover-score">
+                <span>综合评级</span>
+                <strong>{ratingText}</strong>
+                <p>{score}分 · {riskLabel(rating)}</p>
+              </div>
+
+              <div className="ddg-report-cover-decision">
+                <div className="ddg-report-cover-section-title"><CreditCard size={16} /><span>准入建议</span></div>
+                <h3>{decision.suggestion || (isPublicPreDd ? '有条件初步准入' : '待审查')}</h3>
+                <p>{report.recommendation || creditChapter?.summary?.[0] || '暂无授信建议'}</p>
+                <div className="ddg-report-cover-metrics">
+                  <div><span>报告模式</span><strong>{modeLabel}</strong></div>
+                  <div><span>资料覆盖</span><strong>{evidenceDocs.length ? `${evidenceDocs.length}项` : '待补充'}</strong></div>
+                  <div><span>财务资料</span><strong>{financialDataStatus}</strong></div>
+                </div>
+              </div>
+
+              <div className="ddg-report-cover-side">
+                <div className="ddg-report-cover-panel warning">
+                  <div className="ddg-report-cover-section-title"><AlertTriangle size={16} /><span>核心风险</span></div>
+                  <ul>{coreRisks.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
+                <div className="ddg-report-cover-panel">
+                  <div className="ddg-report-cover-section-title"><Shield size={16} /><span>授信边界</span></div>
+                  <ul>{creditBoundary.slice(0, 3).map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
               </div>
             </div>
-            <div className="ddg-report-alert">
-              <AlertTriangle size={18} />
-              {report.data_boundary || overviewChapter?.highlights?.find((item) => item.includes('数据边界')) || '本报告需结合原始凭证和人工尽调复核。'}
+
+            <div className="ddg-report-cover-boundary">
+              <AlertTriangle size={16} />
+              <div>
+                <strong>数据边界</strong>
+                <p>{dataBoundaryItems[0] || report.data_boundary || '本报告需结合原始凭证和人工尽调复核。'}</p>
+              </div>
             </div>
           </section>
 
@@ -1078,11 +1773,17 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
                 <div key={dim.name} className="ddg-risk-card">
                   <div>
                     <h3>{dim.name}</h3>
-                    <span>权重 {Math.round((dim.weight || 0) * 100)}%</span>
+                    <span>权重 {Math.round(dimensionWeight(dim) * 100)}%</span>
                   </div>
                   <strong>{dim.score}</strong>
                   <div className="ddg-risk-bar"><span style={{ width: `${dim.score}%` }} /></div>
                   <p>{(dim.details || [])[0] || '未发现明确重大异常。'}</p>
+                  <EvidenceReferenceList
+                    refs={dimensionEvidenceRefs(dim, chapters)}
+                    evidenceById={evidenceById}
+                    title="评分依据"
+                    limit={2}
+                  />
                 </div>
               ))}
             </div>
@@ -1102,46 +1803,28 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
                 </div>
                 {chapter.subtitle && <p className="ddg-report-section-subtitle">{chapter.subtitle}</p>}
 
-                {isFinancial && financialNarrativeSource && (
-                  <div className={`ddg-narrative-source ${narrativeSourceClass(financialNarrativeSource)}`}>
-                    <div>
-                      <strong>
-                        财务分析文本生成方式：{narrativeSourceLabel(financialNarrativeSource)}
-                        {financialNarrativeProvider ? ` · ${financialNarrativeProvider}` : ''}
-                        {financialNarrativeElapsed ? ` · ${financialNarrativeElapsed}` : ''}
-                      </strong>
-                      <p>
-                        {financialNarrativeSource === 'llm'
-                          ? '本章节摘要由 LLM 基于代码抽取的财务指标生成，并已通过质量闸门。'
-                          : '本章节摘要使用专业兜底模板生成，通常由 LLM 超时、格式异常或质量闸门未通过触发。'}
-                      </p>
-                    </div>
-                    {financialNarrativeWarnings.length > 0 && (
-                      <ul>
-                        {financialNarrativeWarnings.slice(0, 4).map((warning) => <li key={warning}>{warning}</li>)}
-                      </ul>
+                {isFinancial && (
+                  <>
+                    <FinancialDashboardGrid dashboard={financialReport?.financial_dashboard} />
+                    <FinancialSpecialistAnalysis report={financialReport} />
+                    {!financialReport?.financial_dashboard?.charts?.length && !financialReport?.sections?.length && (
+                      <div className="ddg-report-warning-list">
+                        <div><AlertTriangle size={14} /><span>财务专项尚未形成结构化图表和诊断分析，需补充近三年三大表后重新生成。</span></div>
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
 
-                {chapter.summary && chapter.summary.length > 0 && (
-                  <div className="ddg-chapter-summary">
-                    {chapter.summary.slice(0, 8).map((item, index) => (
-                      <p key={index}>{item}</p>
-                    ))}
-                  </div>
-                )}
+                {!isFinancial && <ChapterSummaryList chapter={chapter} evidenceById={evidenceById} />}
+
+                {!isFinancial && <ChapterSubsectionList chapter={chapter} evidenceById={evidenceById} />}
 
                 {isRisk && chapter.findings && chapter.findings.length > 0 && (
-                  <div className="ddg-cross-grid">
-                    {chapter.findings.map((finding, index) => (
-                      <div key={`${finding.title}-${index}`}>
-                        <strong>{finding.title}</strong>
-                        <p>{finding.conclusion}</p>
-                        {finding.evidence_refs?.length ? <span>依据：{finding.evidence_refs.join('、')}</span> : null}
-                      </div>
-                    ))}
-                  </div>
+                  <ChapterFindingList findings={chapter.findings} evidenceById={evidenceById} />
+                )}
+
+                {!isFinancial && !isRisk && chapter.findings && chapter.findings.length > 0 && (
+                  <ChapterFindingList findings={chapter.findings} evidenceById={evidenceById} />
                 )}
 
                 {(chapter.risks && chapter.risks.length > 0 && !isRisk) && (
@@ -1170,9 +1853,7 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
                 ) : null}
 
                 {chapter.evidence_refs && chapter.evidence_refs.length > 0 && !isEvidence && (
-                  <div className="ddg-evidence-ref-row">
-                    {chapter.evidence_refs.slice(0, 6).map((ref) => <span key={ref}>{ref}</span>)}
-                  </div>
+                  <EvidenceReferenceList refs={chapter.evidence_refs} evidenceById={evidenceById} />
                 )}
 
                 {isEvidence && (
@@ -1185,7 +1866,7 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
                           <p>{doc.claim || doc.value || doc.name || '待补充证据详情'}</p>
                           <p>{doc.source_name || doc.source || '未识别来源'}</p>
                           <span>
-                            {trustLabel(doc.reliability || doc.trust_level)} · {Math.round((doc.confidence ?? 0) * 100)}% · {doc.requires_manual_review || doc.status !== 'verified' ? '待复核' : '已验证'}
+                            {doc.display_tool_name ? `${doc.display_tool_name} · ` : ''}{trustLabel(doc.reliability || doc.trust_level)} · {Math.round((doc.confidence ?? 0) * 100)}% · {doc.requires_manual_review || doc.status !== 'verified' ? '待复核' : '已验证'}
                           </span>
                         </div>
                       </div>
@@ -1202,163 +1883,97 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
   );
 }
 
-function DeepResearchReport({ report }: { report: ReportData }) {
-  const tasks = report.research_plan || [];
-  const claims = report.claims || [];
-  const evidence = report.evidence || [];
-  const gaps = report.gaps || [];
-  const evidenceById = new Map(evidence.map((item) => [item.id, item]));
-  const highGaps = gaps.filter((gap) => gap.severity === 'high');
-  const fallbackScore = Math.max(45, Math.min(88, 82 - highGaps.length * 10 - Math.max(gaps.length - highGaps.length, 0) * 3));
-  const score = report.risk_score ?? fallbackScore;
-  const rating = report.risk_rating || (score >= 78 ? 'low' : score >= 60 ? 'medium' : 'high');
-  const decision = report.credit_decision || {};
-  const dimensions = report.risk_dimensions || [];
-  const chapters = report.report_chapters || [];
-  const ratingText = rating === 'low' ? 'A' : rating === 'medium' ? 'B+' : 'C';
-  const executiveSummary = report.executive_summary?.length
-    ? report.executive_summary
-    : Array.isArray(report.summary)
-      ? report.summary
-      : [report.recommendation || report.objective || '暂无综合结论'];
+function UnsupportedReportNotice({
+  report,
+  taskId,
+  message,
+  onBack,
+}: {
+  report?: ReportData;
+  taskId?: string;
+  message?: string;
+  onBack?: () => void;
+}) {
+  const summary = report?.executive_summary || report?.summary as string[] | undefined || [];
+  const evidenceCount = (report?.evidence || report?.evidence_docs || []).length;
 
   return (
-    <div className="ddg-report-page">
-      <header className="ddg-report-topbar">
-        <div className="ddg-report-topbar-inner">
-          <div className="ddg-report-title-group">
-            <div className="ddg-report-brand-icon"><Search size={16} /></div>
+    <div className="min-h-screen bg-[#F9FAFB]">
+      <div className="max-w-[960px] mx-auto px-6 py-8">
+        <header className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack || (() => window.history.back())}
+              className="p-2 -ml-2 rounded-lg hover:bg-[#F3F4F6] transition-colors"
+              title="返回"
+            >
+              <ArrowLeft className="w-4 h-4 text-[#667085]" />
+            </button>
             <div>
-              <h1>{report.enterprise_name}</h1>
-              <p>智能尽调报告 · 贷前授信初审</p>
+              <h1 className="text-lg font-bold text-[#101828]">尽调报告</h1>
+              <p className="text-xs text-[#9CA3AF]">
+                {report?.enterprise_name || '企业名称待获取'} · 任务ID: {taskId || '-'}
+              </p>
             </div>
-            <span className={`ddg-report-rating-badge ${rating}`}>{ratingText}</span>
           </div>
-          <div className="ddg-report-actions">
-            <span className="ddg-report-date">证据 {evidence.length} · 结论 {claims.length} · 缺口 {gaps.length}</span>
-            <button><Download size={14} />导出 PDF</button>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="ddg-deepresearch-layout">
-        <section className="ddg-report-hero-card ddg-report-hero-wide">
-          <div className="ddg-report-score-card">
-            <span className="score-label">综合评分</span>
-            <strong>{score}</strong>
-            <p>{riskLabel(rating)} · {decision.suggestion || '待审查'}</p>
-          </div>
-          <div>
-            <div className="ddg-report-section-heading inline"><FileText size={18} /><h2>调查结论与信贷建议</h2></div>
-            <div className="ddg-chapter-summary">
-              {executiveSummary.map((item, index) => <p key={index}>{item}</p>)}
+        <section className="bg-white border border-[#E5E7EB] rounded-xl p-6">
+          <div className="flex items-start gap-3 mb-5">
+            <div className="p-2 rounded-lg bg-[#FFFBEB]">
+              <AlertTriangle className="w-5 h-5 text-[#D97706]" />
             </div>
-            <div className="ddg-report-metrics-grid">
-              <div className="ddg-report-mini-metric"><span>准入意见</span><strong>{decision.suggestion || '待审查'}</strong></div>
-              <div className="ddg-report-mini-metric"><span>授信额度</span><strong>{decision.credit_limit_advice ? '需测算' : '待定'}</strong></div>
-              <div className="ddg-report-mini-metric"><span>证据数量</span><strong>{evidence.length}</strong></div>
-              <div className="ddg-report-mini-metric"><span>高优先缺口</span><strong>{highGaps.length}</strong></div>
+            <div>
+              <h2 className="text-lg font-bold text-[#101828]">报告暂不能按标准尽调模板展示</h2>
+              <p className="text-sm text-[#667085] mt-1 leading-6">
+                {message || '后端返回的报告结构未命中当前报告页支持的类型。系统不会使用演示数据补齐结论，请检查任务生成链路或重新运行尽调任务。'}
+              </p>
             </div>
           </div>
-        </section>
 
-        <section className="ddg-report-section-card">
-          <div className="ddg-report-section-heading inline"><Shield size={18} /><h2>四维风险评分</h2></div>
-          <div className="ddg-risk-grid">
-            {dimensions.map((dim) => (
-              <div key={dim.name} className="ddg-risk-card">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="p-4 bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg">
+              <p className="text-xs text-[#667085]">报告类型</p>
+              <strong className="block mt-1 text-sm text-[#101828]">{report?.report_type || 'unknown'}</strong>
+            </div>
+            <div className="p-4 bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg">
+              <p className="text-xs text-[#667085]">证据数量</p>
+              <strong className="block mt-1 text-sm text-[#101828]">{evidenceCount}</strong>
+            </div>
+            <div className="p-4 bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg">
+              <p className="text-xs text-[#667085]">风险评分</p>
+              <strong className="block mt-1 text-sm text-[#101828]">{report?.risk_score ?? '未生成'}</strong>
+            </div>
+          </div>
+
+          {(report?.recommendation || summary.length > 0 || report?.data_boundary) && (
+            <div className="space-y-4">
+              {report?.recommendation && (
                 <div>
-                  <h3>{dim.name}</h3>
-                  <span>权重 {Math.round((dim.weight || 0) * 100)}%</span>
+                  <h3 className="text-sm font-semibold text-[#101828] mb-2">后端返回建议</h3>
+                  <p className="text-sm leading-7 text-[#374151]">{report.recommendation}</p>
                 </div>
-                <strong>{dim.score}</strong>
-                <div className="ddg-risk-bar"><span style={{ width: `${dim.score}%` }} /></div>
-                <p>{dim.details?.[0] || '暂无专项说明'}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {chapters.filter((chapter) => !['overview', 'evidence'].includes(chapter.id)).map((chapter) => {
-          const Icon = chapterIcon(chapter.id);
-          return (
-            <section key={chapter.id} className="ddg-report-section-card ddg-chapter-card">
-              <div className="ddg-report-section-heading inline"><Icon size={18} /><h2>{chapter.title}</h2></div>
-              {chapter.subtitle && <p className="ddg-report-section-subtitle">{chapter.subtitle}</p>}
-              {chapter.summary?.length ? (
-                <div className="ddg-chapter-summary">{chapter.summary.map((item, index) => <p key={index}>{item}</p>)}</div>
-              ) : null}
-              {chapter.risks?.length ? (
-                <div className="ddg-report-warning-list">{chapter.risks.slice(0, 5).map((risk, index) => <div key={index}><AlertTriangle size={14} /><span>{risk}</span></div>)}</div>
-              ) : null}
-              {chapter.required_documents?.length ? (
-                <div className="ddg-report-card success ddg-report-inline-card"><div className="ddg-report-card-title"><FileText size={18} /><h3>待补充材料</h3></div><ul>{chapter.required_documents.map((item) => <li key={item}>{item}</li>)}</ul></div>
-              ) : null}
-            </section>
-          );
-        })}
-
-        <section className="ddg-report-section-card ddg-process-appendix">
-          <div className="ddg-report-section-heading inline"><DraftingCompass size={18} /><h2>过程与证据附录</h2></div>
-          <p className="ddg-report-section-subtitle">以下内容用于审查复核和追溯，不作为报告主结论阅读入口。</p>
-          <div className="ddg-research-report-plan">
-            {tasks.map((task, index) => (
-              <article key={task.id || index}>
-                <div><span>{task.category || 'research'} · {task.status || 'pending'}</span><h3>{task.question || task.name || task.id}</h3>{task.purpose && <p>{task.purpose}</p>}</div>
-                <em>{task.evidence_ids?.length || 0} 证据</em>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="ddg-report-section-card">
-          <div className="ddg-report-section-heading inline"><Shield size={18} /><h2>Claim-Evidence 证据链</h2></div>
-          <div className="ddg-claim-evidence-list">
-            {claims.map((claim, index) => {
-              const linkedEvidence = (claim.evidence_ids || []).map((id) => evidenceById.get(id)).filter(Boolean) as EvidenceDocItem[];
-              return (
-                <article key={claim.id || index} className="ddg-claim-evidence-card">
-                  <div className="ddg-claim-evidence-head">
-                    <h3>{claim.text || '未命名结论'}</h3>
-                    <span>{Math.round((claim.confidence || 0) * 100)}%</span>
+              )}
+              {summary.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-[#101828] mb-2">摘要片段</h3>
+                  <div className="space-y-2">
+                    {summary.slice(0, 5).map((item, index) => (
+                      <p key={index} className="text-sm leading-7 text-[#374151]">{item}</p>
+                    ))}
                   </div>
-                  <div className="ddg-claim-evidence-docs">
-                    {linkedEvidence.length ? linkedEvidence.slice(0, 4).map((doc) => (
-                      <a key={doc.id || doc.source_url || doc.name} href={doc.source_url} target="_blank" rel="noreferrer">
-                        <FileText size={14} />
-                        <div>
-                          <strong>{doc.name || (doc as any).label || doc.claim || '证据'}</strong>
-                          <p>{doc.source_name || doc.source || doc.source_type || '未知来源'} · {trustLabel(doc.trust_level || doc.reliability)}</p>
-                        </div>
-                      </a>
-                    )) : <p className="ddg-empty-note">该结论暂无可展开证据，需人工复核。</p>}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="ddg-report-two-col">
-          <div className="ddg-report-card warning">
-            <div className="ddg-report-card-title"><AlertTriangle size={18} /><h3>证据缺口</h3></div>
-            <ul>{gaps.slice(0, 8).map((gap, index) => <li key={gap.id || index}>{gap.description}</li>)}</ul>
-          </div>
-          <div className="ddg-report-card">
-            <div className="ddg-report-card-title"><Folder size={18} /><h3>来源分布</h3></div>
-            <div className="ddg-source-summary-list">
-              {Object.entries(report.source_reliability_summary || {}).map(([source, count]) => (
-                <div key={source}><span>{source}</span><strong>{count}</strong></div>
-              ))}
+                </div>
+              )}
+              {report?.data_boundary && (
+                <div className="p-4 rounded-lg border border-[#FDE68A] bg-[#FFFBEB]">
+                  <h3 className="text-sm font-semibold text-[#92400E] mb-2">数据边界</h3>
+                  <p className="text-sm leading-7 text-[#92400E]">{report.data_boundary}</p>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </section>
-
-        <section className="ddg-report-section-card">
-          <div className="ddg-report-section-heading inline"><AlertTriangle size={18} /><h2>数据边界</h2></div>
-          <p className="ddg-report-body-text">{report.data_boundary}</p>
-        </section>
-      </main>
+      </div>
     </div>
   );
 }
@@ -1392,13 +2007,6 @@ export function ReportPage() {
     loadReport();
   }, [taskId]);
 
-  // 计算风险维度平均分（基于参考数据，后端丰富后替换）
-  const avgScore = RISK_DIMENSIONS.reduce((sum, d) => sum + d.score, 0) / RISK_DIMENSIONS.length;
-
-  // 使用后端风险评分优先，否则用参考数据平均分
-  const displayScore = report?.risk_score ?? Math.round(avgScore);
-  const displayRating = report?.risk_rating ?? 'medium';
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
@@ -1411,333 +2019,34 @@ export function ReportPage() {
   }
 
   if (error) {
-    // 出错时展示报告骨架，但使用通用占位符而非硬编码企业数据
-    const enterpriseName = '（企业名称待获取）';
-    const mockReport: ReportData = {
-      enterprise_name: enterpriseName,
-      risk_rating: 'medium',
-      risk_score: 70,
-      recommendation: '报告加载失败，以下为报告骨架预览。请检查后端服务状态或重新发起尽调任务。',
-      report_type: 'full_due_diligence',
-      risk_dimensions: RISK_DIMENSIONS,
-      credit_decision: {
-        suggestion: '待审查',
-        risk_score: 70,
-        credit_limit_advice: '需补充财务数据后测算',
-        term_advice: '待审查',
-        collateral_advice: '需落实有效担保结构',
-      },
-      executive_summary: [
-        '报告数据尚未加载完成，无法生成核心优势总结。',
-        '请确保后端服务正常运行，并已完成尽调任务执行。',
-        '非上市企业需上传近三年财务报表后形成最终财务判断。',
-      ],
-      cross_findings: [
-        { title: '财务与经营匹配度', risk_level: 'medium', conclusion: '财务专项尚未取得可用数据，需补充近三年财报后判断收入与经营的匹配度。', evidence_refs: [] },
-        { title: '司法风险影响', risk_level: 'medium', conclusion: '司法数据源暂未形成可用证据链，需人工复核后再纳入正式授信判断。', evidence_refs: [] },
-        { title: '行业环境韧性', risk_level: 'medium', conclusion: '行业专项尚未形成可用证据链，需结合主营业务和行业知识库补充识别。', evidence_refs: [] },
-      ],
-      evidence_docs: [],
-      data_boundary: '报告加载失败，当前数据不可用。请检查后端服务状态或重新发起尽调任务。',
-    };
-    return <FullDueDiligenceReport report={mockReport} />;
+    return <UnsupportedReportNotice taskId={taskId} message={error} />;
   }
 
   if (report?.report_type === 'full_due_diligence') {
-    return <FullDueDiligenceReport report={report} />;
+    return <ReportWithQualityDrawer report={report}><FullDueDiligenceReport report={report} /></ReportWithQualityDrawer>;
   }
 
   if (report?.report_type === 'deepresearch_due_diligence') {
-    return <DeepResearchReport report={report} />;
+    return <ReportWithQualityDrawer report={report}><FullDueDiligenceReport report={report} /></ReportWithQualityDrawer>;
   }
 
   if (report?.report_type === 'financial_analysis') {
-    return <FinancialAnalysisReport report={report} taskId={taskId} />;
+    return <ReportWithQualityDrawer report={report}><FinancialAnalysisReport report={report} taskId={taskId} /></ReportWithQualityDrawer>;
   }
 
   if (report?.report_type === 'business_analysis') {
-    return <BusinessAnalysisReport report={report} taskId={taskId} />;
+    return <ReportWithQualityDrawer report={report}><BusinessAnalysisReport report={report} taskId={taskId} /></ReportWithQualityDrawer>;
   }
 
   if (report?.report_type === 'industry_analysis') {
-    return <IndustryAnalysisReport report={report} taskId={taskId} />;
+    return <ReportWithQualityDrawer report={report}><IndustryAnalysisReport report={report} taskId={taskId} /></ReportWithQualityDrawer>;
   }
 
   if (report?.report_type === 'legal_analysis') {
-    return <LegalAnalysisReport report={report} taskId={taskId} />;
+    return <ReportWithQualityDrawer report={report}><LegalAnalysisReport report={report} taskId={taskId} /></ReportWithQualityDrawer>;
   }
 
-  return (
-    <div className="min-h-screen bg-[#F9FAFB]">
-      <div className="max-w-[960px] mx-auto px-6 py-8">
-        {/* ── 顶栏 ──────────────────────────────── */}
-        <header className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 -ml-2 rounded-lg hover:bg-[#F3F4F6] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 text-[#667085]" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-[#101828]">尽调报告</h1>
-              <p className="text-xs text-[#9CA3AF]">
-                {report?.enterprise_name || '未知企业'} · 任务ID: {taskId}
-              </p>
-            </div>
-          </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors">
-            <Download className="w-4 h-4" />
-            <span className="text-sm">导出报告</span>
-          </button>
-        </header>
-
-        {/* ═══════ Section 1: 授信建议（真实数据）═══════ */}
-        <section className="mb-8">
-          <div className={`${riskBgClass(displayRating)} rounded-2xl border border-[#E5E7EB] p-6`}>
-            <div className="flex items-center gap-4 mb-4">
-              <div className={`text-4xl font-bold ${riskColorClass(displayRating)}`}>
-                {displayScore}分
-              </div>
-              <div>
-                <div className={`text-lg font-semibold ${riskColorClass(displayRating)}`}>
-                  {riskLabel(displayRating)}
-                </div>
-                <div className="text-sm text-[#667085]">综合风险评级</div>
-              </div>
-            </div>
-            <div className="p-4 bg-white rounded-xl border border-[#E5E7EB]">
-              <h3 className="text-sm font-semibold text-[#101828] mb-2">授信建议</h3>
-              <p className="text-sm text-[#374151]">
-                {report?.recommendation || '暂无授信建议'}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════ Section 2: 风险评级（参考数据）═══════ */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="p-1.5 bg-[#FEF3C7] rounded-lg">
-              <Shield className="w-4 h-4 text-[#F59E0B]" />
-            </div>
-            <h2 className="text-lg font-bold text-[#101828]">风险评级</h2>
-            <span className="text-xs text-[#9CA3AF] ml-2">（行业基准参考）</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {RISK_DIMENSIONS.map((dim) => (
-              <div key={dim.name} className="bg-white rounded-xl border border-[#E5E7EB] p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-[#101828]">{dim.name}</span>
-                  <span className={`text-sm font-bold ${
-                    dim.status === 'low' ? 'text-[#16A34A]' :
-                    dim.status === 'medium' ? 'text-[#F59E0B]' : 'text-[#DC2626]'
-                  }`}>
-                    {dim.score}分
-                  </span>
-                </div>
-                <div className="h-2 bg-[#F3F4F6] rounded-full overflow-hidden mb-3">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${dim.score}%`, backgroundColor: dimStatusColor(dim.status) }}
-                  />
-                </div>
-                <div className="space-y-1">
-                  {dim.details.map((detail, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs text-[#667085]">
-                      <span className="mt-0.5">•</span>
-                      <span>{detail}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ═══════ Section 3: 财务指标（参考数据）═══════ */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="p-1.5 bg-[#DBEAFE] rounded-lg">
-              <FileText className="w-4 h-4 text-[#3B82F6]" />
-            </div>
-            <h2 className="text-lg font-bold text-[#101828]">财务指标</h2>
-            <span className="text-xs text-[#9CA3AF] ml-2">（行业基准参考）</span>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#F3F4F6]">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[#9CA3AF]">指标</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[#9CA3AF]">2024</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[#9CA3AF]">2023</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[#9CA3AF]">2022</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[#9CA3AF]">行业均值</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[#9CA3AF]">评价</th>
-                </tr>
-              </thead>
-              <tbody>
-                {FINANCIAL_METRICS.map((metric) => (
-                  <tr key={metric.label} className="border-b border-[#F3F4F6] last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#101828]">{metric.label}</td>
-                    <td className="px-4 py-3 text-sm text-right text-[#374151] font-mono">{metric.year2024}</td>
-                    <td className="px-4 py-3 text-sm text-right text-[#9CA3AF] font-mono">{metric.year2023}</td>
-                    <td className="px-4 py-3 text-sm text-right text-[#9CA3AF] font-mono">{metric.year2022}</td>
-                    <td className="px-4 py-3 text-sm text-right text-[#9CA3AF] font-mono">{metric.industryAvg}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        metric.assessment === '优秀' ? 'text-[#16A34A] bg-[#F0FDF4]' :
-                        metric.assessment === '良好' ? 'text-[#3B82F6] bg-[#EFF6FF]' :
-                        'text-[#F59E0B] bg-[#FFFBEB]'
-                      }`}>
-                        {metric.assessment}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* ═══════ Section 4: 司法风险（参考数据）═══════ */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="p-1.5 bg-[#FEE2E2] rounded-lg">
-              <Shield className="w-4 h-4 text-[#DC2626]" />
-            </div>
-            <h2 className="text-lg font-bold text-[#101828]">司法风险</h2>
-            <span className="text-xs text-[#9CA3AF] ml-2">（行业基准参考）</span>
-          </div>
-
-          <div className="space-y-3">
-            {LEGAL_ITEMS.map((item) => (
-              <div key={item.type} className="flex items-start gap-4 p-4 bg-white rounded-xl border border-[#E5E7EB]">
-                <div className={`p-2 rounded-lg ${
-                  item.severity === 'high' ? 'bg-[#FEE2E2]' :
-                  item.severity === 'medium' ? 'bg-[#FFFBEB]' : 'bg-[#F0FDF4]'
-                }`}>
-                  {item.count > 0 ? (
-                    <AlertTriangle className={`w-4 h-4 ${
-                      item.severity === 'high' ? 'text-[#DC2626]' :
-                      item.severity === 'medium' ? 'text-[#F59E0B]' : 'text-[#16A34A]'
-                    }`} />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4 text-[#16A34A]" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-[#101828]">{item.type}</span>
-                    <span className="text-xs text-[#9CA3AF]">{item.count}条</span>
-                  </div>
-                  <p className="text-xs text-[#667085]">{item.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ═══════ Section 5: 行业分析（参考数据）═══════ */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="p-1.5 bg-[#F3E0FF] rounded-lg">
-              <TrendingUp className="w-4 h-4 text-[#7C3AED]" />
-            </div>
-            <h2 className="text-lg font-bold text-[#101828]">行业分析</h2>
-            <span className="text-xs text-[#9CA3AF] ml-2">（行业基准参考）</span>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-6">
-            <div className="grid grid-cols-3 gap-6 mb-6">
-              {[
-                { label: '行业景气度', value: '78分', desc: '高于行业平均' },
-                { label: '行业排名', value: '前25%', desc: '中上游水平' },
-                { label: '政策环境', value: '支持', desc: '国家政策扶持方向' },
-              ].map((item) => (
-                <div key={item.label} className="text-center p-4 bg-[#F9FAFB] rounded-xl">
-                  <p className="text-[28px] font-bold text-[#101828] mb-1">{item.value}</p>
-                  <p className="text-sm font-medium text-[#101828] mb-0.5">{item.label}</p>
-                  <p className="text-xs text-[#667085]">{item.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-[#F9FAFB] rounded-lg">
-                <CheckCircle2 className="w-4 h-4 text-[#22C55E] mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-[#101828]">行业增速稳健</p>
-                  <p className="text-xs text-[#667085] mt-0.5">目标企业所处科技服务行业近三年复合增长率18%，高于GDP增速</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-[#F9FAFB] rounded-lg">
-                <CheckCircle2 className="w-4 h-4 text-[#22C55E] mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-[#101828]">竞争格局清晰</p>
-                  <p className="text-xs text-[#667085] mt-0.5">目标企业市场份额稳定，前5大客户结构合理，无明显垄断风险</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-[#FFF7ED] rounded-lg">
-                <AlertTriangle className="w-4 h-4 text-[#F97316] mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-[#101828]">需关注技术迭代风险</p>
-                  <p className="text-xs text-[#667085] mt-0.5">科技服务行业技术更新快，需关注企业研发投入和人才储备能否持续</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════ Section 6: 附件证据 ═══════ */}
-        <section className="mb-8">
-          <h2 className="text-lg font-bold text-[#101828] mb-5">附件证据</h2>
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
-            {EVIDENCE_DOCS.map((doc, i) => (
-              <div
-                key={doc.name}
-                className={`flex items-center justify-between px-6 py-4 ${
-                  i < EVIDENCE_DOCS.length - 1 ? 'border-b border-[#F3F4F6]' : ''
-                } hover:bg-[#F9FAFB] transition-colors cursor-pointer group`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${doc.status === 'verified' ? 'bg-[#F0FDF4]' : 'bg-[#FFF7ED]'}`}>
-                    {doc.status === 'verified' ? (
-                      <CheckCircle2 className="w-4 h-4 text-[#22C55E]" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-[#F97316]" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[#101828]">{doc.name}</p>
-                    <p className="text-xs text-[#667085]">{doc.source} · {doc.date}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    doc.status === 'verified' ? 'text-[#16A34A] bg-[#F0FDF4]' : 'text-[#EA580C] bg-[#FFF7ED]'
-                  }`}>
-                    {doc.status === 'verified' ? '已验证' : '待验证'}
-                  </span>
-                  <ExternalLink className="w-4 h-4 text-[#D1D5DB] group-hover:text-[#3B82F6] transition-colors" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ═══════ 底部 ═══════ */}
-        <footer className="pt-8 border-t border-[#E5E7EB] text-center">
-          <p className="text-xs text-[#D1D5DB] mb-1">
-            本报告由尽调 Agent 自动生成，仅供参考
-          </p>
-          <p className="text-xs text-[#D1D5DB]">
-            生成时间：{new Date().toLocaleString('zh-CN')} · 数据来源：工商信息、财务报表、司法公开数据、行业研究报告
-          </p>
-        </footer>
-      </div>
-    </div>
-  );
+  return report
+    ? <ReportWithQualityDrawer report={report}><UnsupportedReportNotice report={report} taskId={taskId} onBack={() => navigate(-1)} /></ReportWithQualityDrawer>
+    : <UnsupportedReportNotice report={undefined} taskId={taskId} onBack={() => navigate(-1)} />;
 }

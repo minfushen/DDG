@@ -7,7 +7,7 @@
 ## 技术栈
 
 - **Web 框架**: FastAPI 0.110+
-- **Agent 编排**: LangGraph + CrewAI（完整尽调链路仍保留）
+- **Agent 编排**: LangGraph + DeepResearch Engine
 - **财务规则引擎**: Rebecca
 - **知识检索**: ChromaDB + 本地行业/风控知识库
 - **数据处理**: Pandas, NumPy, openpyxl
@@ -24,7 +24,6 @@ backend/
 │   ├── agents/
 │   │   ├── orchestrator_v2.py
 │   │   ├── state.py
-│   │   ├── crew/          # 完整尽调链路依赖，未移除
 │   │   ├── sub_agents/    # 工商/财务/行业/司法专项 Agent
 │   │   └── tools/         # 数据获取、上市公司识别、行业分类、RAG 等工具
 │   ├── engines/rebecca/   # 财务报表解析和指标分析

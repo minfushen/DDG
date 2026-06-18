@@ -10,7 +10,10 @@ import json
 
 from app.agents.tools.search_tool import search_financial_data
 from app.agents.tools.listed_company_tool import fetch_listed_company_financial, resolve_listed_company
+from app.agents.tools.akshare_financial_tool import fetch_akshare_financial_data
+from app.agents.tools.financial_provider_reconciliation import reconcile_financial_providers, reconciliation_to_evidence, reconciliation_to_gaps
 from app.agents.tools.bocha_search_tool import search_with_bocha
+from app.agents.tools.cninfo_announcement_tool import search_cninfo_announcements
 from app.engines.rebecca.analyzers import FinancialDDAnalyzer
 from app.engines.rebecca.adapter import AnalyzerAdapter
 from app.agents.sub_agents.financial_report_builder import build_financial_analysis_report
@@ -75,6 +78,9 @@ def _run_rebecca_analysis(
     include_structured_report: bool = False,
     data_source: str = "用户上传财报",
     public_context: Optional[List[Dict[str, Any]]] = None,
+    stock_code: str = "",
+    source_type: str = "financial_statement",
+    cross_provider_reconciliation: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     timeline = []
     evidence = []
@@ -169,7 +175,17 @@ def _run_rebecca_analysis(
 
     result = {"success": True, "timeline": timeline, "evidence": evidence}
     if include_structured_report:
-        result["financial_analysis_report"] = build_financial_analysis_report(enterprise_name, rebecca_data, public_context=public_context)
+        result["financial_analysis_report"] = build_financial_analysis_report(
+            enterprise_name,
+            rebecca_data,
+            public_context=public_context,
+            generated_from=data_source,
+            stock_code=stock_code,
+            source_type=source_type,
+            cross_provider_reconciliation=cross_provider_reconciliation,
+        )
+        for item in result["financial_analysis_report"].get("codeact_evidence") or []:
+            evidence.append(item)
     return result
 
 
@@ -189,6 +205,70 @@ def _fetch_financial_public_context(enterprise_name: str, listed_data: Dict[str,
     return result.get("results", [])[:6]
 
 
+def _fetch_cninfo_annual_report_evidence(
+    enterprise_name: str,
+    listed_data: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Fetch and extract the latest annual report PDF from CNINFO.
+
+    Returns the full CNINFO result including extracted evidence and ingestion status.
+    """
+    try:
+        return search_cninfo_announcements(
+            enterprise_name=enterprise_name,
+            stock_code=listed_data.get("stock_code") or "",
+            stock_exchange=listed_data.get("stock_exchange") or "",
+            keyword="年度报告",
+            max_results=6,
+            extract_pdf_content=True,
+            max_pdf_extract=1,
+        )
+    except Exception as exc:
+        return {"success": False, "error": str(exc), "extracted_evidence": [], "ingestion_results": [], "ingestion_gaps": []}
+
+
+def _fetch_listed_financial_data(enterprise_name: str, listed_info: Dict[str, str]) -> Dict[str, Any]:
+    """Fetch Eastmoney and AKShare, then cross-check overlapping fields."""
+    akshare_result = fetch_akshare_financial_data(
+        enterprise_name=enterprise_name,
+        stock_code=listed_info["stock_code"],
+        stock_exchange=listed_info["stock_exchange"],
+    )
+    result_json = fetch_listed_company_financial._run(
+        enterprise_name=enterprise_name,
+        stock_code=listed_info["stock_code"],
+        stock_exchange=listed_info["stock_exchange"],
+    )
+    eastmoney_result = json.loads(result_json)
+    eastmoney_result.setdefault("provider_fallbacks", [])
+    if akshare_result.get("success"):
+        if eastmoney_result.get("success"):
+            reconciliation = reconcile_financial_providers(
+                primary_provider=eastmoney_result.get("data_source") or "东方财富公开财报",
+                primary_statements=eastmoney_result.get("financial_statements") or {},
+                secondary_provider=akshare_result.get("data_source") or "AKShare",
+                secondary_statements=akshare_result.get("financial_statements") or {},
+            )
+            eastmoney_result["cross_provider_reconciliation"] = reconciliation
+            eastmoney_result["secondary_provider"] = akshare_result
+            eastmoney_result["provider_fallbacks"].append({"provider": "akshare", "success": True, "used_for": "cross_validation"})
+            return eastmoney_result
+        akshare_result.setdefault("provider_fallbacks", []).append({
+            "provider": "eastmoney",
+            "success": False,
+            "error": eastmoney_result.get("error"),
+        })
+        return akshare_result
+
+    if eastmoney_result.get("success"):
+        eastmoney_result["provider_fallbacks"].append({
+            "provider": "akshare",
+            "success": False,
+            "error": akshare_result.get("error"),
+        })
+    return eastmoney_result
+
+
 async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
     """运行财务分析Agent
 
@@ -201,12 +281,7 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
     try:
         listed_info = resolve_listed_company(enterprise_name)
         if listed_info:
-            result_json = fetch_listed_company_financial._run(
-                enterprise_name=enterprise_name,
-                stock_code=listed_info["stock_code"],
-                stock_exchange=listed_info["stock_exchange"],
-            )
-            listed_data = json.loads(result_json)
+            listed_data = _fetch_listed_financial_data(enterprise_name, listed_info)
             if not listed_data.get("success"):
                 return {
                     "success": False,
@@ -232,20 +307,36 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
                 "balance_sheet": pd.DataFrame(financial_statements.get("balance_sheet", [])),
                 "cash_flow": pd.DataFrame(financial_statements.get("cash_flow", [])),
             }
+            data_source = listed_data.get("data_source") or "东方财富公开财报"
             public_context = _fetch_financial_public_context(enterprise_name, listed_data)
+            cninfo_result = _fetch_cninfo_annual_report_evidence(enterprise_name, listed_data)
+            cninfo_pdf_evidence = cninfo_result.get("extracted_evidence") or []
+            if cninfo_pdf_evidence:
+                public_context.extend([
+                    {
+                        "title": item.get("label"),
+                        "source": item.get("source_name") or "巨潮资讯网",
+                        "source_url": item.get("source_url"),
+                        "content": (item.get("metadata") or {}).get("excerpt") or item.get("value") or "",
+                    }
+                    for item in cninfo_pdf_evidence
+                ])
             result = _run_rebecca_analysis(
                 enterprise_name,
                 rebecca_data,
                 include_structured_report=True,
-                data_source="东方财富公开财报",
+                data_source=data_source,
                 public_context=public_context,
+                stock_code=listed_data.get("secu_code") or listed_data.get("stock_code") or "",
+                source_type=listed_data.get("source_type") or "investment_research_tool",
+                cross_provider_reconciliation=listed_data.get("cross_provider_reconciliation") or None,
             )
             result["timeline"] = [{
                 "id": str(uuid.uuid4()),
                 "time": datetime.now().strftime("%H:%M:%S"),
                 "agent": "财务Agent",
                 "content": "识别上市公司并获取公开财报",
-                "detail": f"{listed_data.get('security_name')} {listed_data.get('secu_code')}，来源：{listed_data.get('data_source')}",
+                "detail": f"{listed_data.get('security_name')} {listed_data.get('secu_code')}，来源：{data_source}",
                 "status": "completed",
                 "type": "discovery",
                 "findings": [f"已获取年度：{', '.join(listed_data.get('years', []))}"],
@@ -254,7 +345,7 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
                 "time": datetime.now().strftime("%H:%M:%S"),
                 "agent": "财务Agent",
                 "content": "标准化上市公司三大表",
-                "detail": "已映射东方财富字段到利润表、资产负债表、现金流量表标准科目",
+                "detail": f"已映射{data_source}字段到利润表、资产负债表、现金流量表标准科目",
                 "status": "completed",
                 "type": "analysis",
             }] + result.get("timeline", [])
@@ -271,20 +362,79 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
                 })
                 for item in public_context:
                     result.setdefault("evidence", []).append({
-                        "label": "财报公告公开线索",
-                        "value": item.get("title") or item.get("content", "")[:80],
-                        "source": item.get("source") or item.get("url") or "Bocha Web Search",
-                        "source_name": item.get("site_name") or "Bocha Web Search",
-                        "source_url": item.get("url"),
+                        "label": item.get("title") or "财报公告公开线索",
+                        "value": item.get("content", "")[:80],
+                        "source": item.get("source") or item.get("source_url") or "Bocha Web Search",
+                        "source_name": item.get("source") or item.get("source_name") or "Bocha Web Search",
+                        "source_url": item.get("source_url") or item.get("url"),
                         "source_type": "public_financial_report",
                         "confidence": item.get("confidence", 0.72),
                         "trust_level": item.get("trust_level", "medium"),
                         "requires_manual_review": True,
                         "metadata": item,
                     })
+                for item in cninfo_pdf_evidence:
+                    result.setdefault("evidence", []).append(item)
+
+                # Surface PDF knowledge-base ingestion status to the user.
+                ingestion_results = cninfo_result.get("ingestion_results") or []
+                ingestion_gaps = cninfo_result.get("ingestion_gaps") or []
+                if ingestion_results:
+                    total_chunks = sum(r.get("document_count", 0) for r in ingestion_results)
+                    failed = [r for r in ingestion_results if not r.get("success")]
+                    if failed:
+                        result.setdefault("timeline", []).insert(3, {
+                            "id": str(uuid.uuid4()),
+                            "time": datetime.now().strftime("%H:%M:%S"),
+                            "agent": "财务Agent",
+                            "content": "巨潮年报 PDF 解析成功但入库失败",
+                            "detail": "；".join(r.get("error") or "unknown" for r in failed),
+                            "status": "completed",
+                            "type": "risk",
+                        })
+                    else:
+                        result.setdefault("timeline", []).insert(3, {
+                            "id": str(uuid.uuid4()),
+                            "time": datetime.now().strftime("%H:%M:%S"),
+                            "agent": "财务Agent",
+                            "content": "巨潮年报 PDF 已写入企业知识库",
+                            "detail": f"共生成 {total_chunks} 个 RAG chunk，可用于后续问答检索",
+                            "status": "completed",
+                            "type": "discovery",
+                        })
+                if ingestion_gaps:
+                    result.setdefault("gaps", []).extend(ingestion_gaps)
             if result.get("financial_analysis_report"):
-                result["financial_analysis_report"]["generated_from"] = "东方财富公开财报"
                 result["financial_analysis_report"]["stock_code"] = listed_data.get("secu_code")
+                result["financial_analysis_report"]["provider_fallbacks"] = listed_data.get("provider_fallbacks", [])
+                reconciliation = listed_data.get("cross_provider_reconciliation") or {}
+                if reconciliation:
+                    result["financial_analysis_report"]["cross_provider_reconciliation"] = reconciliation
+                    result["financial_analysis_report"]["requires_manual_review"] = not reconciliation.get("passed", True)
+                    result["financial_analysis_report"]["manual_review_items"] = [
+                        f"跨源财务数据差异：{item.get('year')}年{item.get('label')}"
+                        for item in (reconciliation.get("mismatches") or [])[:8]
+                    ]
+                    reconciliation_evidence = reconciliation_to_evidence(enterprise_name, reconciliation)
+                    result.setdefault("evidence", []).extend(reconciliation_evidence)
+                    result["financial_analysis_report"]["provider_reconciliation_evidence_refs"] = [item.get("id") for item in reconciliation_evidence if item.get("id")]
+                    result["financial_analysis_report"]["provider_reconciliation_gaps"] = reconciliation_to_gaps("financial_provider_reconciliation", enterprise_name, reconciliation)
+                    result.setdefault("timeline", []).insert(2, {
+                        "id": str(uuid.uuid4()),
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "agent": "财务Agent",
+                        "content": "交叉校验公开财报结构化数据",
+                        "detail": f"东方财富与AKShare已校验{reconciliation.get('checked_count', 0)}项，差异{reconciliation.get('mismatch_count', 0)}项",
+                        "status": "completed",
+                        "type": "validation",
+                        "findings": [
+                            f"差异项：{item.get('year')}年{item.get('label')}"
+                            for item in (reconciliation.get("mismatches") or [])[:5]
+                        ] or ["核心指标跨源校验未发现超阈值差异"],
+                    })
+                for item in result["financial_analysis_report"].get("codeact_evidence") or []:
+                    item.setdefault("source_url", listed_data.get("source_url"))
+                    item.setdefault("metadata", {})["stock_code"] = listed_data.get("secu_code")
                 metrics = result["financial_analysis_report"].get("key_metrics") or {}
                 metric_labels = {
                     "revenue": "营业收入",
@@ -301,7 +451,7 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
                         result.setdefault("evidence", []).append({
                             "label": label,
                             "value": value,
-                            "source": "东方财富公开财报",
+                            "source": data_source,
                             "source_name": f"{listed_data.get('security_name')} {listed_data.get('secu_code')} 近三年年报财务数据",
                             "source_type": "public_financial_report",
                             "confidence": 0.88,

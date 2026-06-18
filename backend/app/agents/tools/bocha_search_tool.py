@@ -7,12 +7,9 @@ financial data providers.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
-import json
 
-from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
 import httpx
 
 from app.config import settings
@@ -52,15 +49,6 @@ LOW_TRUST_DOMAINS = [
     "sohu.com",
     "toutiao.com",
 ]
-
-
-class BochaWebSearchInput(BaseModel):
-    query: str = Field(description="搜索关键词")
-    count: int = Field(default=8, description="返回结果数量，1-50")
-    freshness: str = Field(default="noLimit", description="时间范围：noLimit/oneDay/oneWeek/oneMonth/oneYear/日期范围")
-    summary: bool = Field(default=True, description="是否返回网页摘要")
-    include: str = Field(default="", description="限定搜索域名，多个用 | 或 , 分隔")
-    exclude: str = Field(default="", description="排除搜索域名，多个用 | 或 , 分隔")
 
 
 def _domain(url: str) -> str:
@@ -187,24 +175,3 @@ def search_with_bocha(
         "raw_code": data.get("code"),
     }
 
-
-class BochaWebSearchTool(BaseTool):
-    name: str = "bocha_web_search"
-    description: str = "通过博查 Web Search 搜索中文公开网页线索，适合企业公告、司法风险、工商线索、行业资料和舆情检索。"
-    args_schema: Type[BaseModel] = BochaWebSearchInput
-
-    def _run(self, query: str, count: int = 8, freshness: str = "noLimit", summary: bool = True, include: str = "", exclude: str = "") -> str:
-        return json.dumps(
-            search_with_bocha(
-                query=query,
-                max_results=count,
-                freshness=freshness,
-                summary=summary,
-                include=include,
-                exclude=exclude,
-            ),
-            ensure_ascii=False,
-        )
-
-
-bocha_web_search = BochaWebSearchTool()

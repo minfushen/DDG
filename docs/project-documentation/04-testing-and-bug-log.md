@@ -262,7 +262,7 @@ PY
 - CrewAI 综合审查作为可选 advisory。
 - `run_node_with_rate_limit_retry()` 对限流做退避重试。
 
-### Bug 8：DuckDuckGo MCP 不稳定
+### Bug 8：DuckDuckGo MCP 不稳定（已移除）
 
 现象：
 
@@ -276,14 +276,40 @@ PY
 
 - 将搜索结果作为线索，不作为强证据。
 - RAG 本地知识库和上市公司工具作为更稳定来源。
+- DuckDuckGo MCP 已从主链路和默认配置移除，避免 VQD 错误拖慢任务。
 
 后续建议：
 
 - 优先 Exa/Tavily。
-- DuckDuckGo MCP 降低重试次数，只作末级兜底。
 - 对工商/司法接入正式 API。
 
 ## 构建与编译验证
+
+### CodeAct 自动质检闭环验证
+
+覆盖点：
+
+- 报告生成后自动调用 `evaluate_report_quality`。
+- 报告顶层写入 `quality_evaluation`、`quality_score`、`quality_passed`、`quality_issues`。
+- timeline 追加“报告质检”节点，展示评分和 P0/P1 问题数量。
+- 手动质量评测 API 仍保持兼容。
+
+验证命令：
+
+```bash
+cd backend
+./venv312/bin/python -m py_compile app/agents/research_engine/report_quality_gate.py app/agents/research_engine/graph_engine.py app/api/tasks.py tests/test_report_quality_gate.py
+./venv312/bin/python -m pytest tests/test_report_quality_gate.py tests/test_report_quality_evaluator.py tests/test_report_quality_api.py -q
+```
+
+验证结果：
+
+- `5 passed`
+
+后续待测：
+
+- 真实完整尽调任务中，执行页是否能看到“报告质检”时间轴节点。
+- 报告页第一屏是否需要更突出展示 `quality_score` 和 P0/P1 摘要。
 
 前端构建：
 

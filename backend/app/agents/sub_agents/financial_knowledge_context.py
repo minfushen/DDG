@@ -92,7 +92,7 @@ def build_financial_knowledge_context(
     query = _query_from_metrics(enterprise_name, key_metrics, risk_summary, triggered)
     if industry_hint:
         query += f" 行业 {industry_hint}"
-    retrieval = retrieve_knowledge(query=query, domain="financial", top_k=top_k)
+    retrieval = retrieve_knowledge(query=query, domain="financial", top_k=top_k, company_name=enterprise_name)
     hits = retrieval.get("results") or []
     knowledge_briefs = []
     for hit in hits[:top_k]:

@@ -7,7 +7,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 export interface CreateTaskRequest {
   enterprise_name: string;
   template_name?: string;
-  engine_mode?: 'deepresearch' | 'classic';
+  engine_mode?: 'deepresearch';
 }
 
 export interface CreateTaskResponse {
@@ -61,6 +61,25 @@ export interface EvidenceItem {
   claim?: string;
   agent?: string;
   domain?: string;
+  tool_call_id?: string;
+  display_tool_name?: string;
+  display_provider?: string;
+}
+
+export interface ToolTrace {
+  tool_call_id?: string;
+  research_task_id?: string;
+  category?: string;
+  display_tool_name?: string;
+  display_provider?: string;
+  query_summary?: string;
+  status?: 'running' | 'success' | 'failed' | 'empty' | string;
+  started_at?: string;
+  ended_at?: string | null;
+  elapsed_ms?: number | null;
+  result_count?: number;
+  evidence_ids?: string[];
+  error?: string | null;
 }
 
 export interface ResearchClaim {
@@ -85,6 +104,21 @@ export interface ResearchGap {
   severity?: string;
 }
 
+export interface SequentialThoughtStep {
+  thoughtNumber?: number;
+  totalThoughts?: number;
+  nextThoughtNeeded?: boolean;
+  summary?: string;
+  raw?: Record<string, any>;
+}
+
+export interface SequentialThoughtLoop {
+  success?: boolean;
+  steps?: SequentialThoughtStep[];
+  plan_context?: string;
+  error?: string;
+}
+
 export interface TaskStatus {
   task_id: string;
   enterprise_name: string;
@@ -101,7 +135,9 @@ export interface TaskStatus {
   research_gaps?: ResearchGap[];
   planner?: any;
   sequential_thinking?: any;
+  sequential_thought_loop?: SequentialThoughtLoop;
   sequential_plan_review?: any;
+  prepare_stage?: string;
   follow_up_tasks?: PlanStep[];
   research_rounds?: Array<{ round: number; task_count: number; description: string }>;
   enterprise_type?: string;
@@ -110,6 +146,7 @@ export interface TaskStatus {
   active_interrupt?: HumanInterrupt | null;
   interrupts?: HumanInterrupt[];
   human_actions?: HumanAction[];
+  tool_traces?: ToolTrace[];
 }
 
 export interface HumanInterrupt {
@@ -152,6 +189,23 @@ export interface UploadResponse {
   message: string;
 }
 
+export interface ReportQualityIssue {
+  severity: 'P0' | 'P1' | 'P2' | string;
+  dimension: string;
+  message: string;
+  recommendation: string;
+}
+
+export interface ReportQualityResult {
+  overall_score: number;
+  grade: string;
+  passed: boolean;
+  dimension_scores: Record<string, number>;
+  issues: ReportQualityIssue[];
+  metrics: Record<string, number>;
+  recommendations: string[];
+}
+
 async function getErrorMessage(response: Response): Promise<string> {
   try {
     const data = await response.json();
@@ -170,7 +224,7 @@ async function getErrorMessage(response: Response): Promise<string> {
 export async function createTask(
   enterpriseName: string,
   templateName?: string,
-  engineMode: 'deepresearch' | 'classic' = 'deepresearch',
+  engineMode: 'deepresearch' = 'deepresearch',
 ): Promise<CreateTaskResponse> {
   const response = await fetch(`${API_BASE_URL}/tasks`, {
     method: 'POST',
@@ -352,6 +406,20 @@ export async function getTaskReport(taskId: string): Promise<any> {
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function evaluateReportQuality(report: any, sample?: any): Promise<ReportQualityResult> {
+  const response = await fetch(`${API_BASE_URL}/report-quality/evaluate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ report, sample }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response));
   }
 
   return response.json();

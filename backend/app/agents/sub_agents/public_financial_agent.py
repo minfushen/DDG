@@ -163,6 +163,7 @@ def build_public_financial_report(
         query=f"{enterprise_name} 非上市企业 财报缺失 公开资料预尽调 中小企业财务审查 待补充材料 额度边界",
         domain="financial",
         top_k=5,
+        company_name=enterprise_name,
     )
     knowledge_hits = retrieval.get("results", [])
     knowledge_evidence = knowledge_hits_to_evidence(knowledge_hits, agent="financial", domain="财务")

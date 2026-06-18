@@ -1,0 +1,119 @@
+{
+  "version": "2026-06-15",
+  "report_outline": [
+    "资料完整度总览",
+    "报告摘要与授信建议",
+    "企业主体与治理结构",
+    "财务状况与偿债能力",
+    "行业与经营环境",
+    "司法与合规风险",
+    "交叉验证与重大风险",
+    "信贷方案建议",
+    "证据链与待补充材料"
+  ],
+  "chapters": [
+    {
+      "id": "business",
+      "title": "企业主体与治理结构",
+      "category": "business",
+      "required_data": ["工商登记", "经营状态", "统一社会信用代码", "注册资本", "股权/实控人", "对外投资", "异常经营", "行政处罚"],
+      "optional_data": ["股权质押", "主要人员", "分支机构", "历史变更"],
+      "preferred_sources": ["权威工商源", "上市公告", "客户授权数据源", "公开搜索线索"],
+      "preferred_tools": ["business_agent", "listed_company", "bocha_search"],
+      "success_criteria": ["形成主体真实性判断", "识别治理和关联风险", "给出授信前置核查动作"],
+      "fallback_language": "基于现有资料推断，授信前需权威工商源复核。",
+      "credit_action_when_missing": "将工商登记、股权穿透、实控人和行政处罚核验列为提款前置条件。",
+      "display_order": 3
+    },
+    {
+      "id": "financial",
+      "title": "财务状况与偿债能力",
+      "category": "financial",
+      "required_data": ["近三年三大表", "审计意见", "营业收入", "净利润", "经营现金流", "资产负债率", "应收账款", "存货", "短期债务"],
+      "optional_data": ["银行流水", "纳税申报", "主要合同", "期后回款", "客户集中度"],
+      "preferred_sources": ["客户上传财报", "上市公告", "财务数据包", "内部财务计算工具"],
+      "preferred_tools": ["financial_agent", "listed_company", "uploaded_files"],
+      "success_criteria": ["形成近三年趋势判断", "识别偿债和现金流压力", "给出前置材料和额度边界"],
+      "fallback_language": "财务资料不足时，不测算正式额度，将三大表、流水和纳税列为前置材料。",
+      "credit_action_when_missing": "暂不测算正式额度；先给公开资料预尽调结论，要求补充三大表、流水、纳税和审计意见。",
+      "display_order": 4
+    },
+    {
+      "id": "industry",
+      "title": "行业与经营环境",
+      "category": "industry",
+      "required_data": ["主营构成", "行业定位", "周期判断", "竞争格局", "政策环境", "上下游议价能力", "授信关注点"],
+      "optional_data": ["年报经营讨论", "行业研报", "价格指数", "同业指标", "内部行业政策"],
+      "preferred_sources": ["年报经营讨论", "RAG知识库", "研报/行业资料", "上市公告", "公开搜索线索"],
+      "preferred_tools": ["industry_agent", "rag", "bocha_search", "listed_company"],
+      "success_criteria": ["识别细分行业", "形成周期和竞争判断", "转化为期限/额度/贷后监控约束"],
+      "fallback_language": "基于现有资料作审慎预判，需补充行业研报或内部行业政策。",
+      "credit_action_when_missing": "控制授信期限，将行业周期、订单持续性和核心客户回款列为贷后监控。",
+      "display_order": 5
+    },
+    {
+      "id": "legal",
+      "title": "司法与合规风险",
+      "category": "legal",
+      "required_data": ["裁判文书", "被执行", "失信", "行政处罚", "监管问询", "重大舆情"],
+      "optional_data": ["诉讼金额", "案由", "处罚机关", "整改状态", "交易所公告"],
+      "preferred_sources": ["权威司法源", "监管公告", "交易所公告", "公开搜索线索"],
+      "preferred_tools": ["legal_agent", "bocha_search", "listed_company"],
+      "success_criteria": ["识别是否存在阻断性司法风险", "区分权威结论和公开线索", "给出提款前复核动作"],
+      "fallback_language": "暂未见重大阻断性风险，不等于无风险，提款前需权威源复核。",
+      "credit_action_when_missing": "将裁判、执行、失信、处罚和监管问询权威复核列为提款前置条件。",
+      "display_order": 6
+    },
+    {
+      "id": "credit",
+      "title": "信贷方案建议",
+      "category": "credit",
+      "required_data": ["准入结论", "额度建议", "期限建议", "担保建议", "提款条件", "贷后监控"],
+      "optional_data": ["内部授信制度", "额度测算规则", "评级模型", "担保政策"],
+      "preferred_sources": ["专项结论", "内部授信制度", "客户材料", "RAG知识库"],
+      "preferred_tools": ["rag"],
+      "success_criteria": ["形成准入/审慎/暂缓建议", "把缺口转成授信动作", "避免无证据编造额度"],
+      "fallback_language": "证据缺口转化为提款前置条件、担保条件或贷后监控指标。",
+      "credit_action_when_missing": "不编造精确额度；采用首笔控制、分阶段释放和前置条件管理。",
+      "display_order": 8
+    }
+  ],
+  "completeness_matrix": [
+    {
+      "dimension": "主体治理",
+      "chapter_id": "business",
+      "required_data": ["工商登记", "股权/实控人", "对外投资", "异常经营", "行政处罚"],
+      "high": "权威工商字段、股权和处罚信息齐备，可形成较强主体判断。",
+      "medium": "取得部分工商或公告线索，可形成初步判断但需权威复核。",
+      "low": "缺少关键工商字段，仅能列为前置核查事项。",
+      "fallback_language": "基于现有资料推断，授信前需权威工商源复核。"
+    },
+    {
+      "dimension": "财务偿债",
+      "chapter_id": "financial",
+      "required_data": ["近三年三大表", "审计意见", "现金流", "应收存货", "短债"],
+      "high": "近三年财务数据和核心指标齐备，可形成偿债能力诊断。",
+      "medium": "取得部分财务数据或上市公告，可形成趋势判断但需原始材料核验。",
+      "low": "缺少三大表和现金流数据，不支持正式额度测算。",
+      "fallback_language": "财务资料不足时，不测算正式额度，将三大表、流水和纳税列为前置材料。"
+    },
+    {
+      "dimension": "行业经营",
+      "chapter_id": "industry",
+      "required_data": ["主营构成", "行业定位", "周期", "竞争格局", "授信关注点"],
+      "high": "主营构成、行业资料和授信关注点齐备，可形成经营环境判断。",
+      "medium": "可识别行业和部分公开线索，需补充研报或内部政策。",
+      "low": "行业定位和主营构成不足，仅可作审慎预判。",
+      "fallback_language": "基于现有资料作审慎预判，需补充行业研报或内部行业政策。"
+    },
+    {
+      "dimension": "司法合规",
+      "chapter_id": "legal",
+      "required_data": ["裁判", "执行", "失信", "行政处罚", "监管问询"],
+      "high": "权威司法和监管线索齐备，可形成合规风险判断。",
+      "medium": "取得公开搜索或公告线索，需权威司法源复核。",
+      "low": "缺少司法和处罚来源，不应输出无风险结论。",
+      "fallback_language": "暂未见重大阻断性风险，不等于无风险，提款前需权威源复核。"
+    }
+  ]
+}

@@ -11,17 +11,70 @@ import uuid
 import asyncio
 from datetime import datetime
 
-from app.agents.orchestrator_v2 import run_orchestrator_v2, form_conclusion, generate_report
 from app.agents.research_engine import prepare_deep_research_plan, run_deep_research_due_diligence
 from app.agents.state import SSEEvent
 from app.agents.evidence import normalize_evidence_list
 from app.agents.hitl import create_interrupt, get_active_interrupt, public_interrupts, resolve_interrupt
+from app.agents.research_engine.tool_trace import public_tool_traces
+from app.agents.sub_agents.full_report_builder import build_full_due_diligence_report
+from app.api.report_exporter import export_completed_report
+from app.api.task_store import load_task_snapshot, save_task_snapshot
 
 router = APIRouter()
 
 # 任务存储（生产环境应使用数据库）
 tasks: Dict[str, Dict[str, Any]] = {}
 task_events: Dict[str, asyncio.Event] = {}
+
+
+def ensure_task_loaded(task_id: str) -> bool:
+    if task_id in tasks:
+        return True
+    snapshot = load_task_snapshot(task_id)
+    if not snapshot:
+        return False
+    tasks[task_id] = normalize_task_snapshot(snapshot)
+    task_events[task_id] = asyncio.Event()
+    return True
+
+
+def persist_task(task_id: str) -> None:
+    task = tasks.get(task_id)
+    if task:
+        save_task_snapshot(task)
+
+
+def normalize_task_snapshot(task: Dict[str, Any]) -> Dict[str, Any]:
+    defaults = {
+        "timeline": [],
+        "plan": [],
+        "evidence": [],
+        "report": None,
+        "error": None,
+        "research_plan": [],
+        "research_claims": [],
+        "research_gaps": [],
+        "follow_up_tasks": [],
+        "research_rounds": [],
+        "tool_traces": [],
+        "interrupts": [],
+        "active_interrupt": None,
+        "human_actions": [],
+        "pending_report": None,
+        "report_export_path": None,
+        "report_export_hash": None,
+        "report_exported_at": None,
+        "planner": None,
+        "sequential_thinking": None,
+        "sequential_thought_loop": None,
+        "sequential_plan_review": None,
+        "engine_mode": "deepresearch",
+        "agent_state": "completed",
+        "enterprise_name": task.get("enterprise_name") or "未知企业",
+    }
+    for key, value in defaults.items():
+        task.setdefault(key, value)
+    return task
 
 
 def _create_financial_upload_interrupt(task: Dict[str, Any], reason: str = "完整尽调需要补充近三年财务报表。") -> Dict[str, Any]:
@@ -81,16 +134,18 @@ def _create_plan_confirmation_interrupt(task: Dict[str, Any], research_state: Di
     research_tasks = research_state.get("tasks", [])
     planner = research_state.get("planner") or {}
     sequential = research_state.get("sequential_thinking") or {}
+    thought_loop = research_state.get("sequential_thought_loop") or {}
     return create_interrupt(
         task,
         interrupt_type="approve_plan",
         title="请确认研究计划",
-        message="LLM Planner 已生成尽调研究计划。请先确认研究问题、证据需求和工具路线，再允许 Agent 执行外部检索和专项分析。",
+        message="研究计划已生成。请先确认研究问题、证据需求和工具路线，再允许 Agent 执行外部检索和专项分析。",
         context={
             "enterprise_name": task.get("enterprise_name"),
             "objective": research_state.get("objective"),
             "planner": planner,
             "sequential_thinking": sequential,
+            "sequential_thought_loop": thought_loop,
             "tasks": research_tasks,
             "task_count": len(research_tasks),
         },
@@ -161,6 +216,39 @@ def _minimal_research_state_from_plan(task: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _plan_items_from_research_tasks(research_plan: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "id": item.get("id"),
+            "name": item.get("question"),
+            "status": item.get("status", "pending"),
+            "category": item.get("category"),
+            "purpose": item.get("purpose"),
+            "required_evidence": item.get("required_evidence", []),
+            "tool_hints": item.get("tool_hints", []),
+            "planner_source": item.get("planner_source"),
+        }
+        for item in research_plan
+    ]
+
+
+def _apply_prepare_research_state(task_id: str, research_state: Dict[str, Any], stage: str = "prepare_update") -> None:
+    task = tasks[task_id]
+    research_plan = research_state.get("tasks", [])
+    task.update({
+        "agent_state": "planning",
+        "timeline": research_state.get("timeline", task.get("timeline", [])),
+        "plan": _plan_items_from_research_tasks(research_plan),
+        "research_state": research_state,
+        "research_plan": research_plan,
+        "planner": research_state.get("planner"),
+        "sequential_thinking": research_state.get("sequential_thinking"),
+        "sequential_thought_loop": research_state.get("sequential_thought_loop"),
+        "sequential_plan_review": research_state.get("sequential_plan_review"),
+        "prepare_stage": stage,
+    })
+
+
 def _publish_pending_report(task_id: str) -> None:
     task = tasks[task_id]
     pending_report = task.get("pending_report")
@@ -178,37 +266,6 @@ def _publish_pending_report(task_id: str) -> None:
     )
 
 
-async def run_task_background(task_id: str):
-    """后台执行任务并更新内存状态。"""
-    task = tasks[task_id]
-
-    try:
-        async for event in run_orchestrator_v2(
-            task_id=task_id,
-            enterprise_name=task["enterprise_name"],
-            template_name=task.get("template_name", "due_diligence_report_template"),
-            input_parse=task.get("input_parse"),
-        ):
-            if event.type == "state":
-                tasks[task_id].update(event.data)
-                if tasks[task_id].get("agent_state") == "waiting_upload":
-                    _create_financial_upload_interrupt(tasks[task_id])
-            elif event.type == "error":
-                tasks[task_id].update({
-                    "agent_state": "completed",
-                    "error": event.data.get("error", "任务执行失败"),
-                })
-
-            notify_task_update(task_id)
-
-    except Exception as e:
-        tasks[task_id].update({
-            "agent_state": "completed",
-            "error": str(e),
-        })
-        notify_task_update(task_id)
-
-
 async def run_deepresearch_task_background(task_id: str):
     """Run the Plan-Execute DeepResearch engine inside the existing task system."""
     task = tasks[task_id]
@@ -220,7 +277,7 @@ async def run_deepresearch_task_background(task_id: str):
                 "time": datetime.now().strftime("%H:%M:%S"),
                 "agent": "DeepResearch Engine",
                 "content": "启动 Plan-Execute 研究引擎",
-                "detail": "先由 LLM Planner 生成研究计划，再按证据需求执行工具调用",
+                "detail": "先生成研究计划，再按证据需求执行证据采集和专项分析",
                 "status": "running",
                 "type": "analysis",
             }],
@@ -228,33 +285,36 @@ async def run_deepresearch_task_background(task_id: str):
         notify_task_update(task_id)
 
         if not task.get("plan_approved") and not task.get("approved_research_state"):
+            async def publish_prepare_update(payload: Dict[str, Any]) -> None:
+                research_state = payload.get("research_state") or {}
+                if not research_state:
+                    return
+                stage = str(payload.get("stage") or "prepare_update")
+                _apply_prepare_research_state(task_id, research_state, stage=stage)
+                notify_task_update(task_id)
+                if stage in {"plan_task", "thought_loop_step"}:
+                    # The in-memory SSE notifier is an Event, not a queue. A tiny
+                    # yield keeps fast prepare updates observable as separate
+                    # frontend states instead of collapsing into one final frame.
+                    await asyncio.sleep(0.12)
+
             prepared = await prepare_deep_research_plan(
                 enterprise_name=task["enterprise_name"],
                 objective="完整贷前尽调",
                 max_iterations=task.get("max_iterations", 6),
+                on_update=publish_prepare_update,
             )
             research_state = prepared.get("research_state", {})
             research_plan = research_state.get("tasks", [])
             task.update({
                 "agent_state": "waiting_human",
                 "timeline": research_state.get("timeline", task.get("timeline", [])),
-                "plan": [
-                    {
-                        "id": item.get("id"),
-                        "name": item.get("question"),
-                        "status": item.get("status", "pending"),
-                        "category": item.get("category"),
-                        "purpose": item.get("purpose"),
-                        "required_evidence": item.get("required_evidence", []),
-                        "tool_hints": item.get("tool_hints", []),
-                        "planner_source": item.get("planner_source"),
-                    }
-                    for item in research_plan
-                ],
+                "plan": _plan_items_from_research_tasks(research_plan),
                 "research_state": research_state,
                 "research_plan": research_plan,
                 "planner": research_state.get("planner"),
                 "sequential_thinking": research_state.get("sequential_thinking"),
+                "sequential_thought_loop": research_state.get("sequential_thought_loop"),
                 "sequential_plan_review": research_state.get("sequential_plan_review"),
                 "error": None if prepared.get("success") else prepared.get("error", "研究计划生成失败"),
             })
@@ -280,6 +340,7 @@ async def run_deepresearch_task_background(task_id: str):
         report = result.get("report") or {}
         research_plan = report.get("research_plan") or research_state.get("tasks", [])
         evidence = report.get("evidence") or research_state.get("evidence", [])
+        tool_traces = research_state.get("tool_traces", []) or report.get("tool_traces", []) or []
         claims = report.get("claims") or research_state.get("claims", [])
         gaps = report.get("gaps") or research_state.get("gaps", [])
         follow_up_tasks = research_state.get("follow_up_tasks", [])
@@ -308,6 +369,7 @@ async def run_deepresearch_task_background(task_id: str):
                 for item in research_plan
             ],
             "evidence": evidence,
+            "tool_traces": tool_traces,
             "report": report,
             "error": None if result.get("success") else result.get("error", "DeepResearch执行失败"),
             "research_state": research_state,
@@ -354,12 +416,15 @@ async def run_deepresearch_task_background(task_id: str):
 def schedule_task_background(task_id: str, delay_seconds: float = 0.5):
     """Schedule execution after the create-task response has flushed."""
     loop = asyncio.get_running_loop()
-    runner = run_deepresearch_task_background if tasks[task_id].get("engine_mode") == "deepresearch" else run_task_background
-    loop.call_later(delay_seconds, lambda: asyncio.create_task(runner(task_id)))
+    loop.call_later(delay_seconds, lambda: asyncio.create_task(run_deepresearch_task_background(task_id)))
 
 
 def notify_task_update(task_id: str):
     """通知 SSE 订阅者任务状态已变化。"""
+    task = tasks.get(task_id)
+    if task:
+        export_completed_report(task)
+    persist_task(task_id)
     if task_id in task_events:
         task_events[task_id].set()
         task_events[task_id] = asyncio.Event()
@@ -405,9 +470,17 @@ def make_task_state_event(task_id: str) -> SSEEvent:
             "research_gaps": task.get("research_gaps", []),
             "planner": task.get("planner"),
             "sequential_thinking": task.get("sequential_thinking"),
+            "sequential_thought_loop": task.get("sequential_thought_loop"),
             "sequential_plan_review": task.get("sequential_plan_review"),
+            "prepare_stage": task.get("prepare_stage"),
             "follow_up_tasks": task.get("follow_up_tasks", []),
             "research_rounds": task.get("research_rounds", []),
+            "tool_traces": public_tool_traces(task.get("tool_traces", [])),
+            "report_export_path": task.get("report_export_path"),
+            "quality_evaluation": (task.get("report") or task.get("pending_report") or {}).get("quality_evaluation"),
+            "quality_score": (task.get("report") or task.get("pending_report") or {}).get("quality_score"),
+            "quality_passed": (task.get("report") or task.get("pending_report") or {}).get("quality_passed"),
+            "quality_issues": (task.get("report") or task.get("pending_report") or {}).get("quality_issues", []),
         },
     )
 
@@ -421,7 +494,7 @@ class CreateTaskRequest(BaseModel):
     )
     engine_mode: str = Field(
         default="deepresearch",
-        description="执行引擎：deepresearch 或 classic"
+        description="执行引擎：仅支持 deepresearch"
     )
 
 
@@ -447,12 +520,20 @@ class TaskStatusResponse(BaseModel):
     research_gaps: List[dict] = []
     planner: Optional[dict] = None
     sequential_thinking: Optional[dict] = None
+    sequential_thought_loop: Optional[dict] = None
     sequential_plan_review: Optional[dict] = None
     follow_up_tasks: List[dict] = []
     research_rounds: List[dict] = []
     active_interrupt: Optional[dict] = None
     interrupts: List[dict] = []
     human_actions: List[dict] = []
+    tool_traces: List[dict] = []
+    report_export_path: Optional[str] = None
+    quality_evaluation: Optional[dict] = None
+    quality_score: Optional[int] = None
+    quality_passed: Optional[bool] = None
+    quality_issues: List[dict] = []
+    prepare_stage: Optional[str] = None
 
 
 class ResumeTaskRequest(BaseModel):
@@ -471,7 +552,6 @@ async def resume_financial_task_with_uploaded_data(
 ):
     """基于上传财报恢复财务任务。"""
     from app.agents.sub_agents.financial_agent import run_financial_agent_with_uploaded_data
-    from app.agents.crew.full_due_diligence_runner import run_full_due_diligence
 
     task = tasks[task_id]
     task.update({
@@ -508,8 +588,6 @@ async def resume_financial_task_with_uploaded_data(
         previous_timeline = task.get("timeline", [])
         previous_evidence = task.get("evidence", [])
         context = task.get("full_due_diligence_context") or {}
-        context_timeline_len = len(context.get("timeline", []))
-        context_evidence_len = len(context.get("evidence", []))
         append_timeline(
             task_id,
             "系统",
@@ -518,28 +596,47 @@ async def resume_financial_task_with_uploaded_data(
             "completed",
             "action",
         )
-        full_result = await run_full_due_diligence(
+        result = await run_financial_agent_with_uploaded_data(
             enterprise_name=task["enterprise_name"],
             parsed_financial_data=parsed_financial_data,
-            existing_context=context,
         )
-        task["timeline"] = previous_timeline + full_result.get("timeline", [])[context_timeline_len:]
-        task["evidence"] = previous_evidence + full_result.get("evidence", [])[context_evidence_len:]
-        if not full_result.get("success"):
+        task["timeline"] = previous_timeline + result.get("timeline", [])
+        financial_evidence = normalize_evidence_list(result.get("evidence", []), agent="financial")
+        task["evidence"] = previous_evidence + financial_evidence
+        if not result.get("success") or not result.get("financial_analysis_report"):
             task.update({
                 "agent_state": "waiting_human",
-                "error": full_result.get("error", "完整尽调恢复失败"),
-                "full_due_diligence_context": full_result.get("full_due_diligence_context", task.get("full_due_diligence_context")),
+                "error": result.get("error", "上传财报分析未完成"),
+                "full_due_diligence_context": context,
             })
             _create_financial_upload_interrupt(task, reason="上传财报分析未完成，请补充或重新上传三大表文件。")
             notify_task_update(task_id)
             return
 
+        sub_reports = dict(context.get("sub_reports") or {})
+        sub_reports["financial"] = result["financial_analysis_report"]
+        merged_evidence = normalize_evidence_list(context.get("evidence", []), agent="research") + financial_evidence
+        report = build_full_due_diligence_report(
+            enterprise_name=task["enterprise_name"],
+            sub_reports=sub_reports,
+            evidence=merged_evidence,
+            pending_upload=False,
+            report_mode="financial_enhanced_dd",
+            financial_data_status="complete",
+        )
+        updated_context = {
+            **context,
+            "sub_reports": sub_reports,
+            "evidence": merged_evidence,
+            "report": report,
+            "pending_upload": False,
+        }
+
         task.update({
             "agent_state": "completed",
-            "report": full_result.get("report"),
+            "report": report,
             "error": None,
-            "full_due_diligence_context": full_result.get("full_due_diligence_context"),
+            "full_due_diligence_context": updated_context,
             "timeline": task.get("timeline", []) + [{
                 "id": uuid.uuid4().hex,
                 "time": datetime.now().strftime("%H:%M:%S"),
@@ -596,31 +693,11 @@ async def resume_financial_task_with_uploaded_data(
         notify_task_update(task_id)
         return
 
-    state = {
-        "task_id": task_id,
-        "enterprise_name": task["enterprise_name"],
-        "template_name": task.get("template_name", "due_diligence_report_template"),
-        "agent_state": task["agent_state"],
-        "timeline": task["timeline"],
-        "plan": task.get("plan", []),
-        "evidence": task["evidence"],
-        "report": task.get("report"),
-        "error": task.get("error"),
-        "execution_plan": None,
-        "crew_result": None,
-        "context": None,
-        "intent": {"type": "single", "target": "financial"},
-    }
-
-    state = form_conclusion(state)
-    task.update({key: state.get(key) for key in ["agent_state", "timeline", "plan", "evidence", "report", "error"]})
-    notify_task_update(task_id)
-
-    state = generate_report(state)
-    task.update({key: state.get(key) for key in ["agent_state", "timeline", "plan", "evidence", "report", "error"]})
-    notify_task_update(task_id)
-
-    task["agent_state"] = "completed"
+    task.update({
+        "agent_state": "waiting_human",
+        "error": "上传财报分析未返回可展示报告",
+    })
+    _create_financial_upload_interrupt(task, reason="上传财报分析未返回可展示报告，请检查文件后重新上传。")
     notify_task_update(task_id)
 
 
@@ -633,7 +710,7 @@ async def create_task(request: CreateTaskRequest):
     input_parse = fast_extract_user_intent(request.enterprise_name)
     enterprise_name = input_parse["enterprise_name"]
 
-    engine_mode = request.engine_mode if request.engine_mode in {"deepresearch", "classic"} else "deepresearch"
+    engine_mode = "deepresearch"
 
     # 创建任务记录
     tasks[task_id] = {
@@ -657,14 +734,22 @@ async def create_task(request: CreateTaskRequest):
         "research_gaps": [],
         "follow_up_tasks": [],
         "research_rounds": [],
+        "tool_traces": [],
         "interrupts": [],
         "active_interrupt": None,
         "human_actions": [],
         "pending_report": None,
+        "report_export_path": None,
+        "report_export_hash": None,
+        "report_exported_at": None,
         "planner": None,
+        "sequential_thinking": None,
+        "sequential_thought_loop": None,
+        "sequential_plan_review": None,
         "created_at": datetime.now().isoformat(),
     }
     task_events[task_id] = asyncio.Event()
+    persist_task(task_id)
     if _should_confirm_entity(request.enterprise_name, enterprise_name, input_parse):
         _create_entity_confirmation_interrupt(tasks[task_id])
         append_timeline(
@@ -688,7 +773,7 @@ async def create_task(request: CreateTaskRequest):
 @router.get("/tasks/{task_id}/stream")
 async def stream_task(task_id: str):
     """SSE流式获取任务执行状态"""
-    if task_id not in tasks:
+    if not ensure_task_loaded(task_id):
         raise HTTPException(status_code=404, detail="任务不存在")
 
     async def event_generator():
@@ -696,7 +781,7 @@ async def stream_task(task_id: str):
         try:
             yield f"data: {make_task_state_event(task_id).model_dump_json()}\n\n"
 
-            while task_id in tasks and tasks[task_id].get("agent_state") not in {"waiting_confirm", "completed"}:
+            while task_id in tasks and tasks[task_id].get("agent_state") not in {"waiting_confirm", "waiting_human", "completed"}:
                 event = task_events[task_id]
                 await event.wait()
                 yield f"data: {make_task_state_event(task_id).model_dump_json()}\n\n"
@@ -720,7 +805,7 @@ async def stream_task(task_id: str):
 @router.get("/tasks/{task_id}", response_model=TaskStatusResponse)
 async def get_task(task_id: str):
     """获取任务状态"""
-    if task_id not in tasks:
+    if not ensure_task_loaded(task_id):
         raise HTTPException(status_code=404, detail="任务不存在")
 
     task = tasks[task_id]
@@ -739,9 +824,12 @@ async def get_task(task_id: str):
         research_gaps=task.get("research_gaps", []),
         planner=task.get("planner"),
         sequential_thinking=task.get("sequential_thinking"),
+        sequential_thought_loop=task.get("sequential_thought_loop"),
         sequential_plan_review=task.get("sequential_plan_review"),
         follow_up_tasks=task.get("follow_up_tasks", []),
         research_rounds=task.get("research_rounds", []),
+        tool_traces=public_tool_traces(task.get("tool_traces", [])),
+        report_export_path=task.get("report_export_path"),
         active_interrupt=get_active_interrupt(task),
         interrupts=public_interrupts(task),
         human_actions=task.get("human_actions", []),
@@ -751,7 +839,7 @@ async def get_task(task_id: str):
 @router.post("/tasks/{task_id}/resume")
 async def resume_task(task_id: str, request: ResumeTaskRequest):
     """上传财报解析成功后继续执行等待中的财务任务。"""
-    if task_id not in tasks:
+    if not ensure_task_loaded(task_id):
         raise HTTPException(status_code=404, detail="任务不存在")
 
     task = tasks[task_id]
@@ -764,6 +852,7 @@ async def resume_task(task_id: str, request: ResumeTaskRequest):
 
     if active_interrupt and active_interrupt.get("type") == "upload_material":
         resolve_interrupt(task, active_interrupt["interrupt_id"], {"action": "upload_and_resume", "parsed_financial_data": True})
+        persist_task(task_id)
     asyncio.create_task(resume_financial_task_with_uploaded_data(task_id, request.parsed_financial_data))
     return {"task_id": task_id, "status": "resuming"}
 
@@ -771,7 +860,7 @@ async def resume_task(task_id: str, request: ResumeTaskRequest):
 @router.get("/tasks/{task_id}/interrupts")
 async def get_task_interrupts(task_id: str):
     """获取任务的人机协同中断列表。"""
-    if task_id not in tasks:
+    if not ensure_task_loaded(task_id):
         raise HTTPException(status_code=404, detail="任务不存在")
     task = tasks[task_id]
     return {
@@ -785,7 +874,7 @@ async def get_task_interrupts(task_id: str):
 @router.post("/tasks/{task_id}/interrupts/{interrupt_id}/resume")
 async def resume_interrupt(task_id: str, interrupt_id: str, request: ResumeInterruptRequest):
     """解决一个人机协同中断并恢复任务。"""
-    if task_id not in tasks:
+    if not ensure_task_loaded(task_id):
         raise HTTPException(status_code=404, detail="任务不存在")
 
     task = tasks[task_id]
@@ -848,7 +937,7 @@ async def resume_interrupt(task_id: str, interrupt_id: str, request: ResumeInter
         task["plan_approved"] = True
         task["approved_research_state"] = research_state
         task["agent_state"] = "calling_tools"
-        append_timeline(task_id, "Human Review", "已确认研究计划", "开始按已确认的研究问题执行工商、财务、司法、行业、RAG和公开数据源工具。", "completed", "action")
+        append_timeline(task_id, "Human Review", "已确认研究计划", "开始按已确认的研究问题执行工商、财务、司法、行业、内部知识库和公开资料采集。", "completed", "action")
         schedule_task_background(task_id, delay_seconds=0.1)
         notify_task_update(task_id)
         return {"task_id": task_id, "status": "resuming", "action": action}
@@ -885,7 +974,7 @@ async def resume_interrupt(task_id: str, interrupt_id: str, request: ResumeInter
 @router.get("/tasks/{task_id}/report")
 async def get_task_report(task_id: str):
     """获取任务报告"""
-    if task_id not in tasks:
+    if not ensure_task_loaded(task_id):
         raise HTTPException(status_code=404, detail="任务不存在")
 
     task = tasks[task_id]
@@ -893,4 +982,7 @@ async def get_task_report(task_id: str):
     if not task.get("report"):
         raise HTTPException(status_code=404, detail="报告尚未生成")
 
-    return task["report"]
+    report = dict(task["report"])
+    if task.get("tool_traces") and not report.get("tool_traces"):
+        report["tool_traces"] = public_tool_traces(task.get("tool_traces", []))
+    return report

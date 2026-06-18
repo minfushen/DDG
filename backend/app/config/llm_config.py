@@ -26,10 +26,3 @@ def get_llm() -> ChatOpenAI:
     )
 
 
-def get_llm_for_crew() -> ChatOpenAI:
-    """获取 CrewAI 使用的 LLM 实例（绕过 Litellm 白名单）
-
-    Returns:
-        ChatOpenAI: LLM 实例
-    """
-    return get_llm()

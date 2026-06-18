@@ -1,21 +1,13 @@
 # ========================================
 # 上市公司数据获取工具
-# 从东方财富公开接口获取 A 股财务数据
+# 当前 MVP 从东方财富公开接口获取 A 股财务数据。
+# 正式项目应按“巨潮/交易所原始披露 > Wind/CSMAR > AKShare/Tushare > 财经网站”的优先级扩展 Provider。
 # ========================================
 
-from typing import Type, Dict, Any, List, Optional
-from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
+from typing import Dict, Any, List, Optional
 import httpx
 import json
 import re
-
-
-class FetchListedCompanyFinancialInput(BaseModel):
-    """获取上市公司财务数据输入"""
-    enterprise_name: str = Field(description="企业名称")
-    stock_code: str = Field(default="", description="股票代码")
-    stock_exchange: str = Field(default="", description="上市交易所")
 
 
 LISTED_COMPANY_MAP = {
@@ -57,10 +49,14 @@ INCOME_FIELD_MAP = {
     "研发费用": "RESEARCH_EXPENSE",
     "财务费用": "FINANCE_EXPENSE",
     "投资收益": "INVEST_INCOME",
+    "资产减值损失": "ASSET_IMPAIRMENT_INCOME",
+    "信用减值损失": "CREDIT_IMPAIRMENT_INCOME",
     "营业利润": "OPERATE_PROFIT",
     "营业外收入": "NONBUSINESS_INCOME",
     "利润总额": "TOTAL_PROFIT",
     "净利润": "NETPROFIT",
+    "归母净利润": "PARENT_NETPROFIT",
+    "扣非净利润": "DEDUCT_PARENT_NETPROFIT",
 }
 
 
@@ -95,6 +91,9 @@ CASHFLOW_FIELD_MAP = {
     "经营活动产生的现金流量净额": "NETCASH_OPERATE",
     "投资活动产生的现金流量净额": "NETCASH_INVEST",
     "筹资活动产生的现金流量净额": "NETCASH_FINANCE",
+    "固定资产折旧": "FA_IR_DEPR",
+    "无形资产摊销": "IA_AMORTIZE",
+    "长期待摊费用摊销": "LPE_AMORTIZE",
 }
 
 
@@ -234,54 +233,89 @@ def _add_gross_profit(income_statement: List[Dict[str, Any]]):
     income_statement.insert(2, record)
 
 
-class FetchListedCompanyFinancialTool(BaseTool):
-    """获取上市公司财务数据工具"""
-    name: str = "fetch_listed_company_financial"
-    description: str = "从东方财富公开接口获取上市公司近三年财务报表，并转换成标准三大表结构。"
-    args_schema: Type[BaseModel] = FetchListedCompanyFinancialInput
+def _add_depreciation_amortization(cash_flow: List[Dict[str, Any]]):
+    components = [
+        row for row in cash_flow
+        if row.get("项目") in {"固定资产折旧", "无形资产摊销", "长期待摊费用摊销"}
+    ]
+    if not components:
+        return
+    record = {"项目": "折旧摊销"}
+    years = sorted({key for row in components for key in row.keys() if str(key).isdigit()})
+    for year in years:
+        values = [row.get(year) for row in components if row.get(year) is not None]
+        record[year] = sum(values) if values else None
+    if any(record.get(year) is not None for year in years):
+        cash_flow.append(record)
 
-    def _run(self, enterprise_name: str, stock_code: str = "", stock_exchange: str = "") -> str:
-        company = resolve_listed_company(enterprise_name, stock_code, stock_exchange)
+
+class _FetchListedCompanyFinancialTool:
+    """Fetch structured A-share financial statements from Eastmoney public pages."""
+
+    name = "fetch_listed_company_financial"
+
+    def _run(self, enterprise_name: str, stock_code: str = "", stock_exchange: str = "", **_: Any) -> str:
+        company = resolve_listed_company(enterprise_name, stock_code=stock_code, stock_exchange=stock_exchange)
         if not company:
             return json.dumps({
                 "success": False,
-                "error": "未识别到上市公司证券代码",
                 "enterprise_name": enterprise_name,
+                "error": "未识别到A股上市公司主体或股票代码。",
             }, ensure_ascii=False)
 
+        secu_code = company.get("secu_code") or f"{company.get('stock_code')}.{company.get('stock_exchange')}"
         try:
-            income_rows = _fetch_eastmoney_report(company["secu_code"], REPORT_MAP["income_statement"])
-            balance_rows = _fetch_eastmoney_report(company["secu_code"], REPORT_MAP["balance_sheet"])
-            cash_rows = _fetch_eastmoney_report(company["secu_code"], REPORT_MAP["cash_flow"])
-
-            income_statement = _build_statement(income_rows, INCOME_FIELD_MAP)
-            _add_gross_profit(income_statement)
-            balance_sheet = _build_statement(balance_rows, BALANCE_FIELD_MAP)
-            cash_flow = _build_statement(cash_rows, CASHFLOW_FIELD_MAP)
-
-            return json.dumps({
-                "success": True,
-                "enterprise_name": enterprise_name,
-                "security_name": company["security_name"],
-                "stock_code": company["stock_code"],
-                "stock_exchange": company["stock_exchange"],
-                "secu_code": company["secu_code"],
-                "data_source": "东方财富公开财报接口",
-                "years": sorted({key for row in income_statement for key in row.keys() if key.isdigit()}),
-                "financial_statements": {
-                    "income_statement": income_statement,
-                    "balance_sheet": balance_sheet,
-                    "cash_flow": cash_flow,
-                },
-            }, ensure_ascii=False)
-        except Exception as e:
+            income_rows = _fetch_eastmoney_report(secu_code, REPORT_MAP["income_statement"])
+            balance_rows = _fetch_eastmoney_report(secu_code, REPORT_MAP["balance_sheet"])
+            cash_rows = _fetch_eastmoney_report(secu_code, REPORT_MAP["cash_flow"])
+        except Exception as exc:
             return json.dumps({
                 "success": False,
-                "error": f"获取上市公司公开财报失败: {str(e)}",
                 "enterprise_name": enterprise_name,
-                "stock_code": company.get("stock_code"),
-                "stock_exchange": company.get("stock_exchange"),
+                "secu_code": secu_code,
+                "error": f"东方财富公开财报获取失败：{type(exc).__name__}: {exc}",
             }, ensure_ascii=False)
 
+        income_statement = _build_statement(income_rows, INCOME_FIELD_MAP)
+        _add_gross_profit(income_statement)
+        balance_sheet = _build_statement(balance_rows, BALANCE_FIELD_MAP)
+        cash_flow = _build_statement(cash_rows, CASHFLOW_FIELD_MAP)
+        _add_depreciation_amortization(cash_flow)
+        years = sorted({
+            year
+            for rows in [income_rows, balance_rows, cash_rows]
+            for year in [_year_from_report(row) for row in rows]
+            if year.isdigit()
+        }, reverse=True)[:3]
 
-fetch_listed_company_financial = FetchListedCompanyFinancialTool()
+        if not income_statement or not balance_sheet or not cash_flow:
+            return json.dumps({
+                "success": False,
+                "enterprise_name": enterprise_name,
+                "secu_code": secu_code,
+                "security_name": company.get("security_name") or enterprise_name,
+                "years": years,
+                "error": "东方财富公开接口未返回完整利润表、资产负债表和现金流量表。",
+            }, ensure_ascii=False)
+
+        return json.dumps({
+            "success": True,
+            "enterprise_name": enterprise_name,
+            "stock_code": company.get("stock_code"),
+            "stock_exchange": company.get("stock_exchange"),
+            "secu_code": secu_code,
+            "security_name": company.get("security_name") or enterprise_name,
+            "company_name": company.get("company_name") or company.get("security_name") or enterprise_name,
+            "years": years,
+            "data_source": "东方财富公开财报",
+            "source_type": "investment_research_tool",
+            "source_url": f"https://emweb.securities.eastmoney.com/pc_hsf10/pages/index.html?type=web&code={secu_code}",
+            "financial_statements": {
+                "income_statement": income_statement,
+                "balance_sheet": balance_sheet,
+                "cash_flow": cash_flow,
+            },
+        }, ensure_ascii=False)
+
+
+fetch_listed_company_financial = _FetchListedCompanyFinancialTool()

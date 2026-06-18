@@ -93,11 +93,11 @@ Plan-Execute 架构中的 `create_research_plan` 由 LLM 负责，而不是固�
 
 - LLM 无 key、超时、返回非 JSON、任务校验失败时，自动回退 `create_default_research_plan()`。
 - 回退原因写入 `timeline` 和 `errors`，但不得阻塞任务创建。
-- Sequential Thinking MCP 可用时只记录计划检查点，不替代 LLM Planner。
+- Sequential Thinking MCP 可用时先执行研究思考链，输出摘要化 plan context；LLM Planner 再基于该 context 生成结构化任务。
 
 ## Sequential Thinking MCP 接入方案
 
-使用 `langchain_mcp_adapters` 将 Sequential Thinking MCP 工具转换为 LangChain Tool。
+使用 `langchain_mcp_adapters` 将 Sequential Thinking MCP 工具转换为 LangChain Tool。系统支持本地 stdio 和远程 Streamable HTTP 两种模式。
 
 建议封装在：
 
@@ -121,23 +121,55 @@ async def load_sequential_thinking_tools():
     return await client.get_tools()
 ```
 
-当前实现状态：已接入为可选增强层，入口为 `backend/app/agents/research_engine/mcp_tools.py`。
+远程私有化部署模式：
+
+```text
+DDG-Agent Backend
+  -> langchain_mcp_adapters
+    -> http://127.0.0.1:38001/mcp
+      -> services/sequential-thinking-wrapper
+        -> official sequential-thinking MCP server / local fallback state recorder
+```
+
+当前实现入口为 `backend/app/agents/research_engine/mcp_tools.py`，wrapper 服务位于 `services/sequential-thinking-wrapper`。
 
 第一阶段不强依赖 MCP 可用性：
 
 - MCP 可用时用于规划和反思。
 - MCP 不可用时使用规则 planner 和规则 reflector。
 
-实现边界：Sequential Thinking MCP 本身不是规划 LLM，也不直接生成专项尽调结论。当前只用于记录研究计划检查点和证据缺口检查点，结构化 `ResearchTask`、`Claim`、`Gap` 仍由项目内规则和后续 LLM/RAG 节点生成。这样可以避免把 MCP 当成大模型使用，也便于私有化部署环境中按需开启。
+实现边界：Sequential Thinking MCP 本身不是规划 LLM，也不直接生成专项尽调结论。它负责维护可审计的研究思考状态，包括初始思考、扩展和修订。结构化 `ResearchTask` 仍由 LLM Planner 生成并由规则校验；`Claim`、`Gap` 和报告正文仍由项目内 Evidence、RAG、工具和报告装配器生成。
 
 配置项：
 
 ```text
 ENABLE_SEQUENTIAL_THINKING=false
+SEQUENTIAL_THINKING_TRANSPORT=stdio
+SEQUENTIAL_THINKING_REMOTE_URL=http://127.0.0.1:38001/mcp
 SEQUENTIAL_THINKING_MCP_COMMAND=npx
 SEQUENTIAL_THINKING_MCP_ARGS="-y @modelcontextprotocol/server-sequential-thinking"
 SEQUENTIAL_THINKING_MCP_TIMEOUT_SECONDS=20
 ```
+
+Plan 节点的目标流程：
+
+```text
+default_tasks
+-> sequential_thought_loop(3 steps)
+-> LLM Planner with thought_loop_context
+-> schema validation
+-> rule fallback if needed
+```
+
+thought loop MVP：
+
+| step | intent |
+| --- | --- |
+| 1 | 确认企业主体、任务目标和公开资料数据边界 |
+| 2 | 拆分工商、财务、司法、行业和授信证据需求 |
+| 3 | 输出计划生成上下文、重点缺口和人工确认点 |
+
+完整设计见 [17 Sequential Thinking Remote MCP 设计文档](./17-sequential-thinking-remote-mcp-design.md)。
 
 ## 感知工具层
 

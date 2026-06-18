@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AgentWorkbench } from './pages/AgentWorkbench/AgentWorkbench';
 import { ExecutionWorkspace } from './pages/AgentWorkbench/ExecutionWorkspace';
+import { QualityEvaluator } from './pages/QualityEvaluator/QualityEvaluator';
 import { ReportPage } from './pages/Report';
 
 function App() {
@@ -15,6 +16,9 @@ function App() {
 
         {/* Page 3: 尽调报告页 — DeepResearch式结果 */}
         <Route path="/report/:taskId" element={<ReportPage />} />
+
+        {/* Internal: 报告质量评测台 */}
+        <Route path="/quality-evaluator" element={<QualityEvaluator />} />
       </Routes>
     </BrowserRouter>
   );

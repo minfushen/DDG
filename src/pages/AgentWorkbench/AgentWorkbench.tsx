@@ -263,7 +263,7 @@ export function AgentWorkbench() {
                 </div>
                 {[
                   ['上市公司财报', '公开三大表', '正常'],
-                  ['工商/司法公开线索', '搜索 + RAG', '可用'],
+                  ['工商/司法公开线索', '公开资料 + 知识库', '可用'],
                   ['非上市财报', '上传恢复', '待材料'],
                 ].map(([label, desc, status]) => (
                   <div className="ddg-saas-source-row" key={label}>

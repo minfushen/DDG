@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.api import tasks
 from app.api import upload
+from app.api import report_quality
+from app.api.task_store import init_task_store, load_recent_task_snapshots, task_store_path
 
 
 @asynccontextmanager
@@ -20,6 +22,18 @@ async def lifespan(app: FastAPI):
     # 确保输出目录存在
     settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     settings.DB_DIR.mkdir(parents=True, exist_ok=True)
+
+    init_task_store()
+    restored = 0
+    for task in load_recent_task_snapshots():
+        task_id = task.get("task_id")
+        if not task_id:
+            continue
+        tasks.tasks[task_id] = tasks.normalize_task_snapshot(task)
+        tasks.task_events[task_id] = tasks.asyncio.Event()
+        restored += 1
+    print(f"📦 任务快照库: {task_store_path()}")
+    print(f"♻️ 已恢复任务快照: {restored}")
 
     yield
 
@@ -49,6 +63,7 @@ app.add_middleware(
 # 注册当前产品形态需要的路由
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
+app.include_router(report_quality.router, prefix="/api/v1", tags=["report-quality"])
 
 
 @app.get("/")

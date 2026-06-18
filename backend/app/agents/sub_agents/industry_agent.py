@@ -186,7 +186,7 @@ async def run_industry_agent(enterprise_name: str, public_info: Optional[Dict[st
             f"知识库文件：{', '.join(classification.get('guide_files', []))}",
             event_type="discovery",
         ))
-        retrieval_result = industry_knowledge_context.get("retrieval") or retrieve_knowledge(query=guide_query, domain="industry", top_k=6)
+        retrieval_result = industry_knowledge_context.get("retrieval") or retrieve_knowledge(query=guide_query, domain="industry", top_k=6, company_name=enterprise_name)
         timeline[-1]["status"] = "completed"
         timeline[-1]["findings"] = [
             f"已检索本地行业指南（{retrieval_result.get('mode')}）",
