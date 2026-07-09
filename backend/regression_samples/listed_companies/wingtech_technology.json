@@ -1,0 +1,12 @@
+{
+  "sample_id": "wingtech_technology",
+  "company_name": "闻泰科技股份有限公司",
+  "display_name": "闻泰科技",
+  "stock_code": "600745",
+  "exchange": "SSE",
+  "test_input": "分析一下闻泰科技这个上市公司",
+  "expected_aliases": ["闻泰科技", "闻泰科技股份有限公司", "600745"],
+  "expected_industry_keywords": ["半导体", "ODM", "功率半导体", "消费电子", "安世半导体"],
+  "focus_areas": ["多业务结构识别", "资产负债压力", "重大诉讼与公告线索", "半导体周期风险"],
+  "quality_gate": {"min_score": 78, "required_dimensions": ["financial_depth", "industry_depth", "legal_business_coverage"]}
+}

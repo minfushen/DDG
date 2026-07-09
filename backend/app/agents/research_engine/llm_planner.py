@@ -7,12 +7,34 @@ import json
 import re
 import time
 
-from langchain_openai import ChatOpenAI
-
+from app.config.llm_config import cached_invoke, get_llm
 from app.config import settings
 
 from .prompts import ALLOWED_RESEARCH_CATEGORIES, ALLOWED_TOOL_HINTS, build_research_planner_prompt
 from .state import ResearchTask, stable_id
+
+
+def _recent_stm_context(session_id: str | None, task_id: str | None, max_entries: int = 12) -> str:
+    """Retrieve recent short-term memory entries for planner awareness.
+
+    Returns an empty string when STM is disabled or no session is provided.
+    """
+    if not settings.ENABLE_SHORT_TERM_MEMORY or not session_id:
+        return ""
+    from app.memory import ShortTermMemory
+
+    stm = ShortTermMemory(session_id=session_id, task_id=task_id)
+    entries = stm.get_recent(n=max_entries)
+    if not entries:
+        return ""
+    lines = []
+    for entry in entries:
+        content = entry.get("content", "")
+        if content:
+            lines.append(f"- {content}")
+    if not lines:
+        return ""
+    return "\n\n=== 本次会话已产生的上下文（供参考，避免重复规划） ===\n" + "\n".join(lines)
 
 
 def _json_from_text(text: str) -> Dict[str, Any]:
@@ -127,6 +149,8 @@ def create_llm_research_plan(
     max_tasks: int | None = None,
     thought_loop_context: str = "",
     skill_context: str = "",
+    session_id: str | None = None,
+    task_id: str | None = None,
 ) -> Dict[str, Any]:
     """Return an LLM-generated research plan or a structured failure."""
 
@@ -149,7 +173,8 @@ def create_llm_research_plan(
             thought_loop_context=thought_loop_context,
             skill_context=skill_context,
         )
-        llm = ChatOpenAI(
+        prompt += _recent_stm_context(session_id, task_id)
+        llm = get_llm(
             model=model,
             api_key=api_key,
             base_url=base_url,
@@ -157,9 +182,15 @@ def create_llm_research_plan(
             max_tokens=8192,
             timeout=settings.RESEARCH_PLANNER_TIMEOUT_SECONDS,
             max_retries=0,
-            model_kwargs={"response_format": {"type": "json_object"}},
+            response_format="json_object",
         )
-        response = llm.invoke(prompt)
+        response = cached_invoke(
+            llm,
+            prompt,
+            ttl_seconds=settings.LLM_CACHE_TTL_SECONDS,
+            session_id=session_id,
+            task_id=task_id,
+        )
         content = str(getattr(response, "content", response))
         parsed = _json_from_text(content)
         tasks, metadata = _normalize_plan(parsed, enterprise_name, max_tasks)

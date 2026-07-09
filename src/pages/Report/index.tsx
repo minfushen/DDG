@@ -47,7 +47,7 @@ interface ReportData {
   summary?: Record<string, number>;
   legal_items?: LegalItem[];
   executive_summary?: string[];
-  risk_dimensions?: FullRiskDimension[];
+
   credit_decision?: CreditDecision;
   cross_findings?: CrossFinding[];
   sub_reports?: Record<string, ReportData | undefined>;
@@ -114,13 +114,23 @@ interface ResearchGapItem {
   severity?: string;
 }
 
+interface GenericTableRow {
+  [key: string]: string | number;
+}
+
+interface GenericTable {
+  columns: string[];
+  rows: GenericTableRow[];
+  source?: string;
+}
+
 interface ReportChapter {
   id: string;
   title: string;
   subtitle?: string;
   summary?: string[];
   summary_citations?: Array<{ text?: string; evidence_refs?: string[] }>;
-  subsections?: Array<{ title?: string; items?: string[]; evidence_refs?: string[] }>;
+  subsections?: Array<{ title?: string; items?: string[]; evidence_refs?: string[]; table?: GenericTable }>;
   highlights?: string[];
   risks?: string[];
   findings?: CrossFinding[];
@@ -268,16 +278,6 @@ interface LegalReportSection {
   attempts?: Array<{ provider?: string; success?: boolean; reason?: string; status_code?: number }>;
 }
 
-interface FullRiskDimension {
-  key?: string;
-  name: string;
-  score: number;
-  max_score?: number;
-  weight?: number;
-  status: 'low' | 'medium' | 'high';
-  details?: string[];
-}
-
 interface CrossFinding {
   title: string;
   risk_level?: string;
@@ -347,16 +347,6 @@ function riskBgClass(rating: string): string {
     high: 'bg-[#FEF2F2]',
   };
   return map[rating] || 'bg-[#F9FAFB]';
-}
-
-function dimensionWeight(dim: FullRiskDimension): number {
-  if (typeof dim.weight === 'number' && dim.weight > 0) return dim.weight;
-  const name = dim.name || '';
-  if (name.includes('财务')) return 0.35;
-  if (name.includes('司法') || name.includes('合规')) return 0.25;
-  if (name.includes('行业') || name.includes('经营')) return 0.2;
-  if (name.includes('工商') || name.includes('治理') || name.includes('关联')) return 0.2;
-  return 0;
 }
 
 function trustLabel(level?: string): string {
@@ -569,6 +559,37 @@ function FinancialReportTableView({ table, unit }: { table: FinancialReportTable
   );
 }
 
+function GenericTableView({ table }: { table: GenericTable }) {
+  if (!table?.columns?.length || !table?.rows?.length) return null;
+  return (
+    <div className="overflow-x-auto border border-[#E5E7EB] rounded-lg bg-white mb-4">
+      <table className="w-full min-w-[480px]">
+        <thead>
+          <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
+            {table.columns.map((col) => (
+              <th key={col} className="px-4 py-3 text-xs font-semibold text-[#667085] text-left">{col}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, i) => (
+            <tr key={i} className="border-b border-[#F3F4F6] last:border-0">
+              {table.columns.map((col) => (
+                <td key={col} className="px-4 py-3 text-sm text-[#374151] whitespace-nowrap">
+                  {row[col] ?? '—'}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {table.source && (
+        <div className="px-4 py-2 text-xs text-[#9CA3AF] border-t border-[#F3F4F6]">数据来源：{table.source}</div>
+      )}
+    </div>
+  );
+}
+
 function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskId?: string }) {
   const financialSections = (report.sections || []) as FinancialReportSection[];
   const rating = report.risk_rating || 'medium';
@@ -612,9 +633,7 @@ function FinancialAnalysisReport({ report, taskId }: { report: ReportData; taskI
                     {subsection.analysis && subsection.analysis.length > 0 && (
                       <div className="mt-4 space-y-2">
                         {subsection.analysis.map((paragraph, index) => (
-                          <p key={index} className="text-sm leading-7 text-[#374151]">
-                            {paragraph}
-                          </p>
+                          <AnalysisParagraph key={index} text={paragraph} className="text-sm leading-7 text-[#374151]" />
                         ))}
                       </div>
                     )}
@@ -661,30 +680,52 @@ function findFinancialSubsection(report: ReportData | undefined, title: string):
   return undefined;
 }
 
+const ANALYSIS_SECTION_MARKERS = ["数据现象：", "归因分析：", "风险信号：", "核查建议："];
+
+function AnalysisParagraph({ text, className }: { text: string; className?: string }) {
+  const coreMatch = text.match(/^(核心判断：.+?。)/);
+  if (!coreMatch) {
+    return <p className={className}>{text}</p>;
+  }
+
+  const coreText = coreMatch[1];
+  const restText = text.slice(coreText.length);
+
+  // 把后续内容按 "数据现象："、"归因分析：" 等标记拆成独立段落
+  const markerRegex = new RegExp(`(${ANALYSIS_SECTION_MARKERS.join("|")})`, "g");
+  const tokens = restText.split(markerRegex).filter(Boolean);
+  const subParagraphs: { label: string; content: string }[] = [];
+  let currentLabel = "";
+  for (const token of tokens) {
+    if (ANALYSIS_SECTION_MARKERS.includes(token)) {
+      currentLabel = token;
+    } else if (currentLabel) {
+      subParagraphs.push({ label: currentLabel, content: token });
+      currentLabel = "";
+    }
+  }
+
+  return (
+    <div className="ddg-analysis-paragraph">
+      <p className={className}>
+        <span className="ddg-core-judgment">{coreText}</span>
+      </p>
+      {subParagraphs.map((part, idx) => (
+        <p
+          key={idx}
+          className={[className, "ddg-analysis-sub-paragraph"].filter(Boolean).join(" ")}
+        >
+          <span className="ddg-analysis-label">{part.label}</span>
+          {part.content}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function FinancialSpecialistAnalysis({ report }: { report?: ReportData }) {
   if (!report?.sections?.length) return null;
-  const groups = [
-    {
-      title: '3.1 收入与利润分析',
-      subtitle: '判断收入增长是否转化为利润，利润是否依赖非经常性因素。',
-      subsections: ['利润表分析', '盈利能力分析'],
-    },
-    {
-      title: '3.2 资产负债分析',
-      subtitle: '拆分资产沉淀位置、负债期限结构和资本实力变化。',
-      subsections: ['资产分析', '负债分析', '所有者权益分析'],
-    },
-    {
-      title: '3.3 盈利质量与营运效率',
-      subtitle: '交叉验证应收、存货、周转效率和现金含量是否支撑收入真实性。',
-      subsections: ['营运能力分析', '现金流量表分析'],
-    },
-    {
-      title: '3.4 偿债能力与财务信号异常',
-      subtitle: '评估短债压力、流动性安全边际、现金流覆盖和异常信号。',
-      subsections: ['偿债能力分析', '主要潜在风险提示'],
-    },
-  ];
+  const financialSections = (report.sections || []) as FinancialReportSection[];
 
   return (
     <div className="ddg-financial-methodology">
@@ -695,46 +736,40 @@ function FinancialSpecialistAnalysis({ report }: { report?: ReportData }) {
           <p>按银行贷前审查习惯组织财务专项结论：先看增长与利润，再看资产负债，随后交叉验证营运效率、现金流与偿债安全边际。</p>
         </div>
       </div>
-      {groups.map((group) => {
-        const subsections = group.subsections
-          .map((title) => findFinancialSubsection(report, title))
-          .filter(Boolean) as FinancialReportSubsection[];
-        if (!subsections.length) return null;
-        return (
-          <section key={group.title} className="ddg-financial-methodology-section">
-            <div className="ddg-financial-methodology-title">
-              <h4>{group.title}</h4>
-              <span>{group.subtitle}</span>
-            </div>
-            <div className="ddg-financial-methodology-body">
-              {subsections.map((subsection) => (
-                <article key={subsection.title} className="ddg-financial-methodology-block">
-                  <div className="ddg-financial-methodology-block-title">
-                    <strong>{subsection.title}</strong>
+      {financialSections.map((section) => (
+        <section key={section.title} className="ddg-financial-methodology-section">
+          <div className="ddg-financial-methodology-title">
+            <h4>{section.title}</h4>
+          </div>
+          <div className="ddg-financial-methodology-body">
+            {section.subsections.map((subsection) => (
+              <article key={subsection.title} className="ddg-financial-methodology-block">
+                <div className="ddg-financial-methodology-block-title">
+                  <strong>{subsection.title}</strong>
+                </div>
+                {subsection.table && <FinancialReportTableView table={subsection.table} unit={subsection.unit} />}
+                {subsection.analysis && subsection.analysis.length > 0 && (
+                  <div className="ddg-financial-methodology-analysis">
+                    {subsection.analysis.map((text, index) => (
+                      <AnalysisParagraph key={index} text={text} />
+                    ))}
                   </div>
-                  {subsection.table && <FinancialReportTableView table={subsection.table} unit={subsection.unit} />}
-                  {subsection.title === '利润表分析' && subsection.table && (
-                    <div className="ddg-financial-methodology-analysis">
-                      {incomeStatementAnalysisFromTable(subsection)?.map((text, index) => <p key={index}>{text}</p>)}
-                    </div>
-                  )}
-                  {!(subsection.title === '利润表分析' && subsection.table) && subsection.analysis?.length ? (
-                    <div className="ddg-financial-methodology-analysis">
-                      {subsection.analysis.slice(0, 3).map((text, index) => <p key={index}>{text}</p>)}
-                    </div>
-                  ) : null}
-                  {subsection.risk提示 && <p className="ddg-financial-methodology-risk">{subsection.risk提示}</p>}
-                  {subsection.risks?.length ? (
-                    <div className="ddg-financial-methodology-risk-list">
-                      {subsection.risks.slice(0, 5).map((risk) => <span key={risk}>{risk}</span>)}
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          </section>
-        );
-      })}
+                )}
+                {subsection.risk提示 && (
+                  <p className="ddg-financial-methodology-risk">{subsection.risk提示}</p>
+                )}
+                {subsection.risks && subsection.risks.length > 0 && (
+                  <div className="ddg-financial-methodology-risk-list">
+                    {subsection.risks.slice(0, 5).map((risk) => (
+                      <span key={risk}>{risk}</span>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
@@ -1350,6 +1385,7 @@ function ChapterSubsectionList({ chapter, evidenceById }: { chapter: ReportChapt
         return (
           <article key={`${chapter.id}-subsection-${subsection.title || index}`} className="ddg-chapter-subsection-card">
             <h3>{subsection.title || `要点 ${index + 1}`}</h3>
+            {subsection.table && <GenericTableView table={subsection.table} />}
             <ul>
               {(subsection.items || []).slice(0, 6).map((item) => <li key={item}>{item}</li>)}
             </ul>
@@ -1359,19 +1395,6 @@ function ChapterSubsectionList({ chapter, evidenceById }: { chapter: ReportChapt
       })}
     </div>
   );
-}
-
-function dimensionEvidenceRefs(dim: FullRiskDimension, chapters: ReportChapter[]): string[] {
-  const name = dim.name || '';
-  const chapterId = name.includes('财务')
-    ? 'financial'
-    : name.includes('司法') || name.includes('合规')
-      ? 'legal'
-      : name.includes('行业') || name.includes('经营')
-        ? 'industry'
-        : 'business';
-  const chapter = chapters.find((item) => item.id === chapterId);
-  return chapter?.evidence_refs || chapter?.findings?.flatMap((finding) => finding.evidence_refs || []) || [];
 }
 
 function ChapterFindingList({ findings, evidenceById }: { findings?: CrossFinding[]; evidenceById: Map<string, EvidenceDocItem> }) {
@@ -1654,7 +1677,6 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
   const rating = report.risk_rating || 'medium';
   const score = report.risk_score ?? 0;
   const isPublicPreDd = report.report_mode === 'public_pre_dd';
-  const dimensions = report.risk_dimensions || [];
   const decision = report.credit_decision || {};
   const financialReport = extractFinancialReport(report);
   const evidenceDocs = [
@@ -1763,29 +1785,6 @@ function FullDueDiligenceReport({ report }: { report: ReportData }) {
                 <strong>数据边界</strong>
                 <p>{dataBoundaryItems[0] || report.data_boundary || '本报告需结合原始凭证和人工尽调复核。'}</p>
               </div>
-            </div>
-          </section>
-
-          <section className="ddg-report-section-card">
-            <div className="ddg-report-section-heading"><Shield size={16} /><h2>四维风险评分</h2></div>
-            <div className="ddg-risk-grid">
-              {dimensions.map((dim) => (
-                <div key={dim.name} className="ddg-risk-card">
-                  <div>
-                    <h3>{dim.name}</h3>
-                    <span>权重 {Math.round(dimensionWeight(dim) * 100)}%</span>
-                  </div>
-                  <strong>{dim.score}</strong>
-                  <div className="ddg-risk-bar"><span style={{ width: `${dim.score}%` }} /></div>
-                  <p>{(dim.details || [])[0] || '未发现明确重大异常。'}</p>
-                  <EvidenceReferenceList
-                    refs={dimensionEvidenceRefs(dim, chapters)}
-                    evidenceById={evidenceById}
-                    title="评分依据"
-                    limit={2}
-                  />
-                </div>
-              ))}
             </div>
           </section>
 

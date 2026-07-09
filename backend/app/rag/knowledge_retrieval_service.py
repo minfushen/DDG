@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from app.agents.evidence import normalize_evidence
+from app.config.rag_loader import get_knowledge_fallback_split_ratio
 from app.rag.collection_names import GENERAL_COLLECTION, company_collection_name
 from app.rag.knowledge_ingestion import build_documents_from_markdown
 
@@ -188,10 +189,12 @@ def retrieve_knowledge(query: str, domain: str = "all", top_k: int = 5, company_
 
     try:
         if company_name:
+            split_ratio = get_knowledge_fallback_split_ratio()
+            company_top_k = max(2, int(top_k * split_ratio))
             company_hits = _vector_search(
                 query=query,
                 domain="all",
-                top_k=max(2, top_k // 2),
+                top_k=company_top_k,
                 collection_name=company_collection_name(company_name),
             )
             if company_hits:

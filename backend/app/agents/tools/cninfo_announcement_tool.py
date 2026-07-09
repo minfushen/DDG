@@ -63,6 +63,18 @@ def classify_announcement(title: str) -> str:
     return "other"
 
 
+# 摘要/英文/已取消版本通常正文很短或非中文，应让完整年报优先解析。
+_ANNUAL_REPORT_LOW_PRIORITY_MARKERS = ["摘要", "英文", "已取消", "更正后", "（修订版）"]
+
+
+def _annual_report_priority(title: str) -> int:
+    """完整年报排在摘要/英文/更正版之前（数值越小优先级越高）。"""
+    clean_title = clean_cninfo_title(title)
+    if any(marker in clean_title for marker in _ANNUAL_REPORT_LOW_PRIORITY_MARKERS):
+        return 1
+    return 0
+
+
 def _format_timestamp(value: Any) -> str:
     try:
         number = int(value)
@@ -322,6 +334,9 @@ def search_cninfo_announcements(
     ingestion_gaps: List[Dict[str, Any]] = []
     if extract_pdf_content:
         annual_reports = [row for row in normalized if row.get("announcement_type") == "annual_report"]
+        # 先按发布时间倒序（最新在前），再按完整年报优先于摘要/英文版稳定排序。
+        annual_reports.sort(key=lambda row: str(row.get("published_at") or ""), reverse=True)
+        annual_reports.sort(key=lambda row: _annual_report_priority(row.get("title", "")))
         for item in annual_reports[:max(1, int(max_pdf_extract or 1))]:
             result = fetch_and_extract_annual_report_pdf(item, enterprise_name=enterprise_name, timeout=20)
             pdf_extraction_results.append(result)

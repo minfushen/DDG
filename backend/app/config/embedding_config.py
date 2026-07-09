@@ -8,17 +8,28 @@ from urllib import error, request
 from functools import lru_cache
 
 from app.config import settings
+from app.config.rag_loader import get_embedding_config
 
 
 class SiliconFlowEmbeddings:
     """Minimal LangChain-compatible embeddings client for SiliconFlow."""
 
-    def __init__(self, api_key: str, base_url: str, model: str):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        model: str,
+        batch_size: int | None = None,
+        max_chars: int | None = None,
+        timeout: int | None = None,
+    ):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.model = model
-        self.batch_size = 1
-        self.max_chars = 500
+        emb_cfg = get_embedding_config()
+        self.batch_size = batch_size if batch_size is not None else emb_cfg.get("batch_size", 1)
+        self.max_chars = max_chars if max_chars is not None else emb_cfg.get("max_chars", 500)
+        self.timeout = timeout if timeout is not None else emb_cfg.get("timeout_seconds", 60)
 
     def _embed_batch(self, texts: List[str]) -> List[List[float]]:
         payload = json.dumps({"model": self.model, "input": texts}).encode("utf-8")
@@ -32,7 +43,7 @@ class SiliconFlowEmbeddings:
             method="POST",
         )
         try:
-            with request.urlopen(req, timeout=60) as resp:
+            with request.urlopen(req, timeout=self.timeout) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
         except error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:500]

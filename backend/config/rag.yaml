@@ -1,0 +1,29 @@
+# config/rag.yaml
+# RAG (retrieval-augmented generation) configuration.
+# Values here act as application defaults; environment variables in
+# app/config/settings.py still take precedence for provider credentials
+# and deployment-specific paths when explicitly set.
+
+retrieval:
+  legal_search:
+    default_top_k: 10
+    summary_top_k: 5
+  knowledge:
+    financial_default: 5
+    industry_default: 6
+    research_default: 5
+    fallback_split_ratio: 0.5
+
+embedding:
+  # Inference-time tunables for the embedding client.
+  batch_size: 1
+  max_chars: 500
+  timeout_seconds: 60
+
+vector_store:
+  chroma_db_dir: "./db/chroma"
+
+ingestion:
+  # PDF 年报解析结果自动入库 RAG
+  auto_ingest_cninfo_annual_report: true
+  auto_ingest_timeout_seconds: 60

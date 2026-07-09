@@ -35,6 +35,7 @@ class DeepResearchGraphState(TypedDict, total=False):
     research_state: ResearchState
     sequential_status: Dict[str, Any]
     sequential_tools: List[Any]
+    session_id: str
     prepared: bool
     executed: bool
     success: bool
@@ -117,6 +118,7 @@ async def _execute_task_round(
     sequential_status: Dict[str, Any],
     sequential_tools: List[Any],
     round_number: int = 1,
+    session_id: str | None = None,
 ) -> None:
     task["status"] = "running"
     task["round"] = round_number
@@ -124,7 +126,7 @@ async def _execute_task_round(
     agent = "Research Engine" if round_number == 1 else "Research Engine · 二轮补证"
     state["timeline"].append(timeline_event(agent, "执行研究任务", task.get("question", ""), "running", "action"))
 
-    result = await asyncio.to_thread(execute_research_task, enterprise_name, task)
+    result = await asyncio.to_thread(execute_research_task, enterprise_name, task, session_id=session_id)
     evidence = result.get("evidence", [])
     tool_traces = result.get("tool_traces", [])
     state["evidence"].extend(evidence)
@@ -169,6 +171,7 @@ async def _prepare_plan_node(graph_state: DeepResearchGraphState) -> DeepResearc
     enterprise_name = graph_state.get("enterprise_name", "")
     objective = graph_state.get("objective") or "完整贷前尽调"
     max_iterations = int(graph_state.get("max_iterations") or 6)
+    session_id = graph_state.get("session_id") or stable_id("sess", enterprise_name, objective)
     state: ResearchState = initial_state(enterprise_name=enterprise_name, objective=objective, max_iterations=max_iterations)
 
     runtime_skills = load_skills_for_task("loan_due_diligence", objective)
@@ -238,7 +241,14 @@ async def _prepare_plan_node(graph_state: DeepResearchGraphState) -> DeepResearc
 
     state["timeline"].append(timeline_event("研究计划生成器", "生成研究计划中", "正在根据研究思考链上下文生成可执行研究问题。", "running", "analysis"))
     await _emit_prepare_update(graph_state, {"stage": "plan_generation_start", "research_state": state})
-    plan_result = await asyncio.to_thread(create_research_plan, enterprise_name, objective, thought_loop_context, runtime_skills)
+    plan_result = await asyncio.to_thread(
+        create_research_plan,
+        enterprise_name,
+        objective,
+        thought_loop_context,
+        runtime_skills,
+        session_id=session_id,
+    )
     tasks = plan_result.get("tasks", [])
     state["planner"] = {
         "source": plan_result.get("planner_source"),
@@ -281,6 +291,7 @@ async def _prepare_plan_node(graph_state: DeepResearchGraphState) -> DeepResearc
         "research_state": state,
         "sequential_status": sequential_status,
         "sequential_tools": sequential_tools,
+        "session_id": session_id,
         "prepared": True,
         "success": True,
     }
@@ -290,6 +301,7 @@ async def _execute_round1_node(graph_state: DeepResearchGraphState) -> DeepResea
     state = graph_state.get("research_state") or {}
     enterprise_name = state.get("enterprise_name", graph_state.get("enterprise_name", ""))
     max_iterations = int(state.get("max_iterations") or graph_state.get("max_iterations") or 6)
+    session_id = graph_state.get("session_id") or stable_id("sess", enterprise_name, state.get("objective", "完整贷前尽调"))
     sequential_status = graph_state.get("sequential_status") or await load_sequential_thinking_tools()
     sequential_tools = graph_state.get("sequential_tools") or sequential_status.get("tools", [])
 
@@ -298,11 +310,11 @@ async def _execute_round1_node(graph_state: DeepResearchGraphState) -> DeepResea
     for task in first_round_tasks:
         if completed >= max_iterations:
             break
-        await _execute_task_round(state, enterprise_name, task, sequential_status, sequential_tools, round_number=1)
+        await _execute_task_round(state, enterprise_name, task, sequential_status, sequential_tools, round_number=1, session_id=session_id)
         completed += 1
         state["iteration"] = completed
     state["first_round_task_count"] = len(first_round_tasks)
-    return {**graph_state, "research_state": state, "sequential_status": sequential_status, "sequential_tools": sequential_tools}
+    return {**graph_state, "research_state": state, "sequential_status": sequential_status, "sequential_tools": sequential_tools, "session_id": session_id}
 
 
 async def _plan_followups_node(graph_state: DeepResearchGraphState) -> DeepResearchGraphState:
@@ -334,6 +346,7 @@ async def _execute_followups_node(graph_state: DeepResearchGraphState) -> DeepRe
     state = graph_state.get("research_state") or {}
     enterprise_name = state.get("enterprise_name", graph_state.get("enterprise_name", ""))
     max_iterations = int(state.get("max_iterations") or graph_state.get("max_iterations") or 6)
+    session_id = graph_state.get("session_id") or stable_id("sess", enterprise_name, state.get("objective", "完整贷前尽调"))
     sequential_status = graph_state.get("sequential_status") or await load_sequential_thinking_tools()
     sequential_tools = graph_state.get("sequential_tools") or sequential_status.get("tools", [])
     completed = int(state.get("iteration") or 0)
@@ -341,10 +354,10 @@ async def _execute_followups_node(graph_state: DeepResearchGraphState) -> DeepRe
     for task in follow_up_tasks:
         if completed >= max_iterations + len(follow_up_tasks):
             break
-        await _execute_task_round(state, enterprise_name, task, sequential_status, sequential_tools, round_number=2)
+        await _execute_task_round(state, enterprise_name, task, sequential_status, sequential_tools, round_number=2, session_id=session_id)
         completed += 1
         state["iteration"] = completed
-    return {**graph_state, "research_state": state, "sequential_status": sequential_status, "sequential_tools": sequential_tools}
+    return {**graph_state, "research_state": state, "sequential_status": sequential_status, "sequential_tools": sequential_tools, "session_id": session_id}
 
 
 async def _synthesize_node(graph_state: DeepResearchGraphState) -> DeepResearchGraphState:

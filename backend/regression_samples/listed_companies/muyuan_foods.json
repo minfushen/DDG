@@ -1,0 +1,12 @@
+{
+  "sample_id": "muyuan_foods",
+  "company_name": "牧原食品股份有限公司",
+  "display_name": "牧原股份",
+  "stock_code": "002714",
+  "exchange": "SZSE",
+  "test_input": "分析一下牧原股份这个上市公司",
+  "expected_aliases": ["牧原股份", "牧原食品股份有限公司", "002714"],
+  "expected_industry_keywords": ["生猪", "养殖", "猪周期", "饲料", "农业"],
+  "focus_areas": ["猪周期和价格波动", "资产负债和现金流", "存货和生物资产", "周期行业授信边界"],
+  "quality_gate": {"min_score": 78, "required_dimensions": ["financial_depth", "industry_depth", "credit_coherence"]}
+}

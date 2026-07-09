@@ -80,3 +80,53 @@ def test_download_pdf_size_guard(monkeypatch):
 
     result = download_pdf("https://example.com/big.pdf", max_size_mb=50)
     assert result is None
+
+
+def test_extract_pdf_uses_mineru_when_enabled(monkeypatch):
+    def fake_mineru(_bytes):
+        return {
+            "success": True,
+            "text": "MinerU parsed markdown",
+            "tables": [],
+            "metadata": {"page_count": 2, "parser_used": "mineru"},
+            "error": "",
+        }
+
+    monkeypatch.setattr("app.agents.tools.pdf_extraction_engine.extract_with_mineru", fake_mineru)
+    monkeypatch.setattr("app.agents.tools.pdf_extraction_engine._mineru_enabled", lambda: True)
+    monkeypatch.setattr("app.agents.tools.pdf_extraction_engine._mineru_available", lambda: True)
+
+    result = extract_pdf(b"fake")
+    assert result["success"] is True
+    assert result["metadata"]["parser_used"] == "mineru"
+    assert result["text"] == "MinerU parsed markdown"
+
+
+def test_extract_pdf_fallback_to_local_when_mineru_fails(monkeypatch):
+    def fake_mineru(_bytes):
+        return {
+            "success": False,
+            "text": "",
+            "tables": [],
+            "metadata": {"page_count": 0, "parser_used": "mineru"},
+            "error": "MinerU service error",
+        }
+
+    def fake_pdfplumber(_bytes):
+        return {
+            "success": True,
+            "text": "local fallback text " * 10,
+            "tables": [],
+            "metadata": {"page_count": 1, "parser_used": "pdfplumber"},
+            "error": "",
+        }
+
+    monkeypatch.setattr("app.agents.tools.pdf_extraction_engine.extract_with_mineru", fake_mineru)
+    monkeypatch.setattr("app.agents.tools.pdf_extraction_engine.extract_with_pdfplumber", fake_pdfplumber)
+    monkeypatch.setattr("app.agents.tools.pdf_extraction_engine._mineru_enabled", lambda: True)
+    monkeypatch.setattr("app.agents.tools.pdf_extraction_engine._mineru_available", lambda: True)
+    monkeypatch.setattr("app.agents.tools.pdf_extraction_engine._pdfplumber_available", lambda: True)
+
+    result = extract_pdf(b"fake")
+    assert result["success"] is True
+    assert result["metadata"]["parser_used"] == "pdfplumber"

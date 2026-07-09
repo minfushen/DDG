@@ -1,0 +1,17 @@
+{
+  "name": "DDG listed-company due-diligence regression samples",
+  "version": "2026-06-14",
+  "description": "10家上市公司回归样例，用于报告质量评测、行业识别、财务诊断和正文级证据引用回归。",
+  "samples": [
+    "silan_micro.json",
+    "maxscend_microelectronics.json",
+    "wingtech_technology.json",
+    "sunwoda.json",
+    "chuaneng_power.json",
+    "lens_technology.json",
+    "wuxi_apptec.json",
+    "sungrow_power.json",
+    "muyuan_foods.json",
+    "aero_engine_corporation.json"
+  ]
+}

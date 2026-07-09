@@ -15,35 +15,17 @@ import json
 import re
 import time
 
-from langchain_openai import ChatOpenAI
-
+from app.config.llm_config import cached_invoke, get_llm
 from app.config import settings
+from app.config.prompt_loader import load_prompt_template, render_prompt_template
+from app.config.quality_gate_loader import get_banned_terms, get_generic_rewrites
 
 
 LLM_INDUSTRY_TIMEOUT_SECONDS = 60
 _LLM_EXECUTOR = ThreadPoolExecutor(max_workers=3, thread_name_prefix="industry-diagnostic")
 
-BANNED_GENERIC_TERMS = [
-    "竞争激烈",
-    "政策利好",
-    "市场空间广阔",
-    "技术更新快",
-    "人才重要",
-    "估值偏高",
-    "发展前景良好",
-    "机遇与挑战并存",
-]
-
-GENERIC_REWRITES = {
-    "竞争激烈": "竞争强度需通过CR5、价格变化、产能利用率和订单覆盖率核验",
-    "政策利好": "政策影响需拆分为补贴、准入、出口管制和监管约束后判断",
-    "市场空间广阔": "市场空间需以行业增速、渗透率、头部公司增速和订单覆盖率验证",
-    "技术更新快": "技术迭代需以关键工艺节点、研发投入、量产进度和客户认证周期验证",
-    "人才重要": "人才依赖需以核心团队稳定性、工艺文档化率和激励覆盖范围验证",
-    "估值偏高": "估值压力需以PB/PE、ROE、产能利用率和折旧压力对标验证",
-    "发展前景良好": "发展前景需以订单、价格、产能利用率和现金流兑现情况验证",
-    "机遇与挑战并存": "行业判断需拆分为需求、供给、政策、技术路线和资金链五类假设验证",
-}
+BANNED_GENERIC_TERMS = get_banned_terms("industry_diagnostic")
+GENERIC_REWRITES = get_generic_rewrites()
 
 DEFAULT_DIAGNOSTIC_TITLES = [
     "行业阶段与竞争格局风险",
@@ -53,11 +35,8 @@ DEFAULT_DIAGNOSTIC_TITLES = [
 
 
 @lru_cache()
-def _get_primary_llm() -> ChatOpenAI:
-    return ChatOpenAI(
-        model=settings.LLM_MODEL,
-        api_key=settings.LLM_API_KEY,
-        base_url=settings.LLM_BASE_URL,
+def _get_primary_llm() -> BaseChatModel:
+    return get_llm(
         temperature=0,
         max_tokens=3072,
         timeout=min(max(settings.LLM_TIMEOUT_SECONDS, LLM_INDUSTRY_TIMEOUT_SECONDS), 90),
@@ -66,10 +45,10 @@ def _get_primary_llm() -> ChatOpenAI:
 
 
 @lru_cache()
-def _get_backup_llm() -> ChatOpenAI | None:
+def _get_backup_llm() -> BaseChatModel | None:
     if not settings.FINANCIAL_NARRATIVE_BACKUP_LLM_API_KEY or not settings.FINANCIAL_NARRATIVE_BACKUP_LLM_BASE_URL:
         return None
-    return ChatOpenAI(
+    return get_llm(
         model=settings.FINANCIAL_NARRATIVE_BACKUP_LLM_MODEL or settings.LLM_MODEL,
         api_key=settings.FINANCIAL_NARRATIVE_BACKUP_LLM_API_KEY,
         base_url=settings.FINANCIAL_NARRATIVE_BACKUP_LLM_BASE_URL,
@@ -152,7 +131,7 @@ def _public_anchor_lines(public_info: Dict[str, Any]) -> List[str]:
         if value:
             lines.append(f"{label}：{value}")
     if review.get("business_review"):
-        lines.append(f"年报经营讨论：{review.get('business_review')[:700]}")
+        lines.append(f"年报经营讨论：{review.get('business_review')[:1500]}")
     for row in main_business[:6]:
         if isinstance(row, dict):
             lines.append("主营构成：" + "，".join(f"{k}={v}" for k, v in row.items() if v))
@@ -190,11 +169,176 @@ def _knowledge_lines(knowledge_context: Dict[str, Any]) -> List[Dict[str, Any]]:
     ]
 
 
+
+
+def _pick_industry_name(classification: dict) -> str:
+    """从分类结果中提取优先行业名称。
+
+    优先取 semantic_industry_name，其次 industry_name，兜底为"未知行业"。
+    """
+    return classification.get("semantic_industry_name") or classification.get("industry_name") or "未知行业"
+
+
+def _fetch_market_data_anchor(classification: dict) -> dict:
+    """获取并规范化行业市场数据锚点。
+
+    调用 get_industry_market_data，对搜索结果截断到 title+snippet 共不超过 240 字符，
+    并保留 source/date/url 以及质量相关字段。失败时保留 error 字段。
+    """
+    from app.agents.tools.industry_market_data_tool import get_industry_market_data
+
+    raw = get_industry_market_data(_pick_industry_name(classification))
+    if not raw.get("success"):
+        return {"success": False, "error": raw.get("error") or "获取行业市场数据失败"}
+
+    def _truncate_result(result: dict) -> dict:
+        title = (result.get("title") or "")[:120]
+        snippet = (result.get("snippet") or "")[:120]
+        return {
+            "title": title,
+            "snippet": snippet,
+            "source": result.get("source"),
+            "date": result.get("date"),
+            "url": result.get("url"),
+            "trust_level": result.get("trust_level"),
+            "confidence": result.get("confidence"),
+            "source_type": result.get("source_type"),
+            "requires_manual_review": result.get("requires_manual_review"),
+            "query": result.get("query"),
+        }
+
+    def _normalize_search_category(category: dict) -> dict:
+        return {
+            "queries": category.get("queries") or [],
+            "results": [_truncate_result(r) for r in (category.get("results") or [])],
+            "quality_score": category.get("quality_score"),
+            "quality_level": category.get("quality_level"),
+            "refilled": category.get("refilled"),
+        }
+
+    index_data = raw.get("index_data") or {}
+    return {
+        "success": True,
+        "industry_name": raw.get("industry_name"),
+        "quality_summary": raw.get("quality_summary"),
+        "index_data": {
+            "success": index_data.get("success", False),
+            "symbol": index_data.get("symbol"),
+            "latest_close": index_data.get("latest_close"),
+            "latest_date": index_data.get("latest_date"),
+            "year_change_pct": index_data.get("year_change_pct"),
+            "avg_turnover": index_data.get("avg_turnover"),
+            "source": index_data.get("source"),
+            "error": index_data.get("error"),
+            "quality_level": index_data.get("quality_level"),
+            "fallback_search": index_data.get("fallback_search"),
+        },
+        "market_size": _normalize_search_category(raw.get("market_size") or {}),
+        "concentration": _normalize_search_category(raw.get("concentration") or {}),
+        "policy": _normalize_search_category(raw.get("policy") or {}),
+        "chain": _normalize_search_category(raw.get("chain") or {}),
+        "research_reports": _normalize_search_category(raw.get("research_reports") or {}),
+    }
+
+
+def _build_market_data_anchor_text(data_anchors: dict) -> list[str]:
+    """将市场数据锚点渲染为供 LLM 引用的文本行列表。"""
+    lines: list[str] = []
+    index = data_anchors.get("index_data") or {}
+    if index.get("success"):
+        symbol = index.get("symbol") or ""
+        latest_close = index.get("latest_close")
+        latest_date = index.get("latest_date") or ""
+        year_change = index.get("year_change_pct")
+        avg_turnover = index.get("avg_turnover")
+        parts = []
+        if latest_close is not None:
+            parts.append(f"最新收盘 {latest_close}")
+        if latest_date:
+            parts.append(f"日期 {latest_date}")
+        if year_change is not None:
+            parts.append(f"近一年涨跌幅 {year_change}%")
+        if avg_turnover is not None:
+            parts.append(f"近20日平均成交额 {avg_turnover} 亿元")
+        line = f"东方财富行业指数（{symbol}）" + "，".join(parts) + "。"
+        idx_quality = index.get("quality_level")
+        if idx_quality and idx_quality != "ok":
+            line += f"[指数数据：{idx_quality}]"
+        if index.get("error"):
+            line += "[需补充]"
+        lines.append(line)
+    else:
+        lines.append("行业指数：未获取到有效指数数据。")
+
+    category_labels = {
+        "market_size": "市场规模",
+        "concentration": "竞争格局",
+        "policy": "政策",
+        "chain": "产业链",
+        "research_reports": "研报",
+    }
+    for key, label in category_labels.items():
+        category = data_anchors.get(key) or {}
+        results = category.get("results") or []
+        cat_quality_level = category.get("quality_level")
+        if not results:
+            missing_line = f"[{label}] 未获取到有效公开线索"
+            if cat_quality_level in ("low", "none"):
+                missing_line += f" [数据质量：{cat_quality_level}]"
+            missing_line += " [需补充]"
+            lines.append(missing_line)
+            continue
+        for result in results[:2]:
+            title = result.get("title") or ""
+            snippet = (result.get("snippet") or "")[:80]
+            source = result.get("source") or ""
+            date = result.get("date") or ""
+            meta = ", ".join(p for p in [source, date] if p)
+            meta_text = f"（{meta}）" if meta else ""
+            line = f"[{label}] {title} | {snippet}{meta_text}"
+            if cat_quality_level in ("low", "none"):
+                line += f"[数据质量：{cat_quality_level}]"
+            if result.get("requires_manual_review"):
+                line += "[需人工复核]"
+            lines.append(line)
+
+    return lines
+
+def _format_attribution_anchor(annual_report_notes: Dict[str, Any] | None) -> str:
+    """把年报深度归因渲染为行业诊断可用的现状锚点句。"""
+    attribution = (annual_report_notes or {}).get("attribution") or {}
+    if not attribution or attribution.get("source") == "fallback":
+        return ""
+    parts: List[str] = []
+    for field, label in [
+        ("industry_context", "年报对行业景气/竞争格局的判断"),
+        ("capacity_status", "年报披露的产能状态"),
+        ("company_strategy", "年报披露的经营策略"),
+    ]:
+        value = attribution.get(field)
+        if value:
+            parts.append(f"{label}：{value}")
+    for field, label in [
+        ("revenue_drivers", "年报对营收增长的解释"),
+        ("margin_drivers", "年报对毛利率变动的解释"),
+        ("profit_drivers", "年报对利润变动的解释"),
+    ]:
+        drivers = attribution.get(field) or []
+        for driver in drivers[:2]:
+            factor = driver.get("factor") or ""
+            if factor:
+                parts.append(f"{label}：{factor}")
+    if not parts:
+        return ""
+    return "；".join(parts) + "（来源：年报经营情况讨论与分析章节）。"
+
+
 def _fallback_diagnostics(
     enterprise_name: str,
     classification: Dict[str, Any],
     public_info: Dict[str, Any],
     knowledge_context: Dict[str, Any],
+    annual_report_notes: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     semantic_name = classification.get("semantic_industry_name") or classification.get("industry_name") or "待确认行业"
     path = " > ".join(classification.get("industry_path") or []) or "标准行业路径待确认"
@@ -213,15 +357,23 @@ def _fallback_diagnostics(
     main_business = basic.get("main_business") or "[需补充：主营收入构成、核心产品和核心客户]"
     rules = _rule_lines(knowledge_context)
     source_ids = [hit.get("source_id") for hit in _knowledge_lines(knowledge_context) if hit.get("source_id")]
+    attribution_anchor = _format_attribution_anchor(annual_report_notes)
 
     def rule_ids(index: int) -> List[str]:
         return [rule.get("rule_id") for rule in rules[index:index + 3] if rule.get("rule_id")]
+
+    def _anchor_with_attribution(base: str) -> str:
+        if not attribution_anchor:
+            return base
+        if attribution_anchor in base:
+            return base
+        return base + " " + attribution_anchor
 
     if is_new_energy:
         diagnostic_items = [
             {
                 "title": "产品结构、技术路线与需求周期风险",
-                "current_anchor": f"标的行业识别为{semantic_name}；标准路径为{path}；公开主营信息为{main_business}。当前仍需补充消费类电池、动力电池、储能、电芯/PACK/BMS等产品收入占比、毛利率和客户结构。",
+                "current_anchor": _anchor_with_attribution(f"标的行业识别为{semantic_name}；标准路径为{path}；公开主营信息为{main_business}。当前仍需补充消费类电池、动力电池、储能、电芯/PACK/BMS等产品收入占比、毛利率和客户结构。"),
                 "risk_substance": "锂电池企业授信风险应穿透到产品结构和技术路线：消费电子电池受终端换机周期影响，动力电池受整车厂定点和装车量影响，储能业务受项目交付、消防安全和海外认证影响。若收入增长来自低毛利扩产或价格竞争，现金流和利润修复可能不同步。",
                 "verification_actions": ["获取近三年按消费类电池、动力电池、储能等拆分的收入和毛利", "核验核心客户定点、订单覆盖率和装车/出货量数据", "对标宁德时代、亿纬锂能、国轩高科等同业产品结构和毛利率"],
                 "missing_items": ["主营构成", "出货量/装车量", "客户定点和订单覆盖率", "同业毛利率基准"],
@@ -251,7 +403,7 @@ def _fallback_diagnostics(
         diagnostic_items = [
             {
                 "title": "技术节点、产品结构与产能利用风险",
-                "current_anchor": f"标的行业识别为{semantic_name}；标准路径为{path}；公开主营信息为{main_business}。当前尚未取得细分产品收入占比、晶圆产线节点、良率、产能利用率和客户认证进度。",
+                "current_anchor": _anchor_with_attribution(f"标的行业识别为{semantic_name}；标准路径为{path}；公开主营信息为{main_business}。当前尚未取得细分产品收入占比、晶圆产线节点、良率、产能利用率和客户认证进度。"),
                 "risk_substance": "集成电路制造/IDM企业的授信风险不能停留在概念标签，需穿透到工艺节点、产品毛利、产线稼动率和新增折旧压力；若扩产节奏快于订单覆盖或良率爬坡，利润和现金流会被折旧、研发投入与库存占用同步挤压。",
                 "verification_actions": ["获取近三年按产品/工艺节点划分的收入和毛利", "核验主要产线产能利用率、良率和客户认证进度", "对标华虹公司、晶合集成、中芯国际等同业的成熟制程价格与稼动率"],
                 "missing_items": ["主营构成", "工艺节点和良率", "产能利用率", "同业对标"],
@@ -281,7 +433,7 @@ def _fallback_diagnostics(
         diagnostic_items = [
             {
                 "title": "行业阶段与竞争格局风险",
-                "current_anchor": f"标的行业识别为{semantic_name}；公开主营信息为{main_business}；行业路径为{path}。",
+                "current_anchor": _anchor_with_attribution(f"标的行业识别为{semantic_name}；公开主营信息为{main_business}；行业路径为{path}。"),
                 "risk_substance": "若行业已进入成熟期或周期底部，而企业仍依赖扩产、价格修复或单一产品放量支撑增长，则需重点核查增长假设与订单兑现能力。",
                 "verification_actions": ["获取近三年行业增速、CR5和头部企业收入增速", "对比标的主营产品与头部企业产品结构", "核验新增订单、产能利用率和价格趋势"],
                 "missing_items": ["行业增速", "CR5/市场份额", "头部企业对标数据"],
@@ -367,6 +519,14 @@ def render_industry_diagnostics(diagnostics: Dict[str, Any]) -> List[str]:
     overall = diagnostics.get("overall_position") or {}
     header = f"【行业定位与周期判断】{overall.get('cycle_stage') or '[需补充：行业周期]'} | {overall.get('positioning') or '行业定位待补充'}。{overall.get('core_judgement') or ''}".strip()
     lines = [header]
+    data_anchors = diagnostics.get("data_anchors")
+    if data_anchors:
+        anchor_texts = _build_market_data_anchor_text(data_anchors)
+        index_line = anchor_texts[0] if anchor_texts else ""
+        other_lines = [t for t in anchor_texts[1:] if t]
+        summary = " ".join(other_lines[:2]) if other_lines else ""
+        if index_line or summary:
+            lines.append(f"数据锚点：{index_line} {summary}".strip())
     for index, item in enumerate(diagnostics.get("diagnostics") or [], 1):
         actions = "；".join(_as_list(item.get("verification_actions"), 5)) or "补充行业KPI、同业对标和公开权威来源后复核"
         missing = _as_list(item.get("missing_items"), 5)
@@ -436,7 +596,23 @@ def _prompt(
     classification: Dict[str, Any],
     public_info: Dict[str, Any],
     knowledge_context: Dict[str, Any],
+    annual_report_notes: Dict[str, Any] | None = None,
+    market_data_anchor: Dict[str, Any] | None = None,
 ) -> str:
+    """构建行业诊断 LLM prompt。"""
+    attribution = (annual_report_notes or {}).get("attribution") or {}
+    attribution_payload: Dict[str, Any] = {}
+    if attribution and attribution.get("source") != "fallback":
+        attribution_payload = {
+            "industry_context": attribution.get("industry_context"),
+            "capacity_status": attribution.get("capacity_status"),
+            "company_strategy": attribution.get("company_strategy"),
+            "revenue_drivers": attribution.get("revenue_drivers") or [],
+            "margin_drivers": attribution.get("margin_drivers") or [],
+            "profit_drivers": attribution.get("profit_drivers") or [],
+            "forward_risks": attribution.get("forward_risks") or [],
+            "data_boundary": attribution.get("data_boundary"),
+        }
     payload = {
         "enterprise_name": enterprise_name,
         "industry_classification": {
@@ -450,42 +626,28 @@ def _prompt(
             "ignored_noise": classification.get("ignored_noise"),
         },
         "public_anchors": _public_anchor_lines(public_info),
+        "annual_report_attribution": attribution_payload,
         "triggered_rules": _rule_lines(knowledge_context),
         "rag_knowledge": _knowledge_lines(knowledge_context),
+        "market_data_anchors": _build_market_data_anchor_text(market_data_anchor or {}),
     }
-    return f"""
-你是银行贷前尽调行业分析师。请基于输入资料生成“尽调式诊断”，只输出 JSON，不要输出 Markdown，不要解释过程。
-
-输入资料：{json.dumps(payload, ensure_ascii=False)}
-
-写作目标：学习资深分析师的结构，但绝不编造未提供的数字。行业分析要回答“这门生意好不好、能不能持续、授信审查应核什么”。
-
-硬性要求：
-1. 输出 overall_position 和 3 个 diagnostics，结构为“现状锚定 / 风险实质 / 核查要点”。
-2. 每个 diagnostics 至少引用一个 rule_id 或 evidence/source_id；若证据不足，必须写 [需补充：...]，不能虚构良率、市场份额、估值、CR5、订单覆盖率等数字。
-3. 每段必须绑定标的行业、主营业务、公开资料、RAG 知识或触发规则之一，不能写行业科普。
-4. 行业子赛道必须尽量精准，例如半导体需区分设计、制造、封测、设备材料；无法判断时写 [需补充：细分赛道]。
-5. 必须包含关键假设和数据边界，提醒公开资料只能用于初筛。
-6. 禁止空泛表达：{', '.join(BANNED_GENERIC_TERMS)}。如果需要表达类似含义，必须加事实锚点、对标对象、时间节点或 [需补充]。
-7. 若 semantic_industry_id=new_energy，只能围绕消费类电池、动力电池、储能、电芯/PACK/BMS、材料价格、装车量、出货量、客户定点、安全合规等锂电池KPI；禁止写晶圆、制程、IDM、流片、封测等半导体KPI。
-
-JSON格式：
-{{
-  "overall_position": {{"cycle_stage": "周期阶段或[需补充]", "positioning": "行业定位", "core_judgement": "一句话核心判断", "confidence": 0.75}},
-  "diagnostics": [
-    {{"title": "技术/产品/竞争格局风险", "current_anchor": "现状锚定", "risk_substance": "风险实质", "verification_actions": ["核查动作"], "missing_items": ["待补充材料"], "evidence_ids": ["知识或证据ID"], "rule_ids": ["规则ID"]}},
-    {{"title": "产业链议价能力与经营韧性风险", "current_anchor": "现状锚定", "risk_substance": "风险实质", "verification_actions": ["核查动作"], "missing_items": ["待补充材料"], "evidence_ids": ["知识或证据ID"], "rule_ids": ["规则ID"]}},
-    {{"title": "行业KPI与授信审查适配风险", "current_anchor": "现状锚定", "risk_substance": "风险实质", "verification_actions": ["核查动作"], "missing_items": ["待补充材料"], "evidence_ids": ["知识或证据ID"], "rule_ids": ["规则ID"]}}
-  ],
-  "assumptions": ["关键假设"],
-  "data_boundary": "数据边界"
-}}
-""".strip()
+    template = load_prompt_template("industry_diagnostic")
+    variables = {
+        "payload": json.dumps(payload, ensure_ascii=False),
+        "banned_terms": ", ".join(BANNED_GENERIC_TERMS),
+    }
+    return render_prompt_template(template, variables).strip()
 
 
-def _invoke_one(provider: str, llm: ChatOpenAI, prompt: str) -> Dict[str, Any]:
+def _invoke_one(
+    provider: str,
+    llm: ChatOpenAI,
+    prompt: str,
+    session_id: str | None = None,
+    task_id: str | None = None,
+) -> Dict[str, Any]:
     started_at = time.monotonic()
-    response = llm.invoke(prompt)
+    response = cached_invoke(llm, prompt, session_id=session_id, task_id=task_id)
     return {
         "provider": provider,
         "raw_response": str(getattr(response, "content", response)),
@@ -494,9 +656,14 @@ def _invoke_one(provider: str, llm: ChatOpenAI, prompt: str) -> Dict[str, Any]:
     }
 
 
-def _invoke_llm(prompt: str, fallback: Dict[str, Any]) -> Dict[str, Any]:
+def _invoke_llm(
+    prompt: str,
+    fallback: Dict[str, Any],
+    session_id: str | None = None,
+    task_id: str | None = None,
+) -> Dict[str, Any]:
     futures: Dict[Future, str] = {
-        _LLM_EXECUTOR.submit(_invoke_one, provider, llm, prompt): provider
+        _LLM_EXECUTOR.submit(_invoke_one, provider, llm, prompt, session_id, task_id): provider
         for provider, llm in _available_llms()
     }
     if not futures:
@@ -545,14 +712,23 @@ def build_industry_diagnostic_narrative(
     classification: Dict[str, Any],
     public_info: Dict[str, Any] | None = None,
     industry_knowledge_context: Dict[str, Any] | None = None,
+    annual_report_notes: Dict[str, Any] | None = None,
+    session_id: str | None = None,
+    task_id: str | None = None,
 ) -> Dict[str, Any]:
     """Build industry diagnostics with guarded LLM fallback."""
     public_info = public_info or {}
     knowledge_context = industry_knowledge_context or {}
-    fallback = _fallback_diagnostics(enterprise_name, classification, public_info, knowledge_context)
+    data_anchors = _fetch_market_data_anchor(classification)
+    fallback = _fallback_diagnostics(enterprise_name, classification, public_info, knowledge_context, annual_report_notes=annual_report_notes)
     started_at = time.monotonic()
     try:
-        candidate = _invoke_llm(_prompt(enterprise_name, classification, public_info, knowledge_context), fallback)
+        candidate = _invoke_llm(
+            _prompt(enterprise_name, classification, public_info, knowledge_context, annual_report_notes=annual_report_notes, market_data_anchor=data_anchors),
+            fallback,
+            session_id=session_id,
+            task_id=task_id,
+        )
         diagnostics = candidate.get("diagnostics") or fallback
         warnings = (candidate.get("quality_warnings") or []) + _cross_industry_warnings(diagnostics, classification)
         if warnings:
@@ -564,6 +740,7 @@ def build_industry_diagnostic_narrative(
                 "quality_warnings": warnings + (candidate.get("race_errors") or []),
                 "llm_elapsed_ms": round((time.monotonic() - started_at) * 1000),
                 "llm_provider": candidate.get("provider"),
+                "data_anchors": data_anchors,
             }
         return {
             "success": True,
@@ -573,6 +750,7 @@ def build_industry_diagnostic_narrative(
             "quality_warnings": candidate.get("race_errors") or [],
             "llm_elapsed_ms": round((time.monotonic() - started_at) * 1000),
             "llm_provider": candidate.get("provider"),
+            "data_anchors": data_anchors,
         }
     except Exception as exc:
         return {
@@ -582,4 +760,5 @@ def build_industry_diagnostic_narrative(
             "diagnostics": fallback,
             "quality_warnings": [f"LLM行业诊断生成失败：{type(exc).__name__}"],
             "llm_elapsed_ms": round((time.monotonic() - started_at) * 1000),
+            "data_anchors": data_anchors,
         }

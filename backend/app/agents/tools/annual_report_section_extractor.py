@@ -48,6 +48,34 @@ SECTION_PATTERNS: Dict[str, List[str]] = {
         r"重大风险",
         r"特别风险提示",
     ],
+    "shareholder_changes": [
+        r"股份变动及股东情况",
+        r"股本变动及股东情况",
+        r"普通股股东(?:总数|情况)",
+        r"前十名股东持股情况",
+        r"控股股东及实际控制人",
+    ],
+    "corporate_governance": [
+        r"公司治理(?:情况|结构)?",
+        r"董事、监事(?:和|、)高级管理人员",
+        r"董事会(?:工作|履职)情况",
+    ],
+    "related_party_transactions": [
+        r"关联交易(?:情况)?",
+        r"日常经营相关的关联交易",
+        r"重大关联交易",
+    ],
+    "material_litigation": [
+        r"重大诉讼、仲裁事项",
+        r"重大诉讼仲裁",
+        r"诉讼仲裁事项",
+        r"或有事项",
+    ],
+    "guarantee_external": [
+        r"对外担保情况",
+        r"重大担保",
+        r"违规对外担保",
+    ],
 }
 
 SECTION_LABELS: Dict[str, str] = {
@@ -56,6 +84,11 @@ SECTION_LABELS: Dict[str, str] = {
     "audit_opinion": "审计意见",
     "asset_impairment": "资产减值",
     "major_risk_warnings": "重大风险提示",
+    "shareholder_changes": "股份变动及股东情况",
+    "corporate_governance": "公司治理",
+    "related_party_transactions": "关联交易",
+    "material_litigation": "重大诉讼仲裁与或有事项",
+    "guarantee_external": "对外担保",
 }
 
 # Headers that signal the end of a narrative section.
@@ -76,29 +109,36 @@ def _clean_text(text: str) -> str:
     return text.strip()
 
 
-def _find_section_bounds(text: str, patterns: List[str]) -> Optional[tuple[int, int]]:
-    """Find (start, end) of the first matching section.
+def _find_section_bounds(text: str, patterns: List[str], min_body_chars: int = 200) -> Optional[tuple[int, int]]:
+    """Find (start, end) of the most substantive matching section.
 
+    年报正文前通常有目录，目录里的标题彼此紧邻，截取出来的正文极短。
+    这里遍历所有匹配位置，优先选择正文长度达到 ``min_body_chars`` 的匹配，
+    若都不达标则回退到正文最长的一个，从而自动跳过目录命中。
     End is determined by the next major section header or end of text.
     """
     combined = "|".join(f"(?:{pattern})" for pattern in patterns)
-    match = re.search(combined, text)
-    if not match:
-        return None
-    start = match.start()
-    # Search for terminators after the header.
     terminator_pattern = "|".join(SECTION_TERMINATORS)
-    remaining = text[start + 1:]
-    term_match = re.search(terminator_pattern, remaining, re.MULTILINE)
-    if term_match:
-        end = start + 1 + term_match.start()
-    else:
-        end = len(text)
-    return start, end
+
+    best: Optional[tuple[int, int]] = None
+    best_len = -1
+    for match in re.finditer(combined, text):
+        start = match.start()
+        remaining = text[start + 1:]
+        term_match = re.search(terminator_pattern, remaining, re.MULTILINE)
+        end = start + 1 + term_match.start() if term_match else len(text)
+        body_len = end - start
+        # 一旦命中足够长的正文，直接采用（年报正文按出现顺序，越靠前越权威）。
+        if body_len >= min_body_chars:
+            return start, end
+        if body_len > best_len:
+            best_len = body_len
+            best = (start, end)
+    return best
 
 
 def extract_section(text: str, patterns: List[str], context_chars: int = 2000) -> Optional[str]:
-    """Extract text around the first match of any pattern, bounded by section terminators."""
+    """Extract text around the most substantive match, bounded by section terminators."""
     bounds = _find_section_bounds(text, patterns)
     if not bounds:
         return None
@@ -110,29 +150,76 @@ def extract_section(text: str, patterns: List[str], context_chars: int = 2000) -
 
 
 def extract_all_sections(extraction_result: Dict[str, Any], context_chars: int = 2000) -> Dict[str, Optional[str]]:
-    """Extract all priority sections from PDF extraction result."""
+    """Extract all priority sections from PDF extraction result.
+
+    ``business_review``（经营情况讨论与分析）是深度归因抽取的主要依据，
+    单独使用更大的字符上限（8000），避免归因结论被截断丢失。
+    其余章节维持传入的 ``context_chars``（默认 2000）。
+    """
     text = extraction_result.get("text") or ""
     return {
-        section: extract_section(text, patterns, context_chars=context_chars)
+        section: extract_section(
+            text,
+            patterns,
+            context_chars=BUSINESS_REVIEW_CONTEXT_CHARS if section == "business_review" else context_chars,
+        )
         for section, patterns in SECTION_PATTERNS.items()
     }
 
 
+# 经营情况讨论与分析章节是深度归因依据，给予更大上下文窗口。
+BUSINESS_REVIEW_CONTEXT_CHARS = 8000
+
+
+def _header_score(row: List[str]) -> int:
+    """Score a row by how many main-business table header keywords it contains."""
+    header = " ".join(str(cell or "") for cell in row)
+    keywords = ["产品", "地区", "行业", "营业收入", "营业成本", "毛利率", "收入", "占比"]
+    return sum(1 for keyword in keywords if keyword in header)
+
+
 def _is_main_business_table(table: List[List[str]]) -> bool:
-    """Heuristic to identify main-business-composition tables."""
+    """Heuristic to identify main-business-composition tables.
+
+    Some PDF tables have a title row (e.g. '主营业务分行业情况') before the
+    actual header row, so we inspect the first few rows.
+    """
     if not table or len(table) < 2:
         return False
-    header = " ".join(str(cell or "") for cell in table[0])
-    keywords = ["产品", "地区", "行业", "营业收入", "营业成本", "毛利率", "收入", "占比"]
-    score = sum(1 for keyword in keywords if keyword in header)
-    return score >= 2
+    for row in table[:3]:
+        if _header_score(row) >= 2:
+            return True
+    return False
+
+
+def _find_main_business_header(table: List[List[str]]) -> Optional[int]:
+    """Return the index of the actual header row, skipping title rows."""
+    if not table:
+        return None
+    best_index: Optional[int] = None
+    best_score = 1
+    for index, row in enumerate(table[:5]):
+        score = _header_score(row)
+        if score > best_score:
+            best_score = score
+            best_index = index
+    return best_index
+
+
+def _normalize_header_key(key: str) -> str:
+    """Normalize table header keys by removing spaces, parentheses and common suffixes."""
+    key = str(key or "").strip().replace("\n", " ")
+    key = re.sub(r"\s+", "", key)
+    key = key.replace("（%）", "").replace("(%)", "").replace("(%）", "").replace("(%) ", "")
+    key = key.replace("比上年增减", "同比").replace("增减", "")
+    return key
 
 
 def _row_to_dict(header: List[str], row: List[str]) -> Dict[str, str]:
     """Map a table row to a dict using the header."""
     result: Dict[str, str] = {}
     for index, key in enumerate(header):
-        key = str(key or "").strip().replace("\n", " ")
+        key = _normalize_header_key(key)
         if not key:
             continue
         value = str(row[index] if index < len(row) else "").strip()
@@ -143,11 +230,15 @@ def _row_to_dict(header: List[str], row: List[str]) -> Dict[str, str]:
 def extract_main_business_tables(tables: List[List[List[str]]]) -> List[Dict[str, Any]]:
     """Extract structured rows from main-business-composition tables."""
     results: List[Dict[str, Any]] = []
+    skip_item_names = {"合计", "总计", "分产品", "分地区", "分行业", "主营业务分产品情况", "主营业务分行业情况", "主营业务分地区情况"}
     for table in tables:
         if not _is_main_business_table(table):
             continue
-        header = table[0]
-        for row in table[1:]:
+        header_index = _find_main_business_header(table)
+        if header_index is None:
+            continue
+        header = table[header_index]
+        for row in table[header_index + 1:]:
             row_dict = _row_to_dict(header, row)
             item_name = (
                 row_dict.get("产品")
@@ -159,7 +250,7 @@ def extract_main_business_tables(tables: List[List[List[str]]]) -> List[Dict[str
                 or row_dict.get("分行业")
                 or ""
             )
-            if not item_name or item_name in {"合计", "总计", "分产品", "分地区", "分行业"}:
+            if not item_name or item_name in skip_item_names or "情况" in item_name or "收入合计" in item_name:
                 continue
             income = (
                 row_dict.get("营业收入")

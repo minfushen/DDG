@@ -1,0 +1,122 @@
+# config/quality_gate.yaml
+# Quality gate configuration shared across narrative / attribution writers.
+# Centralized so copywriters, risk reviewers and engineers can tune gating
+# rules without touching Python code.
+
+banned_terms:
+  # Used by financial_narrative_writer.py
+  financial_narrative:
+    - "此前为"
+    - "销售额为"
+    - "资产持有率"
+    - "流动资金比例"
+    - "经营活动量净额"
+    - "财务指标整体准确"
+    - "建议授信"
+    - "牛奶准入"
+    - "细线准入"
+    - "兜模拟底"
+    - "债务比率"
+    - "极强"
+    - "绝对安全"
+    - "完全无风险"
+    - "欠质量"
+    - "现象与增益"
+    - "主要血"
+    - "现象与极限"
+    - "经营杠杆/利息"
+    - "目的要点"
+    - "有息保安"
+    - "设有及或有库存"
+    - "营运收益"
+    - "经营同期/日历"
+    - "应收昔"
+    - "剩余金额净额"
+    - "纳税规模增长未能转化"
+    - "资产风险真实性"
+    - "流动负债为1."
+    - "经营程度与收入增长"
+    # OCR / 识别错误词与低质量口语表达
+    - "鱼子"
+    - "鱼籽"
+    - "显着"
+    - "显箸"
+    - "什么玩意儿"
+    - "啥玩意儿"
+    - "玩意儿"
+    # 财务叙述常见错误表达
+    - "资产证券分析"
+    - "最新原来"
+    - "同期波动"
+    - "近期一期"
+    - "资产拓展"
+
+  # Used by annual_report_attribution_extractor.py
+  annual_report_attribution:
+    - "兜模拟底"
+    - "极强"
+    - "绝对安全"
+    - "完全无风险"
+    - "鱼子"
+    - "鱼籽"
+    - "显着"
+    - "显箸"
+    - "玩意儿"
+    - "资产证券分析"
+    - "同期波动"
+    - "近期一期"
+
+  # Used by industry_diagnostic_writer.py
+  industry_diagnostic:
+    - "竞争激烈"
+    - "政策利好"
+    - "市场空间广阔"
+    - "技术更新快"
+    - "人才重要"
+    - "估值偏高"
+    - "发展前景良好"
+    - "机遇与挑战并存"
+
+# OCR / recognition-error hints: bad term -> suggested correction.
+ocr_error_hints:
+  "鱼子": "ROE（净资产收益率）"
+  "鱼籽": "ROE（净资产收益率）"
+  "显着": "显著"
+  "显箸": "显著"
+  "什么玩意儿": "删除口语化表达"
+  "啥玩意儿": "删除口语化表达"
+  "玩意儿": "删除口语化表达"
+  "资产证券分析": "资产负债分析"
+  "最新原来": "最新同比增速"
+  "同期波动": "同比变动/同比增速"
+  "近期一期": "最近一期"
+  "资产拓展": "资产扩张"
+
+# Generic phrase rewrites for industry diagnostic.
+generic_rewrites:
+  "竞争激烈": "竞争强度需通过CR5、价格变化、产能利用率和订单覆盖率核验"
+  "政策利好": "政策影响需拆分为补贴、准入、出口管制和监管约束后判断"
+  "市场空间广阔": "市场空间需以行业增速、渗透率、头部公司增速和订单覆盖率验证"
+  "技术更新快": "技术迭代需以关键工艺节点、研发投入、量产进度和客户认证周期验证"
+  "人才重要": "人才依赖需以核心团队稳定性、工艺文档化率和激励覆盖范围验证"
+  "估值偏高": "估值压力需以PB/PE、ROE、产能利用率和折旧压力对标验证"
+  "发展前景良好": "发展前景需以订单、价格、产能利用率和现金流兑现情况验证"
+  "机遇与挑战并存": "行业判断需拆分为需求、供给、政策、技术路线和资金链五类假设验证"
+
+# Business-penetration quality gate used by financial_narrative_writer.py.
+business_penetration:
+  causal_words:
+    - "主因是"
+    - "受"
+    - "影响"
+    - "反映"
+    - "表明"
+    - "导致"
+    - "源于"
+  causal_count_threshold: 3
+  hint_hits_threshold: 2
+  required_sections:
+    - "收入与利润"
+    - "资产负债"
+    - "盈利质量"
+    - "偿债能力"

@@ -282,6 +282,18 @@ def _financial_highlights(report: Optional[Dict[str, Any]]) -> List[str]:
             "财务结论仅用于公开资料预尽调，不可替代正式授信财务审查。",
             report.get("recommendation") or "建议补充财报、流水、纳税资料和主要合同后复核。",
         ]
+    narrative_sections = report.get("narrative_sections") or []
+    if narrative_sections and report.get("narrative_source") == "llm" and not report.get("narrative_quality_warnings"):
+        highlights = []
+        for sec in narrative_sections[:4]:
+            title = sec.get("section_title") or ""
+            narrative = sec.get("narrative") or ""
+            if title and narrative:
+                highlights.append(f"{title}：{narrative[:220]}{'...' if len(narrative) > 220 else ''}")
+        if highlights:
+            highlights.append(report.get("recommendation") or "财务专项已形成结构化结论。")
+            return highlights[:6]
+
     narrative_summary = _as_text_list(report.get("narrative_summary"), 6)
     if narrative_summary:
         return narrative_summary

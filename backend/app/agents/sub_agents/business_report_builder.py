@@ -119,6 +119,113 @@ def _answer_field(answer: str, field: str) -> Optional[str]:
     return None
 
 
+def _value(basic_info: Dict[str, Dict[str, Any]], field: str) -> str:
+    return str(basic_info.get(field, {}).get("value", "") or "").strip()
+
+
+def _trust(basic_info: Dict[str, Dict[str, Any]], field: str) -> str:
+    return str(basic_info.get(field, {}).get("trust_level", "unknown") or "unknown").strip()
+
+
+def _build_business_narrative(
+    basic_info: Dict[str, Dict[str, Any]],
+    risk_summary: List[str],
+    generated_from: str,
+) -> List[str]:
+    """Generate heuristic deep-analysis paragraphs for business registry data.
+
+    The output reads like natural-language due-diligence prose while remaining
+    fully deterministic and grounded in the extracted structured fields.
+    """
+    paragraphs: List[str] = []
+
+    name = _value(basic_info, "企业名称") or _value(basic_info, "股票简称")
+    credit_code = _value(basic_info, "统一社会信用代码")
+    legal_person = _value(basic_info, "法定代表人")
+    capital = _value(basic_info, "注册资本")
+    founded = _value(basic_info, "成立日期")
+    status = _value(basic_info, "经营状态") or _value(basic_info, "企业类型")
+    address = _value(basic_info, "注册地址")
+    scope = _value(basic_info, "经营范围")
+    controller = _value(basic_info, "控股股东/实际控制人")
+    stock_code = _value(basic_info, "股票代码")
+
+    # 1. 主体画像
+    entity = name if name else "该企业"
+    parts = [f"{entity}为"]
+    if founded:
+        parts.append(f"成立于 {founded} 的")
+    if status:
+        parts.append(f"{status}主体")
+    else:
+        parts.append("工商登记主体")
+    if capital:
+        parts.append(f"，注册资本 {capital}")
+    if credit_code:
+        parts.append(f"，统一社会信用代码 {credit_code}")
+    if stock_code:
+        parts.append(f"，A股证券代码 {stock_code}")
+    parts.append("。")
+    if address:
+        parts.append(f"注册地址位于 {address}。")
+    profile = "".join(parts)
+    paragraphs.append(profile)
+
+    # 2. 治理结构
+    governance_parts = []
+    if legal_person:
+        governance_parts.append(f"法定代表人为 {legal_person}")
+    if controller:
+        governance_parts.append(f"控股股东/实际控制人为 {controller}")
+    if governance_parts:
+        paragraphs.append(
+            "治理结构方面，" + "，".join(governance_parts) + "。"
+            "建议结合股权穿透图、一致行动协议及实际控制人征信/涉诉情况，评估治理集中度和关联交易风险。"
+        )
+    else:
+        paragraphs.append(
+            "治理结构方面，当前未稳定识别法定代表人或实际控制人信息，建议通过工商登记档案、年报和权威企业数据 API 补充股权穿透资料，"
+            "以判断是否存在隐名控制、股权代持或实际控制人风险传导。"
+        )
+
+    # 3. 经营范围与业务边界
+    if scope:
+        paragraphs.append(
+            f"经营范围覆盖 {scope[:160]}{'……' if len(scope) > 160 else ''}。"
+            "授信审核时应将经营范围与主营业务收入、主要客户/供应商、行业分类进行交叉验证，"
+            "识别是否存在超范围经营、主营业务下滑或依赖单一业务线的风险。"
+        )
+    else:
+        paragraphs.append(
+            "经营范围字段缺失，无法直接判断业务边界。建议补充营业执照、公司章程或年报中的主营构成描述，"
+            "作为行业定位和现金流稳定性判断的基础。"
+        )
+
+    # 4. 数据可信度与缺口
+    high_conf_fields = [f for f, v in basic_info.items() if v.get("trust_level") in {"high", "medium"}]
+    if high_conf_fields:
+        paragraphs.append(
+            f"数据来源为 {generated_from}，其中 {len(high_conf_fields)} 个字段（{'、'.join(high_conf_fields[:6])}）"
+            f"具备中/高可信度，可作为初审参考；"
+            f"其余字段置信度较低，需以国家企业信用信息公示系统、工商登记档案等权威源复核。"
+        )
+    else:
+        paragraphs.append(
+            f"数据来源为 {generated_from}，但本次检索未命中高/中可信度来源，当前工商结论仅可作为辅助线索。"
+            f"授信前应将工商登记、股权穿透、异常经营和行政处罚核验作为前置条件。"
+        )
+
+    # 5. 风险提示与授信建议
+    if risk_summary:
+        paragraphs.append("风险提示：" + "；".join(risk_summary[:3]))
+    paragraphs.append(
+        "授信关注建议：优先核对企业主体存续状态、注册资本实缴/认缴情况、法定代表人及实际控制人信用状况；"
+        "其次关注经营范围与主营业务匹配度、对外投资/关联交易、股权质押和经营异常记录。"
+    )
+
+    return paragraphs
+
+
 def build_business_analysis_report(enterprise_name: str, search_data: Dict[str, Any]) -> Dict[str, Any]:
     """基于 Tavily 搜索结果生成结构化工商分析报告。"""
     results = search_data.get("results", [])
@@ -163,6 +270,9 @@ def build_business_analysis_report(enterprise_name: str, search_data: Dict[str, 
     if not risk_summary:
         risk_summary.append("已命中高/中可信度公开来源，基础工商字段具备初步可核验性。")
 
+    generated_from = "Tavily 公开搜索"
+    narrative_summary = _build_business_narrative(basic_info, risk_summary, generated_from)
+
     sections = [
         {
             "title": "一、工商基础信息",
@@ -182,7 +292,11 @@ def build_business_analysis_report(enterprise_name: str, search_data: Dict[str, 
             ],
         },
         {
-            "title": "二、来源可信度",
+            "title": "二、工商深度分析",
+            "analysis": narrative_summary,
+        },
+        {
+            "title": "三、来源可信度",
             "sources": [
                 {
                     "title": item.get("title"),
@@ -194,7 +308,7 @@ def build_business_analysis_report(enterprise_name: str, search_data: Dict[str, 
             ],
         },
         {
-            "title": "三、风险提示",
+            "title": "四、风险提示",
             "risks": risk_summary,
         },
     ]
@@ -202,10 +316,11 @@ def build_business_analysis_report(enterprise_name: str, search_data: Dict[str, 
     return {
         "report_type": "business_analysis",
         "enterprise_name": normalized_name,
-        "generated_from": "Tavily 公开搜索",
+        "generated_from": generated_from,
         "basic_info": basic_info,
         "sections": sections,
         "risk_summary": risk_summary,
+        "narrative_summary": narrative_summary,
         "evidence": evidence,
         "raw_answer": answer,
     }
@@ -245,6 +360,8 @@ def build_authoritative_business_report(enterprise_name: str, registry_data: Dic
     if not risk_summary:
         risk_summary.append("已命中企业工商专项 API，基础工商字段具备较高可核验性。")
 
+    narrative_summary = _build_business_narrative(basic_info, risk_summary, generated_from)
+
     return {
         "report_type": "business_analysis",
         "enterprise_name": registry_data.get("enterprise_name") or enterprise_name,
@@ -260,7 +377,11 @@ def build_authoritative_business_report(enterprise_name: str, registry_data: Dic
                 ],
             },
             {
-                "title": "二、来源可信度",
+                "title": "二、工商深度分析",
+                "analysis": narrative_summary,
+            },
+            {
+                "title": "三、来源可信度",
                 "sources": [
                     {
                         "title": generated_from,
@@ -271,11 +392,12 @@ def build_authoritative_business_report(enterprise_name: str, registry_data: Dic
                 ],
             },
             {
-                "title": "三、风险提示",
+                "title": "四、风险提示",
                 "risks": risk_summary,
             },
         ],
         "risk_summary": risk_summary,
+        "narrative_summary": narrative_summary,
         "evidence": evidence,
         "raw_record": registry_data.get("raw_record"),
         "provider": registry_data.get("provider"),

@@ -1,0 +1,225 @@
+app:
+  name: "DDG 简单问答"
+  mode: "advanced-chat"
+  description: "基于 Dify 知识库的简单问答工作流，供快速查询使用"
+  icon: "💬"
+  icon_background: "#3b82f6"
+
+# ==================== 环境变量 ====================
+env_variables:
+  - name: "DDG_API_BASE_URL"
+    type: "string"
+    value: "http://localhost:8000"
+    description: "ddg-agent 后端地址（供工具查询使用）"
+  - name: "DIFY_AUTH_TOKEN"
+    type: "secret"
+    value: ""
+    description: "ddg-agent API 认证令牌"
+
+# ==================== 节点配置 ====================
+nodes:
+
+  # ─── 1. 开始节点 ───
+  - id: "start"
+    type: "start"
+    position:
+      x: 100
+      y: 100
+    data:
+      title: "开始"
+      desc: "接收用户问题"
+      variables:
+        - name: "question"
+          type: "text-input"
+          label: "你的问题"
+          required: true
+          placeholder: "请输入你的问题，如：华为是做什么的？"
+      selected: false
+
+  # ─── 2. 知识库检索 ───
+  - id: "kb_retrieval"
+    type: "knowledge-retrieval"
+    position:
+      x: 400
+      y: 100
+    data:
+      title: "知识库检索"
+      desc: "检索 Dify 知识库中的行业知识和 FAQ"
+      query_variable_selector:
+        - "start"
+        - "question"
+      knowledge_configs:
+        - knowledge_id: "{{#knowledge#}}"
+          retrieval_mode: "semantic"
+          top_k: 5
+      selected: false
+
+  # ─── 3. 判断是否需要工具查询 ───
+  - id: "need_tool_check"
+    type: "if-else"
+    position:
+      x: 700
+      y: 100
+    data:
+      title: "判断是否需要工具查询"
+      desc: "如果知识库没有足够信息，调用搜索工具补充"
+      cases:
+        - id: "has_result"
+          name: "有知识库结果"
+          condition: "{{#kb_retrieval.result#}} is not empty"
+          logical_operator: "and"
+        - id: "no_result"
+          name: "无知识库结果"
+          condition: "{{#kb_retrieval.result#}} is empty"
+          logical_operator: "and"
+      selected: false
+
+  # ─── 4. 直接回答（有知识库结果） ───
+  - id: "answer_with_kb"
+    type: "llm"
+    position:
+      x: 1000
+      y: 100
+    data:
+      title: "基于知识库回答"
+      desc: "使用知识库检索结果生成回答"
+      model:
+        provider: "openai"
+        name: "gpt-4o"
+        mode: "chat"
+      prompt:
+        - role: "system"
+          text: |
+            你是尽调知识助手。请基于以下知识库内容回答用户问题。
+            如果知识库内容不足以完整回答，请补充说明，并建议用户进行深度尽调获取更详细的信息。
+            
+            知识库检索结果：
+            {{#kb_retrieval.result#}}
+      temperature: 0.7
+      selected: false
+
+  # ─── 5. 工具搜索（无知识库结果） ───
+  - id: "tool_search"
+    type: "http-request"
+    position:
+      x: 1000
+      y: 300
+    data:
+      title: "工具搜索补充"
+      desc: "调用 ddg-agent 搜索工具补充信息"
+      method: "POST"
+      url: "{{#env.DDG_API_BASE_URL#}}/api/v1/dify/tools/searxng"
+      headers:
+        Content-Type: "application/json"
+        Authorization: "Bearer {{#env.DIFY_AUTH_TOKEN#}}"
+      body:
+        type: "json"
+        data:
+          query: "{{#start.question#}}"
+          max_results: 5
+      timeout:
+        max_connect_timeout: 10
+        max_read_timeout: 30
+      selected: false
+
+  - id: "answer_with_search"
+    type: "llm"
+    position:
+      x: 1300
+      y: 300
+    data:
+      title: "基于搜索结果回答"
+      desc: "使用搜索结果生成回答"
+      model:
+        provider: "openai"
+        name: "gpt-4o"
+        mode: "chat"
+      prompt:
+        - role: "system"
+          text: |
+            你是尽调搜索助手。请基于以下搜索结果回答用户问题。
+            搜索结果可能不完整，请如实告知用户信息的局限性，并建议进行深度尽调。
+            
+            搜索结果：
+            {{#tool_search.body.data.results#}}
+      temperature: 0.7
+      selected: false
+
+  # ─── 6. 结束节点 ───
+  - id: "end_kb"
+    type: "end"
+    position:
+      x: 1300
+      y: 100
+    data:
+      title: "结束（知识库）"
+      output:
+        - variable: "answer"
+          value_selector:
+            - "answer_with_kb"
+            - "text"
+      selected: false
+
+  - id: "end_search"
+    type: "end"
+    position:
+      x: 1600
+      y: 300
+    data:
+      title: "结束（搜索）"
+      output:
+        - variable: "answer"
+          value_selector:
+            - "answer_with_search"
+            - "text"
+      selected: false
+
+# ==================== 连接关系 ====================
+edges:
+  - id: "start_to_kb"
+    source: "start"
+    target: "kb_retrieval"
+    type: "default"
+
+  - id: "kb_to_check"
+    source: "kb_retrieval"
+    target: "need_tool_check"
+    type: "default"
+
+  - id: "check_to_answer_kb"
+    source: "need_tool_check"
+    target: "answer_with_kb"
+    type: "custom"
+    condition: "{{#need_tool_check.cases.0#}}"
+
+  - id: "answer_kb_to_end"
+    source: "answer_with_kb"
+    target: "end_kb"
+    type: "default"
+
+  - id: "check_to_tool"
+    source: "need_tool_check"
+    target: "tool_search"
+    type: "custom"
+    condition: "{{#need_tool_check.cases.1#}}"
+
+  - id: "tool_to_answer_search"
+    source: "tool_search"
+    target: "answer_with_search"
+    type: "default"
+
+  - id: "answer_search_to_end"
+    source: "answer_with_search"
+    target: "end_search"
+    type: "default"
+
+# ==================== 对话配置 ====================
+opening_statement:
+  - text: "你好！我是 DDG 尽调问答助手。我可以回答企业、行业、金融相关的问题。"
+  - text: "如果你有具体的目标企业，也可以直接说\"帮我做一份[企业名称]的尽调报告\"，我会启动深度尽调流程。"
+
+suggested_questions:
+  - "华为是做什么的？"
+  - "新能源汽车行业现状怎么样？"
+  - "什么是 EBITDA？"
+  - "帮我做一份比亚迪的尽调报告"

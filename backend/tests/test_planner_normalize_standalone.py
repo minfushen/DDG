@@ -23,6 +23,12 @@ stub_settings = types.SimpleNamespace(
     RESEARCH_PLANNER_TIMEOUT_SECONDS=90,
 )
 
+# Save original modules so we can restore them after loading llm_planner.
+# Without restore, the stubs below pollute sys.modules and break later tests.
+_keys_to_save = ["app", "app.config", "app.agents", "app.agents.research_engine"]
+_sub_keys = ["app.agents.research_engine.prompts", "app.agents.research_engine.state"]
+_orig_modules = {k: sys.modules.get(k) for k in _keys_to_save + _sub_keys}
+
 # Create a minimal app.config.settings stub
 app_pkg = types.ModuleType("app")
 config_mod = types.ModuleType("app.config")
@@ -40,7 +46,11 @@ prompts_mod.ALLOWED_TOOL_HINTS = [
 ]
 prompts_mod.build_research_planner_prompt = lambda *args, **kwargs: ""
 sys.modules["app.agents"] = types.ModuleType("app.agents")
-sys.modules["app.agents.research_engine"] = types.ModuleType("app.agents.research_engine")
+# Keep the stub as a package with __path__ so later tests can still import
+# real submodules such as report_quality_evaluator.
+_re_stub = types.ModuleType("app.agents.research_engine")
+_re_stub.__path__ = [str(backend_dir / "app" / "agents" / "research_engine")]
+sys.modules["app.agents.research_engine"] = _re_stub
 sys.modules["app.agents.research_engine.prompts"] = prompts_mod
 
 state_mod = types.ModuleType("app.agents.research_engine.state")
@@ -60,6 +70,13 @@ spec = importlib.util.spec_from_file_location(
 )
 llm_planner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(llm_planner)
+
+# Restore original modules to avoid polluting other tests' imports.
+for k, mod in _orig_modules.items():
+    if mod is None:
+        sys.modules.pop(k, None)
+    else:
+        sys.modules[k] = mod
 
 
 def test_normalize_plan_missing_tasks_returns_empty():

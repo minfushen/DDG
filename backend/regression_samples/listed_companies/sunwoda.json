@@ -1,0 +1,12 @@
+{
+  "sample_id": "sunwoda",
+  "company_name": "欣旺达电子股份有限公司",
+  "display_name": "欣旺达",
+  "stock_code": "300207",
+  "exchange": "SZSE",
+  "test_input": "分析一下欣旺达这个上市公司",
+  "expected_aliases": ["欣旺达", "欣旺达电子股份有限公司", "300207"],
+  "expected_industry_keywords": ["锂电池", "动力电池", "消费电池", "新能源", "储能"],
+  "focus_areas": ["近三年财报数据", "应收账款与经营现金流", "动力电池行业周期", "客户集中度和产能扩张"],
+  "quality_gate": {"min_score": 80, "required_dimensions": ["financial_depth", "industry_depth", "inline_citations"]}
+}

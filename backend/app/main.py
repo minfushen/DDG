@@ -6,9 +6,12 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.api import tasks
+from app.api import tools
 from app.api import upload
 from app.api import report_quality
 from app.api.task_store import init_task_store, load_recent_task_snapshots, task_store_path
+from app.api.cache_store import init_cache_store, clear_cache
+from app.memory import init_memory_db
 
 
 @asynccontextmanager
@@ -24,6 +27,12 @@ async def lifespan(app: FastAPI):
     settings.DB_DIR.mkdir(parents=True, exist_ok=True)
 
     init_task_store()
+    init_cache_store()
+    init_memory_db()
+    if settings.CLEAR_CACHE_ON_START:
+        cleared = clear_cache()
+        print(f"🧹 启动时清空缓存: {cleared} 条")
+
     restored = 0
     for task in load_recent_task_snapshots():
         task_id = task.get("task_id")
@@ -52,18 +61,27 @@ app = FastAPI(
 )
 
 # 配置 CORS
+_cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+_allow_all_origins = _cors_origins == ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 开发环境允许所有来源
-    allow_credentials=True,
+    allow_origins=["*"] if _allow_all_origins else _cors_origins,
+    # 星号（开发模式）下不允许带凭证跨域，杜绝任意站点带凭证调用；
+    # 生产环境使用显式域名白名单时才允许凭证。
+    allow_credentials=False if _allow_all_origins else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # 注册当前产品形态需要的路由
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
+app.include_router(tools.router, prefix="/api/v1", tags=["tools"])
 app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
 app.include_router(report_quality.router, prefix="/api/v1", tags=["report-quality"])
+
+# 注册 Dify 适配层路由（Dify 作为轻量入口和问答增强层）
+from app.api import dify_adapter
+app.include_router(dify_adapter.router, prefix="/api/v1", tags=["dify"])
 
 
 @app.get("/")

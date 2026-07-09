@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.rag.knowledge_retrieval_service import knowledge_hits_to_evidence, retrieve_knowledge
+from app.config.rag_loader import get_knowledge_retrieval_top_k
 
 
 UNAVAILABLE_METRICS = [
@@ -162,7 +163,7 @@ def build_public_financial_report(
     retrieval = retrieve_knowledge(
         query=f"{enterprise_name} 非上市企业 财报缺失 公开资料预尽调 中小企业财务审查 待补充材料 额度边界",
         domain="financial",
-        top_k=5,
+        top_k=get_knowledge_retrieval_top_k("financial"),
         company_name=enterprise_name,
     )
     knowledge_hits = retrieval.get("results", [])

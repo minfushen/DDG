@@ -1,0 +1,12 @@
+{
+  "sample_id": "aero_engine_corporation",
+  "company_name": "中国航发动力股份有限公司",
+  "display_name": "航发动力",
+  "stock_code": "600893",
+  "exchange": "SSE",
+  "test_input": "分析一下航发动力这个上市公司",
+  "expected_aliases": ["航发动力", "中国航发动力股份有限公司", "600893"],
+  "expected_industry_keywords": ["航空发动机", "军工", "高端装备", "航空制造", "国防"],
+  "focus_areas": ["军工订单周期", "应收账款和存货", "政策与型号研制", "长期资产和回款节奏"],
+  "quality_gate": {"min_score": 78, "required_dimensions": ["industry_depth", "financial_depth", "credit_coherence"]}
+}

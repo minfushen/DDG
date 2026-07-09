@@ -36,10 +36,6 @@ def _risk_status(score: int) -> str:
     return "high"
 
 
-def _dimension(name: str, score: int, weight: float, details: List[str]) -> Dict[str, Any]:
-    return {"name": name, "score": score, "max_score": 100, "weight": weight, "status": _risk_status(score), "details": details[:4]}
-
-
 def _finding_summary(findings: List[Dict[str, Any]], fallback: str) -> List[str]:
     rows = [str(item.get("conclusion")) for item in findings if item.get("conclusion")]
     return rows[:4] or [fallback]
@@ -113,11 +109,73 @@ def _financial_required_documents(evidence: List[Dict[str, Any]]) -> List[str]:
 
 
 def _financial_structured_subsections(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Expose financial agent report sections as customer-facing chapter blocks."""
+    """Expose financial agent report as customer-facing chapter blocks.
+
+    Priority: LLM narrative diagnostics (attribution) > narrative summary > legacy sections.
+    """
     for item in evidence:
         report = ((item.get("metadata") or {}).get("financial_analysis_report") or {})
         if not report:
             continue
+
+        diagnostics = (report.get("narrative_diagnostics") or {}).get("diagnostics") or []
+        if diagnostics:
+            output: List[Dict[str, Any]] = []
+            title_map = {
+                "3.1 收入与利润分析": "盈利质量与成长性风险",
+                "3.2 资产负债分析": "资本结构与偿债能力风险",
+                "3.3 盈利质量与营运效率": "资产真实性与营运效率风险",
+                "3.4 偿债能力与财务信号异常": "资本结构与偿债能力风险",
+            }
+            diagnostic_by_title = {d.get("title"): d for d in diagnostics if d.get("title")}
+            for section_title, diag_title in title_map.items():
+                diag = diagnostic_by_title.get(diag_title)
+                if not diag:
+                    continue
+                items: List[str] = []
+                if diag.get("phenomenon"):
+                    items.append(str(diag["phenomenon"]))
+                if diag.get("driver"):
+                    items.append(f"风险实质：{diag['driver']}")
+                if diag.get("verification_action"):
+                    actions = diag["verification_action"]
+                    if isinstance(actions, list) and actions:
+                        items.append(f"核查动作：{'；'.join(str(a) for a in actions)}")
+                if diag.get("missing_items"):
+                    missing = diag["missing_items"]
+                    if isinstance(missing, list) and missing:
+                        items.append(f"待补充：{'、'.join(str(m) for m in missing)}")
+                if items:
+                    output.append({
+                        "title": section_title,
+                        "items": items[:6],
+                        "evidence_refs": report.get("codeact_evidence_refs") or [],
+                    })
+            if output:
+                return output
+
+        # Fallback 1: narrative_summary if diagnostics unavailable.
+        summary = report.get("narrative_summary") or []
+        if summary:
+            title_map = {
+                "3.1 收入与利润分析": ["3.1 收入与利润分析"],
+                "3.2 资产负债分析": ["3.2 资产负债分析"],
+                "3.3 盈利质量与营运效率": ["3.3 盈利质量与营运效率"],
+                "3.4 偿债能力与财务信号异常": ["3.4 偿债能力与财务信号异常"],
+            }
+            output = []
+            for section_title, prefixes in title_map.items():
+                items = [s for s in summary if any(str(s).startswith(p) for p in prefixes)]
+                if items:
+                    output.append({
+                        "title": section_title,
+                        "items": [str(i) for i in items[:3]],
+                        "evidence_refs": report.get("codeact_evidence_refs") or [],
+                    })
+            if output:
+                return output
+
+        # Fallback 2: legacy hard-coded sections (original behavior).
         flattened = [sub for section in report.get("sections") or [] for sub in section.get("subsections") or []]
         title_map = {
             "3.1 收入与利润分析": ["利润表分析", "盈利能力分析"],
@@ -125,14 +183,14 @@ def _financial_structured_subsections(evidence: List[Dict[str, Any]]) -> List[Di
             "3.3 盈利质量与营运效率": ["现金流量表分析", "营运能力分析"],
             "3.4 偿债能力与财务信号异常": ["偿债能力分析", "主要潜在风险提示"],
         }
-        output: List[Dict[str, Any]] = []
+        output = []
         for title, names in title_map.items():
             items: List[str] = []
             for sub in flattened:
                 if sub.get("title") not in names:
                     continue
                 items.extend(str(text) for text in (sub.get("analysis") or []) if text)
-                items.extend(str(risk) for risk in (sub.get("risks") or []) if risk)
+                items.extend(str(risk) for risk in (sub.get("risks") or []) if text)
                 if sub.get("risk提示"):
                     items.append(str(sub.get("risk提示")))
             if items:
@@ -142,8 +200,517 @@ def _financial_structured_subsections(evidence: List[Dict[str, Any]]) -> List[Di
     return []
 
 
+def _industry_subsections(evidence: List[Dict[str, Any]], industry_summary: List[str], industry_gaps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Build industry section subsections from the full industry_analysis_report.
+
+    Falls back to public-info snippets and finally to template placeholders.
+    """
+    report: Dict[str, Any] | None = None
+    for item in evidence:
+        report = ((item.get("metadata") or {}).get("industry_analysis_report") or {})
+        if report:
+            break
+
+    sections = report.get("sections") or [] if report else []
+    public_info = report.get("listed_company_public_info") or {} if report else {}
+    if not public_info:
+        for item in evidence:
+            if item.get("source_type") == "listed_company_public_info":
+                public_info = item.get("metadata", {}).get("public_info") or {}
+                if public_info:
+                    break
+
+    # Try to map report sections to chapter subsections.
+    title_map = {
+        "行业定位与周期判断": "行业定位",
+        "行业识别结论": None,  # used as metadata, not a chapter subsection
+        "年报经营讨论与主营构成": "行业定位",
+        "行业地位与研报摘要": "竞争格局",
+        "诉讼公告、担保质押与资本市场风险线索": "政策环境",
+        "行业尽调重点": "授信关注点",
+        "行业动态规则与关键假设": "授信关注点",
+        "关键财务指标阈值": None,
+        "行业风险": "周期判断",
+        "建议来源与核验路径": None,
+        "知识库来源": None,
+    }
+    mapped: Dict[str, List[str]] = {
+        "行业定位": [],
+        "周期判断": [],
+        "竞争格局": [],
+        "政策环境": [],
+        "上下游议价能力": [],
+        "授信关注点": [],
+    }
+
+    for sec in sections:
+        sec_title = sec.get("title", "")
+        target = title_map.get(sec_title)
+        if target is None:
+            continue
+        analysis = sec.get("analysis") or []
+        risks = sec.get("risks") or []
+        rows = sec.get("rows") or []
+        mapped[target].extend(str(a) for a in analysis if a)
+        if sec_title == "年报经营讨论与主营构成" and rows:
+            mapped[target].append("主营构成：" + "；".join(
+                f"{row.get('item_name')} {row.get('income_ratio')}"
+                for row in rows[:6] if isinstance(row, dict)
+            ))
+        if sec_title == "行业风险" and risks:
+            mapped["周期判断"].extend(str(r) for r in risks[:4])
+
+    # Public info fallback for missing dimensions.
+    if public_info:
+        basic = public_info.get("basic_info") or {}
+        review = public_info.get("annual_business_review") or {}
+        clues = public_info.get("search_clues") or {}
+        if not mapped["行业定位"]:
+            mapped["行业定位"].extend(filter(None, [
+                f"公开行业标签：{basic.get('industry')}" if basic.get("industry") else None,
+                f"主营业务：{basic.get('main_business')}" if basic.get("main_business") else None,
+                review.get("business_review") if review.get("business_review") else None,
+            ]))
+        if not mapped["竞争格局"]:
+            mapped["竞争格局"].extend(
+                str(item.get("content", ""))[:240]
+                for item in (clues.get("industry_position") or [])[:3]
+                if item.get("content")
+            )
+        if not mapped["政策环境"]:
+            mapped["政策环境"].extend(
+                str(item.get("content", ""))[:240]
+                for item in (clues.get("research_summaries") or [])[:3]
+                if item.get("content")
+            )
+
+    # Final template fallback for any still-empty dimension.
+    fallbacks = {
+        "行业定位": ["结合标准行业分类、主营构成和年报经营讨论判断企业在产业链中的位置。"],
+        "周期判断": ["结合行业景气度、订单周期、资本开支和客户需求变化判断经营韧性。"],
+        "竞争格局": ["关注标的在子赛道中的份额、技术壁垒、客户集中度和同业竞争压力。"],
+        "政策环境": ["关注监管、产业政策、地缘贸易限制及行业准入变化。"],
+        "上下游议价能力": ["关注供应商集中度、客户集中度、账期和成本转嫁能力。"],
+        "授信关注点": ["建议将行业周期、核心客户回款、订单持续性和价格波动纳入额度释放和贷后监控条件。"],
+    }
+
+    output: List[Dict[str, Any]] = []
+    for title, fallback in fallbacks.items():
+        items = mapped.get(title) or []
+        if not items:
+            items = fallback
+        output.append({"title": title, "items": items[:5]})
+
+    # ── 2D table: key financial metric thresholds from industry guides ──
+    metric_table: Dict[str, Any] | None = None
+    for sec in sections:
+        if sec.get("title") == "八、关键财务指标阈值":
+            rows = sec.get("rows") or []
+            if rows and isinstance(rows[0], dict) and "headers" in rows[0] and "rows" in rows[0]:
+                metric_table = {
+                    "columns": rows[0]["headers"],
+                    "rows": rows[0]["rows"],
+                    "source": "行业指南知识库",
+                }
+            elif rows:
+                # Fallback for list-of-dict rows.
+                metric_table = {
+                    "columns": list(rows[0].keys()) if rows else [],
+                    "rows": rows,
+                    "source": "行业指南知识库",
+                }
+            break
+    if metric_table:
+        output.append({
+            "title": "行业关键指标阈值",
+            "items": ["以下为行业指南中给出的关键财务指标阈值参考，可用于与标的财务数据进行横向对比。"],
+            "table": metric_table,
+        })
+
+    # ── Deep narrative: industry diagnostics ──
+    diagnostics_raw = report.get("industry_diagnostics") or {} if report else {}
+    if isinstance(diagnostics_raw, dict):
+        diagnostics = diagnostics_raw.get("diagnostics") or []
+    else:
+        diagnostics = diagnostics_raw
+    if diagnostics:
+        diagnostic_items: List[str] = []
+        for d in diagnostics[:5]:
+            title = d.get("title") or "行业诊断"
+            current = d.get("current_anchor") or ""
+            risk = d.get("risk_substance") or ""
+            actions = d.get("verification_actions") or []
+            missing = d.get("missing_items") or []
+            parts = [f"【{title}】"]
+            if current:
+                parts.append(f"现状锚定：{current}")
+            if risk:
+                parts.append(f"风险实质：{risk}")
+            if actions:
+                parts.append(f"核查要点：{'；'.join(str(a) for a in actions if a)}")
+            if missing:
+                parts.append(f"待补充：{'；'.join(str(m) for m in missing if m)}")
+            diagnostic_items.append("\n".join(parts))
+        if diagnostic_items:
+            output.append({
+                "title": "行业深度诊断",
+                "items": diagnostic_items,
+            })
+
+    return output
+
+
+def _legal_subsections(evidence: List[Dict[str, Any]], legal_summary: List[str], legal_gaps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Build legal section subsections from cninfo, yuandian, legal_agent and public clues."""
+    cninfo_risk: Dict[str, Any] | None = None
+    yuandian_risk: Dict[str, Any] | None = None
+    legal_report: Dict[str, Any] | None = None
+    public_clues: List[Dict[str, Any]] = []
+    for item in evidence:
+        source_type = item.get("source_type")
+        metadata = item.get("metadata") or {}
+        if source_type == "cninfo_webapi_risk":
+            cninfo_risk = metadata
+        elif source_type == "yuandian_legal_risk":
+            yuandian_risk = metadata
+        elif source_type == "legal_analysis_report" or (metadata.get("legal_analysis_report") and not legal_report):
+            legal_report = metadata.get("legal_analysis_report") or metadata
+        elif source_type in {"public_web_search_clue", "official_or_authoritative_public_source"}:
+            if isinstance(metadata, dict) and metadata.get("title"):
+                public_clues.append(metadata)
+
+    risk_counts: Dict[str, int] = {}
+    risk_records: Dict[str, List[Dict[str, Any]]] = {}
+    if cninfo_risk:
+        for key, label in [("litigation", "诉讼"), ("guarantees", "对外担保"), ("penalties", "处罚"), ("asset_freezes", "资产冻结"), ("arbitration", "仲裁")]:
+            section = cninfo_risk.get(key) or {}
+            risk_counts[label] = section.get("count", 0)
+            risk_records[label] = section.get("records", []) or []
+
+    # ── Build unified case summary table ────────────────────────────
+    case_rows: List[Dict[str, Any]] = []
+
+    # 1. Yuandian case summaries (structured)
+    yuandian_summaries = (yuandian_risk or {}).get("case_summaries") or []
+    for s in yuandian_summaries[:8]:
+        if not isinstance(s, dict):
+            continue
+        parties = s.get("plaintiffs") or s.get("defendants") or s.get("parties") or []
+        case_rows.append({
+            "类型": "裁判文书",
+            "案号": s.get("case_number") or "",
+            "案由": s.get("case_cause") or "",
+            "法院/来源": s.get("court") or "元典案例库",
+            "当事人": "、".join(str(p) for p in parties) or "",
+            "日期": s.get("judgment_date") or "",
+            "摘要": (s.get("title") or "")[:80],
+        })
+
+    # 2. Legal agent legal_items
+    legal_items = (legal_report or {}).get("legal_items") or []
+    for item in legal_items[:8]:
+        if not isinstance(item, dict):
+            continue
+        case_rows.append({
+            "类型": "、".join(str(t) for t in item.get("types") or []) or "司法线索",
+            "案号": "、".join(str(n) for n in item.get("case_numbers") or []) or "",
+            "案由": "、".join(str(c) for c in item.get("causes") or []) or "",
+            "法院/来源": item.get("source") or "公开搜索",
+            "当事人": "",
+            "日期": "",
+            "摘要": (item.get("excerpt") or item.get("title") or "")[:80],
+        })
+
+    # 3. Cninfo material records (heuristic)
+    for label in ["诉讼", "处罚", "对外担保"]:
+        for rec in risk_records.get(label, [])[:5]:
+            if not isinstance(rec, dict):
+                continue
+            summary_text = next((str(v) for v in rec.values() if isinstance(v, str) and v.strip()), "")
+            case_rows.append({
+                "类型": label,
+                "案号": "",
+                "案由": "",
+                "法院/来源": "巨潮资讯WebAPI",
+                "当事人": "",
+                "日期": "",
+                "摘要": summary_text[:80],
+            })
+
+    # ── Build deep narrative paragraphs ─────────────────────────────
+    narrative_items: List[str] = []
+    total_yuandian = (yuandian_risk or {}).get("total", len(yuandian_summaries))
+    if total_yuandian:
+        summary = (yuandian_risk or {}).get("summary") or {}
+        causes = summary.get("case_cause_distribution") or {}
+        levels = summary.get("court_level_distribution") or {}
+        cause_part = ""
+        if causes:
+            cause_part = "主要案由包括" + "、".join(f"{k}（{v}条）" for k, v in sorted(causes.items(), key=lambda x: -x[1])[:3]) + "。"
+        level_part = ""
+        if levels:
+            level_part = "审理法院层级分布：" + "、".join(f"{k}{v}条" for k, v in levels.items()) + "。"
+        narrative_items.append(
+            f"元典案例库返回{total_yuandian}条司法线索。{cause_part}{level_part}"
+        )
+        for s in yuandian_summaries[:2]:
+            title = s.get("title") or ""
+            court = s.get("court") or ""
+            cause = s.get("case_cause") or ""
+            date = s.get("judgment_date") or ""
+            parties = s.get("plaintiffs") or s.get("defendants") or s.get("parties") or []
+            narrative_items.append(
+                f"典型案件：{title}（{court}，{date}）。案由：{cause}；当事人：{'、'.join(str(p) for p in parties)}。"
+            )
+
+    cninfo_total = sum(risk_counts.values())
+    if cninfo_total:
+        narrative_items.append(
+            f"巨潮官方API返回结构化司法风险：诉讼{risk_counts.get('诉讼', 0)}条、对外担保{risk_counts.get('对外担保', 0)}条、处罚{risk_counts.get('处罚', 0)}条、资产冻结{risk_counts.get('资产冻结', 0)}条、仲裁{risk_counts.get('仲裁', 0)}条。"
+        )
+
+    if not narrative_items:
+        narrative_items.append(
+            "基于当前资料暂未识别到结构化司法风险记录，但仍建议以裁判文书网、执行信息公开网、国家企业信用信息公示系统和交易所公告复核。"
+        )
+
+    subsections = [
+        {
+            "title": "司法风险概览",
+            "items": narrative_items[:4],
+        },
+        {
+            "title": "被执行/失信",
+            "items": [
+                f"巨潮官方API返回被执行/资产冻结线索：{risk_counts.get('资产冻结', 0)}条"
+                if risk_counts.get("资产冻结", 0) > 0
+                else "巨潮官方API暂未返回被执行、失信或资产冻结记录，仍需以执行信息公开网、失信被执行人名单复核。"
+            ],
+        },
+        {
+            "title": "行政处罚",
+            "items": [
+                f"巨潮官方API返回处罚线索：{risk_counts.get('处罚', 0)}条，需核验处罚机关、金额、事由和整改状态。"
+                if risk_counts.get("处罚", 0) > 0
+                else "巨潮官方API暂未返回行政处罚记录，仍需以国家企业信用信息公示系统、行业主管部门复核。"
+            ],
+        },
+        {
+            "title": "监管问询/公告",
+            "items": [
+                f"巨潮官方API返回对外担保线索：{risk_counts.get('对外担保', 0)}条，需关注担保对象、金额和代偿风险。"
+                if risk_counts.get("对外担保", 0) > 0
+                else "巨潮官方API暂未返回对外担保记录；上市公司仍需重点核验交易所问询、监管函、诉讼公告和重大事项公告。"
+            ],
+        },
+        {
+            "title": "重大舆情",
+            "items": _gap_descriptions(legal_gaps)[:4]
+                or ["基于当前公开线索暂未见重大阻断性司法风险，仍建议在提款前完成权威司法源复核。"],
+        },
+    ]
+
+    if case_rows:
+        subsections.insert(1, {
+            "title": "司法线索明细表",
+            "items": ["以下为元典/巨潮/legal_agent 返回的司法线索结构化摘要，可作为贷前复核清单。"],
+            "table": {
+                "columns": ["类型", "案号", "案由", "法院/来源", "当事人", "日期", "摘要"],
+                "rows": case_rows[:15],
+                "source": "元典开放平台 / 巨潮资讯WebAPI / 公开搜索",
+            },
+        })
+
+    return subsections
+
+
+def _cross_validation_subsections(
+    evidence: List[Dict[str, Any]],
+    cross_findings: List[Dict[str, Any]],
+    financial_score: int,
+    legal_score: int,
+    industry_score: int,
+) -> List[Dict[str, Any]]:
+    """Build cross-validation subsections from real evidence instead of hard-coded templates."""
+    # Load financial narrative diagnostics and codeact results.
+    financial_diagnostics: List[Dict[str, Any]] = []
+    codeact_analysis: Dict[str, Any] | None = None
+    for item in evidence:
+        report = ((item.get("metadata") or {}).get("financial_analysis_report") or {})
+        if report:
+            nd = report.get("narrative_diagnostics") or {}
+            financial_diagnostics = nd.get("diagnostics") or []
+            codeact_analysis = report.get("codeact_analysis") or codeact_analysis
+            break
+
+    # Load cninfo risk counts.
+    cninfo_risk: Dict[str, Any] | None = None
+    for item in evidence:
+        if item.get("source_type") == "cninfo_webapi_risk":
+            cninfo_risk = item.get("metadata") or {}
+            break
+    risk_total = 0
+    if cninfo_risk:
+        risk_total = sum(
+            (cninfo_risk.get(k) or {}).get("count", 0)
+            for k in ["litigation", "guarantees", "penalties", "asset_freezes", "arbitration"]
+        )
+
+    # Load industry diagnostic summary.
+    industry_summary: List[str] = []
+    for item in evidence:
+        report = ((item.get("metadata") or {}).get("industry_analysis_report") or {})
+        if report:
+            industry_summary = (report.get("industry_diagnostic_summary") or report.get("risk_summary") or [])[:4]
+            break
+
+    # 1. 财务真实性与经营匹配
+    business_match_items = [cross_findings[0]["conclusion"]]
+    for diag in financial_diagnostics:
+        if "成长性" in str(diag.get("title", "")) and diag.get("driver"):
+            business_match_items.append(f"经营匹配：{diag['driver']}")
+            break
+
+    # 2. 现金流与利润是否匹配
+    cash_profit_items = [
+        "重点核验利润增长是否有经营现金流、银行流水和纳税申报支撑；经营现金流/净利润长期低于1或背离扩大需警惕收入确认质量。"
+    ]
+    for diag in financial_diagnostics:
+        title = str(diag.get("title", ""))
+        if ("营运" in title or "资产" in title) and diag.get("phenomenon"):
+            cash_profit_items.append(f"现金流勾稽：{diag['phenomenon']}")
+            break
+    if codeact_analysis and codeact_analysis.get("validation_passed") is False:
+        issues = codeact_analysis.get("validation_issues") or []
+        if issues:
+            cash_profit_items.append(f"CodeAct 三大表勾稽异常：{issues[0]}")
+
+    # 3. 司法风险是否影响授信安全边界
+    if risk_total > 0:
+        legal_items = [
+            f"巨潮官方API返回{risk_total}条司法/合规风险线索，直接影响授信准入、额度释放和担保条件。",
+            "需重点核验诉讼主体、标的金额、担保对象、处罚事由及整改进度。",
+        ]
+    else:
+        legal_items = [
+            "巨潮官方API暂未返回司法/合规风险线索，但公开搜索线索需以权威司法及交易所公告复核。",
+        ]
+
+    # 4. 行业周期是否影响还款来源
+    industry_items = [cross_findings[2]["conclusion"]]
+    if industry_summary:
+        industry_items.extend(str(s) for s in industry_summary[:2])
+
+    return [
+        {"title": "财务与经营范围是否匹配", "items": business_match_items[:3]},
+        {"title": "现金流与利润是否匹配", "items": cash_profit_items[:3]},
+        {"title": "司法风险是否影响授信安全边界", "items": legal_items[:3]},
+        {"title": "行业周期是否影响还款来源", "items": industry_items[:3]},
+    ]
+
+
 def _gap_descriptions(gaps: List[Dict[str, Any]]) -> List[str]:
     return [str(gap.get("description")) for gap in gaps if gap.get("description")]
+
+
+def _business_subsections(all_evidence: List[Dict[str, Any]], business_summary: List[str], business_gaps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Build business section subsections dynamically from evidence (all categories)."""
+    shareholder_items: List[str] = []
+    shareholder_table: Dict[str, Any] | None = None
+    penalty_items: List[str] = []
+    related_items: List[str] = []
+    registry_rows: List[Dict[str, str]] = []
+
+    for item in all_evidence:
+        source_type = item.get("source_type", "")
+        metadata = item.get("metadata") or {}
+
+        if source_type == "official_business_registry":
+            biz_fields = (metadata.get("extracted_fields") or {}).get("business_fields") or {}
+            shareholders = metadata.get("shareholders") or {}
+            ctrl = (shareholders.get("actual_controller") or {}).get("records", [])
+            top = shareholders.get("top_shareholders") or {}
+            capital_changes = shareholders.get("share_capital_changes") or {}
+            latest_ctrl = ctrl[-1].get("F004V") if ctrl else None
+            ctrl_type = biz_fields.get("控制方式")
+
+            # Structured registry table: prefer CNINFO fields, fallback to Tavily search clues.
+            if biz_fields:
+                registry_rows = [
+                    {"项目": k, "登记信息": str(v)}
+                    for k, v in biz_fields.items()
+                    if v and str(v).strip()
+                ]
+
+            if metadata.get("shareholder_table", {}).get("success"):
+                shareholder_table = metadata["shareholder_table"]
+
+            if latest_ctrl:
+                shareholder_items.append(f"实际控制人：{latest_ctrl}" + (f"（{ctrl_type}）" if ctrl_type else ""))
+            if top.get("count", 0) > 0:
+                shareholder_items.append(f"十大股东共{top['count']}条记录（来源：巨潮官方数据）")
+            if capital_changes.get("count", 0) > 0:
+                related_items.append(f"股本变动记录：{capital_changes['count']}条")
+
+        # Risk data from legal category evidence
+        if source_type == "cninfo_webapi_risk":
+            for key, label in [("litigation", "诉讼"), ("penalties", "处罚"), ("guarantees", "对外担保"), ("asset_freezes", "资产冻结"), ("arbitration", "仲裁")]:
+                section = metadata.get(key) or {}
+                count = section.get("count", 0)
+                if count > 0:
+                    penalty_items.append(f"{label}：{count}条")
+
+    # Fallback textual summaries when structured data is missing.
+    if not registry_rows:
+        registry_rows = [{"项目": "工商登记", "登记信息": business_summary[0] if business_summary else "暂无结构化工商登记信息"}]
+
+    # If only code is present (no company name/controller), keep a human-readable note in items.
+    registry_items = business_summary[:2] if len(business_summary) >= 2 else ["以下工商登记信息来自巨潮官方API或公开工商数据源。"]
+    if not shareholder_items:
+        shareholder_items = ["需结合年报、工商登记和权威股权穿透数据复核。"]
+    if not related_items:
+        related_items = ["需关注对外投资、关联交易、股权质押和实际控制人风险传导。"]
+    if not penalty_items:
+        penalty_items = ["基于当前资料暂未见明确重大工商异常，建议授信前完成权威工商源核验。"]
+
+    shareholder_sub: Dict[str, Any] = {"title": "股权结构与实控人", "items": shareholder_items[:5]}
+    if shareholder_table and shareholder_table.get("rows"):
+        shareholder_sub["table"] = {
+            "columns": shareholder_table.get("columns", []),
+            "rows": shareholder_table["rows"],
+            "source": f"巨潮资讯WebAPI（报告期：{shareholder_table.get('report_date', '')}）",
+        }
+
+    # ── Deep narrative from business_analysis_report ─────────────────
+    narrative_items: List[str] = []
+    for item in all_evidence:
+        report = ((item.get("metadata") or {}).get("business_analysis_report") or {})
+        if report and report.get("narrative_summary"):
+            narrative_items = report["narrative_summary"][:6]
+            break
+
+    subsections: List[Dict[str, Any]] = []
+    if narrative_items:
+        subsections.append({
+            "title": "工商深度分析",
+            "items": narrative_items,
+        })
+
+    subsections.extend([
+        {
+            "title": "工商登记信息",
+            "items": registry_items,
+            "table": {
+                "columns": ["项目", "登记信息"],
+                "rows": registry_rows,
+                "source": "巨潮资讯WebAPI / 公开工商数据",
+            },
+        },
+        shareholder_sub,
+        {"title": "关联企业与对外投资", "items": related_items[:4]},
+        {"title": "异常经营/行政处罚", "items": penalty_items[:4]},
+    ])
+    return subsections
 
 
 def _business_implication(score: int, has_evidence: bool) -> str:
@@ -352,13 +919,6 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
         },
     ]
 
-    risk_dimensions = [
-        _dimension("工商与治理", business_score, 0.20, [_business_implication(business_score, business_has_evidence)] + business_summary[:2]),
-        _dimension("财务健康度", financial_score, 0.35, [_financial_implication(financial_score, financial_has_evidence)] + financial_summary[:2]),
-        _dimension("司法合规", legal_score, 0.25, [_legal_implication(legal_score, legal_has_evidence)] + legal_summary[:2]),
-        _dimension("行业与经营环境", industry_score, 0.20, [_industry_implication(industry_score, industry_has_evidence)] + industry_summary[:2]),
-    ]
-
     all_core_refs = list(dict.fromkeys(business_refs + financial_refs + legal_refs + industry_refs))[:12]
     credit_refs = list(dict.fromkeys(financial_refs + legal_refs + industry_refs + business_refs))[:8]
     credit_summary = [
@@ -415,12 +975,7 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
             business_summary,
             business_refs,
             business_findings,
-            subsections=[
-                {"title": "工商登记信息", "items": business_summary[:2]},
-                {"title": "股权结构与实控人", "items": ["需结合年报、工商登记和权威股权穿透数据复核。"]},
-                {"title": "关联企业与对外投资", "items": ["需关注对外投资、关联交易、股权质押和实际控制人风险传导。"]},
-                {"title": "异常经营/行政处罚", "items": _gap_descriptions(business_gaps)[:4] or ["基于当前资料暂未见明确重大工商异常，建议授信前完成权威工商源核验。"]},
-            ],
+            subsections=_business_subsections(evidence, business_summary, business_gaps),
             risks=_gap_descriptions(business_gaps),
         ),
         _chapter(
@@ -446,14 +1001,7 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
             industry_summary,
             industry_refs,
             industry_findings_rows,
-            subsections=[
-                {"title": "行业定位", "items": industry_summary[:2]},
-                {"title": "周期判断", "items": ["结合行业景气度、订单周期、资本开支和客户需求变化判断经营韧性。"]},
-                {"title": "竞争格局", "items": ["关注标的在子赛道中的份额、技术壁垒、客户集中度和同业竞争压力。"]},
-                {"title": "政策环境", "items": ["关注监管、产业政策、地缘贸易限制及行业准入变化。"]},
-                {"title": "上下游议价能力", "items": ["关注供应商集中度、客户集中度、账期和成本转嫁能力。"]},
-                {"title": "授信关注点", "items": _gap_descriptions(industry_gaps)[:4] or ["建议将行业周期、核心客户回款、订单持续性和价格波动纳入额度释放和贷后监控条件。"]},
-            ],
+            subsections=_industry_subsections(evidence, industry_summary, industry_gaps),
             risks=_gap_descriptions(industry_gaps),
         ),
         _chapter(
@@ -463,13 +1011,7 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
             legal_summary,
             legal_refs,
             legal_findings,
-            subsections=[
-                {"title": "裁判文书", "items": legal_summary[:2]},
-                {"title": "被执行/失信", "items": ["需以执行信息公开网、失信被执行人名单等权威源复核。"]},
-                {"title": "行政处罚", "items": ["需核验处罚机关、处罚金额、处罚事由和整改状态。"]},
-                {"title": "监管问询/公告", "items": ["上市公司需重点核验交易所问询、监管函、诉讼公告和重大事项公告。"]},
-                {"title": "重大舆情", "items": _gap_descriptions(legal_gaps)[:4] or ["基于当前公开线索暂未见重大阻断性司法风险，仍建议在提款前完成权威司法源复核。"]},
-            ],
+            subsections=_legal_subsections(evidence, legal_summary, legal_gaps),
             risks=_gap_descriptions(legal_gaps),
         ),
         _chapter(
@@ -479,12 +1021,9 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
             [item["conclusion"] for item in cross_findings],
             all_core_refs,
             cross_findings,
-            subsections=[
-                {"title": "财务与经营范围是否匹配", "items": [cross_findings[0]["conclusion"]]},
-                {"title": "现金流与利润是否匹配", "items": ["重点核验利润增长是否有经营现金流、银行流水和纳税申报支撑。"]},
-                {"title": "司法风险是否影响授信安全边界", "items": [cross_findings[1]["conclusion"]]},
-                {"title": "行业周期是否影响还款来源", "items": [cross_findings[2]["conclusion"]]},
-            ],
+            subsections=_cross_validation_subsections(
+                evidence, cross_findings, financial_score, legal_score, industry_score
+            ),
         ),
         _chapter(
             "credit",
@@ -527,7 +1066,6 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
         "risk_score": weighted_score,
         "recommendation": f"建议{suggestion}。正式授信前需补齐高优先级证据缺口，并以权威工商、司法、财报和客户原始材料复核。",
         "executive_summary": summary,
-        "risk_dimensions": risk_dimensions,
         "credit_decision": {
             "suggestion": suggestion,
             "risk_score": weighted_score,

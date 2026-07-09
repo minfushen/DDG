@@ -8,7 +8,13 @@ from app.rag.pdf_knowledge_ingestion import Document
 
 
 def test_company_collection_name_normalization():
-    assert company_collection_name("三安光电") == "ddg_kb_company_三安光电"
+    # Chinese names are normalized to a stable hash suffix to satisfy Chroma's
+    # [a-zA-Z0-9._-] name restriction.
+    assert company_collection_name("三安光电").startswith("ddg_kb_company_")
+    assert len(company_collection_name("三安光电")) <= 63
+    assert company_collection_name("三安光电") == company_collection_name("三安光电")
+    assert company_collection_name("三安光电") != company_collection_name("贵州茅台")
+
     assert company_collection_name("ABC Corp., Ltd.") == "ddg_kb_company_ABC_Corp_Ltd"
     assert company_collection_name("  ") == "ddg_kb_company_unknown_company"
     assert len(company_collection_name("x" * 100)) <= 63
@@ -103,7 +109,7 @@ def test_ingest_company_documents_mocked(monkeypatch):
     result = ingest_company_documents("测试公司", docs)
 
     assert result["success"] is True
-    assert result["collection_name"] == "ddg_kb_company_测试公司"
-    assert called["manager_kwargs"]["collection_name"] == "ddg_kb_company_测试公司"
+    assert result["collection_name"].startswith("ddg_kb_company_")
+    assert called["manager_kwargs"]["collection_name"] == result["collection_name"]
     assert called["documents"] == docs
     assert called["ids"] == ["pdf_123"]

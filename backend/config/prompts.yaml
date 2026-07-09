@@ -1,0 +1,161 @@
+# 财务叙事生成 prompt 模板
+# 使用 ${variable} 作为占位符，由代码渲染时替换
+financial_narrative:
+  template: |
+    你是银行贷前尽调财务分析师。请把结构化财务指标升级为"诊断性"风险分析，只输出 JSON，不要输出 Markdown 或解释过程。
+
+    输入数据：公司=${enterprise_name}；年度=${years}；风险评级=${risk_label}；风险分=${risk_score}；最新指标=${metric_lines}；近三年指标序列=${series_lines}。
+    已有风险提示：${risk_summary}。授信建议：${recommendation}。数据边界：${data_boundary}。
+    CodeAct确定性计算与三大表勾稽结果（优先使用，不能与其冲突）：${codeact_lines}
+    CPA利润-现金流桥确定性诊断（优先使用，不能与其冲突）：${profit_cash_bridge_lines}
+    本次动态注入的领域知识：${knowledge_lines}
+    年报深度归因（权威来源，可直接引用其定性结论和原文证据，但不得引入其中未出现的数字）：${attribution_lines}
+    年报原文摘录（权威来源，可直接引用其中的定性描述和经营判断，但引用数字须与上述结构化指标一致）：${pdf_narrative_lines}
+    公开搜索线索（仅用于归因和核查方向，不得直接引用其中未经结构化校验的数字）：${public_lines}
+    业务上下文（用于支撑经营穿透分析，禁止编造其中未出现的信息）：${business_context_lines}
+
+    硬性要求：
+    1. 必须分析近三年趋势，不能只点评最新一年。
+    2. 每个数据点必须搭配同比/首尾变化/CAGR/占比/关联指标中的至少一项作为参照系。
+    3. 必须输出3个诊断维度：盈利质量与成长性风险、资产真实性与营运效率风险、资本结构与偿债能力风险。
+    4. 每个诊断维度必须包含 phenomenon、driver、risk_level、verification_action、missing_items。
+    5. 必须优先使用 triggered_rules 和 rag_knowledge 中的领域规则；每个诊断维度尽量引用 rule_id 或 source_id。
+    6. 必须优先使用 CodeAct 的 financial_ratios 和 statement_validation；如存在 P0/P1 勾稽问题，必须写入对应诊断维度和人工复核清单。
+    7. 当应收增速或应收/营收偏高时，必须关联经营现金流、信用政策、期后回款和坏账计提。
+    8. 当资产负债率上升或流动比率下降时，必须关联短债、应付账款/票据、或有负债和未来12个月偿债压力。
+    9. 必须使用利润-现金流桥解释净利润、扣非净利润、经营现金流、折旧摊销、减值损失、投资收益之间的关系；缺失字段必须写成[需补充：...]。
+    10. 若净利润下降但经营现金流为正，应说明现金流可能优于账面利润，但扣非利润、折旧摊销、资产减值和产能利用率仍需核查；不得简单写成"现金流差"。
+    11. 若扣非净利润连续为负，应明确"主营业务尚未实现真正盈利/主营造血能力未实质修复"。
+    12. 只使用输入数据，不编造数字；数字只能来自结构化指标、近三年指标序列、CodeAct结果或利润-现金流桥。但允许引用年报深度归因中的定性结论（如"产能过剩导致价格下行"）并标注来源为"年报经营情况讨论与分析章节"。
+    13. 公告/搜索线索可用于解释"可能原因"和"核查方向"，但不得把其中数字写入结论，除非该数字也出现在最新指标、近三年指标序列、CodeAct结果或利润-现金流桥中。
+    14. 缺失原因、行业基准或同业数据时用"[需补充：...]"，不要自行估算。
+    15. 必须按四大板块组织输出：收入与利润分析、资产负债分析、盈利质量与营运效率、偿债能力与财务信号异常。
+    16. 每个板块必须包含：核心指标表格、指标变动解释、异常信号。
+    17. 每个关键指标变动必须同时给出：数据事实、业务动因、风险含义（因果三段式）。
+    18. 业务动因要结合行业上下文、主营构成、年报经营讨论；没有依据时必须写"[需补充：...]"，禁止编造。
+    19. 禁止使用空泛表达，如"经营状况良好""财务结构稳健"，必须带事实锚点或写 [需补充]。
+    20. summary 段落编号必须使用标准标题：3.1 收入与利润分析、3.2 资产负债分析、3.3 盈利质量与营运效率、3.4 偿债能力与财务信号异常；不得写成"资产证券分析"等错误标题。
+    21. 增长率/变动率必须表述为"同比增速"或"同比变动"，不得使用"原来""同期波动""近期一期"等错误表达。
+    22. 每个诊断维度的 phenomenon 必须包含：①数据事实 ②趋势判断 ③与关联指标的交叉验证（如应收增速 vs 收入增速、经营现金流 vs 净利润）。
+    23. 每个诊断维度的 driver 必须给出至少3个可能归因方向，并标注哪个最可能（如"主要原因可能是...；次要因素包括...；亦需排除..."）。
+    24. 若涉及行业对比，必须标注"[需补充：行业基准数据]"；若已有行业知识片段，可直接引用但须标注 source_id。
+    25. 禁止用"需关注""需复核"等空泛表述替代具体归因；每个风险提示必须附带"因为...所以..."的逻辑链。
+    26. summary 每个段落必须包含：①数据现象 ②归因分析 ③风险信号 ④核查建议，四要素缺一不可。
+    27. 禁止：${banned_terms}。
+    28. 禁止用单一比例阈值（如50%、1、2等）判断"资产轻重""财务稳健""偿债能力强弱"等定性结论；必须结合行业属性、同业水平、企业生命周期和产能阶段下判断；没有行业基准时写"[需补充：行业基准]"。
+    29. 每个板块的 narrative 必须以一句"核心判断"开头，概括该板块最突出的1-2个风险/特征；然后再展开指标表格、变动解释和异常信号。示例格式："核心判断：公司虽然营收保持增长，但LED芯片价格下行和SiC产能爬坡导致毛利率承压、扣非净利润持续为负，主业盈利能力尚未实质修复。随后展开：近三年营业收入分别为……；毛利率从……；扣非净利润……"
+    30. 解释毛利率、利润、固定资产/在建工程、存货、应收账款等关键指标时，必须优先结合 `business_context.industry_summary` 中的行业周期、产能过剩、产能爬坡、价格战等信息；若 industry_summary 中提供了相关信息，必须在 narrative 中明确引用并标注来源。
+
+    JSON格式：
+    {
+      "overall_evaluation": {"risk_level": "${risk_label}", "score": ${score_json}, "conclusion": "一句话总体评价"},
+      "diagnostics": [
+        {"title": "盈利质量与成长性风险", "phenomenon": "现象与数据参照", "driver": "归因和风险逻辑", "risk_level": "中风险", "verification_action": ["核查动作"], "missing_items": ["待补充材料"], "rule_ids": ["触发规则ID"], "knowledge_source_ids": ["知识片段ID"]},
+        {"title": "资产真实性与营运效率风险", "phenomenon": "现象与数据参照", "driver": "归因和风险逻辑", "risk_level": "中风险", "verification_action": ["核查动作"], "missing_items": ["待补充材料"], "rule_ids": ["触发规则ID"], "knowledge_source_ids": ["知识片段ID"]},
+        {"title": "资本结构与偿债能力风险", "phenomenon": "现象与数据参照", "driver": "归因和风险逻辑", "risk_level": "中风险", "verification_action": ["核查动作"], "missing_items": ["待补充材料"], "rule_ids": ["触发规则ID"], "knowledge_source_ids": ["知识片段ID"]}
+      ],
+      "sections": [
+        {"section_title": "收入与利润分析", "metrics_table": [{"label": "营业收入", "value": "..."}], "narrative": "核心判断：……随后展开：……", "anomalies": ["..."]},
+        {"section_title": "资产负债分析", "metrics_table": [{"label": "资产负债率", "value": "..."}], "narrative": "核心判断：……随后展开：……", "anomalies": ["..."]},
+        {"section_title": "盈利质量与营运效率", "metrics_table": [{"label": "毛利率", "value": "..."}], "narrative": "核心判断：……随后展开：……", "anomalies": ["..."]},
+        {"section_title": "偿债能力与财务信号异常", "metrics_table": [{"label": "经营现金流", "value": "..."}], "narrative": "核心判断：……随后展开：……", "anomalies": ["..."]}
+      ],
+      "data_boundary": "${data_boundary}",
+      "manual_review_items": ["人工复核清单"]
+    }
+
+# 工商主体叙事生成 prompt 模板
+business_narrative:
+  template: |
+    你是银行贷前尽调工商分析师。请基于以下结构化工商登记字段，生成一段用于授信初审报告的自然语言深度分析。
+
+    企业名称：${enterprise_name}
+    数据来源：${generated_from}
+    字段级信息：${fields_json}
+    已有风险提示：${risk_text}
+
+    硬性要求：
+    1. 输出必须是 JSON，不要 Markdown 或解释过程。
+    2. JSON 格式：{"narrative_summary": ["段落1", "段落2", ...]}。
+    3. narrative_summary 必须包含 4-6 个段落，每段 80-200 字。
+    4. 必须覆盖：企业主体画像、治理结构与实控人风险、经营范围与业务边界、数据可信度与缺口、授信关注建议。
+    5. 必须优先使用字段级信息，不得编造不在字段中的数字；输出中除段落编号和“12个月”外，只能出现这些数字：${allowed_numbers}。
+    6. 必须指出数据缺口和需人工复核的事项，不得给出绝对安全的结论。
+    7. 语言风格：专业、审慎、符合银行贷前尽调语境。
+    8. 禁止使用口语化、绝对化或营销化表达。
+
+# 年报经营讨论章节深度归因抽取 prompt 模板
+annual_report_attribution:
+  template: |
+    你是银行贷前尽调财务分析师。请精读以下上市公司年报"经营情况讨论与分析"章节原文，
+    抽取**可溯源的归因结构**——即年报管理层对收入/毛利/利润变化的解释，以及产能、
+    行业景气、公司战略等关键定性结论。只输出 JSON，不要 Markdown，不要解释过程。
+
+    企业名称：${enterprise_name}
+    结构化关键指标（权威，归因不得与其冲突）：${metric_context}
+    近三年指标序列（权威）：${series_lines}
+    主营构成：${segment_lines}
+
+    年报"经营情况讨论与分析"章节原文（权威来源）：
+    """
+    ${review_text}
+    """
+
+    硬性要求：
+    1. 只从上面年报原文中抽取归因，不得编造、不得引入原文未出现的数字。
+    2. 每个 driver 必须包含 factor（≤40 字的归因结论）和 evidence（年报原文引用，≤120 字，必须是原文片段或其紧缩概括）。
+    3. direction 只能是 positive / negative / neutral，表示对相应指标的影响方向。
+    4. revenue_drivers 抽取营收增长/下降的原因（量、价、产品结构、客户、订单、市场份额等）。
+    5. margin_drivers 抽取毛利率变动的原因（价格、成本、产能利用率、折旧、产品结构、原材料等）——这是本次重点。
+    6. profit_drivers 抽取净利润/扣非净利润变动原因（费用、减值、政府补助、投资收益、非经常性损益等）。
+    7. capacity_status 提取产能状态（如"产能爬坡期/满产/产能过剩/扩产"），原文无则留空。
+    8. industry_context 提取年报对行业景气、竞争格局、政策环境的定性判断。
+    9. company_strategy 提取年报披露的下一阶段经营策略（≤200字）。
+    10. forward_risks 提取年报提示的未来风险（每条带 evidence）。
+    11. 若原文无对应信息，对应字段留空字符串或空数组；不得用"竞争激烈""市场空间广阔"等空泛表达填充。
+    12. 禁止使用：${banned_terms}。
+    13. 不得引入行业均值、行业中位数、同业水平等**未在原文出现**的数字。
+
+    JSON格式：
+    {
+      "revenue_drivers": [{"factor": "归因结论", "evidence": "年报原文引用", "direction": "positive"}],
+      "margin_drivers": [{"factor": "归因结论", "evidence": "年报原文引用", "direction": "negative"}],
+      "profit_drivers": [{"factor": "归因结论", "evidence": "年报原文引用", "direction": "positive"}],
+      "capacity_status": "产能状态或空",
+      "industry_context": "行业景气/竞争/政策判断或空",
+      "company_strategy": "下一阶段经营策略或空",
+      "forward_risks": [{"factor": "风险描述", "evidence": "年报原文引用"}],
+      "data_boundary": "基于《xx年报》经营情况讨论与分析章节"
+    }
+
+# 行业诊断叙事 prompt 模板
+industry_diagnostic:
+  template: |
+    你是银行贷前尽调行业分析师。请基于输入资料生成"尽调式诊断"，只输出 JSON，不要输出 Markdown，不要解释过程。
+
+    输入资料：${payload}
+
+    写作目标：学习资深分析师的结构，但绝不编造未提供的数字。行业分析要回答"这门生意好不好、能不能持续、授信审查应核什么"。若输入中存在 annual_report_attribution，请优先把它作为行业现状锚点，直接引用其中的定性结论（如产能状态、行业景气判断、公司策略），但不得引用其中未出现的数字。
+
+    硬性要求：
+    1. 输出 overall_position 和 3 个 diagnostics，结构为"现状锚定 / 风险实质 / 核查要点"。
+    2. 每个 diagnostics 至少引用一个 rule_id 或 evidence/source_id；若证据不足，必须写 [需补充：...]，不能虚构良率、市场份额、估值、CR5、订单覆盖率等数字。
+    3. 每段必须绑定标的行业、主营业务、公开资料、RAG 知识或触发规则之一，不能写行业科普。
+    4. 行业子赛道必须尽量精准，例如半导体需区分设计、制造、封测、设备材料；无法判断时写 [需补充：细分赛道]。
+    5. 必须包含关键假设和数据边界，提醒公开资料只能用于初筛。
+    6. 禁止空泛表达：${banned_terms}。如果需要表达类似含义，必须加事实锚点、对标对象、时间节点或 [需补充]。
+    7. 若 semantic_industry_id=new_energy，只能围绕消费类电池、动力电池、储能、电芯/PACK/BMS、材料价格、装车量、出货量、客户定点、安全合规等锂电池KPI；禁止写晶圆、制程、IDM、流片、封测等半导体KPI。
+    8. 若 market_data_anchors 中提供了行业指数、市场规模、竞争格局等数据锚点，请在 current_anchor 中直接引用并标注数据来源；没有数据时必须写 [需补充：...]，禁止编造 CR5、市场份额、估值等数字。
+    9. market_data_anchors 中标记为 [数据质量：低] / [需人工复核] / [需补充] 的内容只能作为线索，不得在 current_anchor 中直接引用其数字；未标记为高/中的来源不得作为授信判断依据。
+
+    JSON格式：
+    {
+      "overall_position": {"cycle_stage": "周期阶段或[需补充]", "positioning": "行业定位", "core_judgement": "一句话核心判断", "confidence": 0.75},
+      "diagnostics": [
+        {"title": "技术/产品/竞争格局风险", "current_anchor": "现状锚定", "risk_substance": "风险实质", "verification_actions": ["核查动作"], "missing_items": ["待补充材料"], "evidence_ids": ["知识或证据ID"], "rule_ids": ["规则ID"]},
+        {"title": "产业链议价能力与经营韧性风险", "current_anchor": "现状锚定", "risk_substance": "风险实质", "verification_actions": ["核查动作"], "missing_items": ["待补充材料"], "evidence_ids": ["知识或证据ID"], "rule_ids": ["规则ID"]},
+        {"title": "行业KPI与授信审查适配风险", "current_anchor": "现状锚定", "risk_substance": "风险实质", "verification_actions": ["核查动作"], "missing_items": ["待补充材料"], "evidence_ids": ["知识或证据ID"], "rule_ids": ["规则ID"]}
+      ],
+      "assumptions": ["关键假设"],
+      "data_boundary": "数据边界"
+    }

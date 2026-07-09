@@ -87,26 +87,68 @@ def _industry_claim_text(task: ResearchTask, evidence: List[Dict[str, Any]]) -> 
     return None
 
 
-def _business_claim_text(task: ResearchTask, evidence: List[Dict[str, Any]]) -> str | None:
-    field_evidence = [
-        item for item in evidence
-        if item.get("trust_level") in {"high", "medium"}
-        or item.get("source_type") in {"official_business_registry", "official_credit_publicity", "commercial_business_data", "official_named_source"}
+def _is_clean_field_value(value: str) -> bool:
+    """Check if a field value is clean structured data, not raw web text."""
+    if not value or len(value) > 80:
+        return False
+    # Reject values containing sentence-level punctuation (raw text indicator)
+    if any(ch in value for ch in ["。", "；", "：", "，"]):
+        return False
+    # Reject values that look like raw scraped web content
+    noise_keywords = [
+        "附其他", "资料", "证明材料", "须经批准", "查看历史", "向平台反馈",
+        "领取", "更多", "制造", "销售", "批发", "经营", "进出口", "批准",
+        "有限公司基本情况", "年检", "审计", "纳税证明", "信用等",
+        "发起人", "合法经营", "SVIP", "成员企业", "成员风险",
+        "融资轮次", "实际控制人挖掘", "公司背景", "工商信息查看",
     ]
-    extracted = summarize_extracted_fields(field_evidence, "business_fields")
-    fields = extracted.get("fields") or {}
-    if fields:
+    if any(kw in value for kw in noise_keywords):
+        return False
+    return True
+
+
+def _business_claim_text(task: ResearchTask, evidence: List[Dict[str, Any]]) -> str | None:
+    # Priority 1: Use cninfo_webapi authoritative data (highest quality)
+    cninfo_fields: Dict[str, str] = {}
+    for item in evidence:
+        if item.get("source_type") == "official_business_registry":
+            biz_fields = ((item.get("metadata") or {}).get("extracted_fields") or {}).get("business_fields") or {}
+            for k, v in biz_fields.items():
+                if v and _is_clean_field_value(str(v)) and k not in cninfo_fields:
+                    cninfo_fields[k] = str(v)
+
+    if cninfo_fields:
+        parts = []
+        for field in ["企业名称", "证券代码", "法定代表人", "注册资本", "成立日期", "注册地址",
+                       "统一社会信用代码", "经营状态", "实际控制人", "控制方式"]:
+            if cninfo_fields.get(field):
+                parts.append(f"{field}：{cninfo_fields[field]}")
+        if parts:
+            return "工商专项已获取以下登记信息：" + "；".join(parts[:8]) + "。"
+
+    # Priority 2: Use medium/high trust structured fields (from business_agent)
+    clean_fields: Dict[str, str] = {}
+    for item in evidence:
+        if item.get("trust_level") not in {"high", "medium"}:
+            continue
+        biz_fields = ((item.get("metadata") or {}).get("extracted_fields") or {}).get("business_fields") or {}
+        for k, v in biz_fields.items():
+            if v and _is_clean_field_value(str(v)) and k not in clean_fields:
+                clean_fields[k] = str(v)
+
+    if clean_fields:
         parts = []
         for field in ["统一社会信用代码", "法定代表人", "注册资本", "经营状态", "成立日期", "经营范围"]:
-            if fields.get(field):
-                parts.append(f"{field}：{fields[field]}")
-        high_count = len([item for item in field_evidence if item.get("trust_level") == "high"])
-        prefix = "工商专项已从工商/信用类公开来源抽取" if high_count else "工商专项仅从中可信工商类来源抽取"
-        return f"{prefix}{len(fields)}个主体字段，其中高可信来源{high_count}项；" + "；".join(parts[:6]) + "。"
+            if clean_fields.get(field):
+                parts.append(f"{field}：{clean_fields[field]}")
+        if parts:
+            return "工商专项已从公开来源获取：" + "；".join(parts[:6]) + "。"
+
+    # Priority 3: Use any high-trust evidence claim
     high = [item for item in evidence if item.get("trust_level") == "high"]
     if high:
         top = high[0]
-        return f"工商专项命中高可信公开来源：{top.get('claim') or top.get('value') or top.get('source_name')}，但结构化字段仍需进一步核验。"
+        return f"工商专项命中高可信公开来源：{top.get('claim') or top.get('value') or top.get('source_name')}。"
     return None
 
 

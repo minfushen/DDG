@@ -1,0 +1,12 @@
+{
+  "sample_id": "maxscend_microelectronics",
+  "company_name": "江苏卓胜微电子股份有限公司",
+  "display_name": "卓胜微",
+  "stock_code": "300782",
+  "exchange": "SZSE",
+  "test_input": "分析一下卓胜微这家上市公司",
+  "expected_aliases": ["卓胜微", "江苏卓胜微电子股份有限公司", "300782"],
+  "expected_industry_keywords": ["半导体", "射频", "射频前端", "芯片设计", "集成电路"],
+  "focus_areas": ["射频前端细分赛道识别", "毛利率与产品周期", "客户集中度", "研发投入与技术迭代"],
+  "quality_gate": {"min_score": 80, "required_dimensions": ["financial_depth", "industry_depth", "inline_citations"]}
+}

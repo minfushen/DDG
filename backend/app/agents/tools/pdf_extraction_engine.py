@@ -1,21 +1,23 @@
 """PDF download and tiered extraction engine.
 
 Tiered strategy for Chinese A-share annual reports:
-1. pdfplumber (primary): excellent for digital PDFs with tables and structured text.
-2. pymupdf/fitz (fallback): faster raw text extraction, better for complex layouts or
+1. MinerU cloud API (primary when enabled): structured markdown + table extraction,
+   best for complex layouts, tables, and scanned pages.
+2. pdfplumber (local primary): excellent for digital PDFs with tables and structured text.
+3. pymupdf/fitz (local fallback): faster raw text extraction, better for complex layouts or
    when pdfplumber returns empty text.
-
-mineru / ppstructure are intentionally not used in this iteration to avoid heavy
-model dependencies; they can be plugged in later as part of Document Intelligence
-Pipeline v1.
 """
 
 from __future__ import annotations
 
 import io
+import tempfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
+
+from app.config import settings
 
 
 DEFAULT_TIMEOUT_SECONDS = 30
@@ -36,6 +38,51 @@ def _pymupdf_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+def _mineru_enabled() -> bool:
+    """Return True if MinerU cloud parser is configured and enabled."""
+    return settings.MINERU_ENABLED and bool(settings.MINERU_API_TOKEN)
+
+
+def _mineru_available() -> bool:
+    """Return True if the MinerU client module can be imported."""
+    try:
+        from app.services.mineru_client import extract_local_pdf  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+
+
+
+def extract_with_mineru(pdf_bytes: bytes) -> Dict[str, Any]:
+    """Extract PDF using MinerU cloud API with automatic page splitting.
+
+    PDFs with more than MINERU_MAX_PAGES_PER_TASK pages are split locally using
+    pymupdf, submitted as separate tasks, and merged back in page order.
+    """
+    from app.services.mineru_client import MinerUError, extract_pdf_bytes
+
+    try:
+        return extract_pdf_bytes(pdf_bytes)
+    except MinerUError as exc:
+        return {
+            "success": False,
+            "text": "",
+            "tables": [],
+            "metadata": {"page_count": 0, "parser_used": "mineru"},
+            "error": f"MinerU failed: {exc}",
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "text": "",
+            "tables": [],
+            "metadata": {"page_count": 0, "parser_used": "mineru"},
+            "error": f"MinerU unexpected error: {exc}",
+        }
 
 
 def download_pdf(url: str, timeout: int = DEFAULT_TIMEOUT_SECONDS, max_size_mb: int = MAX_PDF_SIZE_MB) -> Optional[bytes]:
@@ -156,7 +203,7 @@ def _clean_tables(tables: List[List[List[str]]]) -> List[List[List[str]]]:
 
 
 def extract_pdf(pdf_bytes: Optional[bytes]) -> Dict[str, Any]:
-    """Tiered extraction: pdfplumber first, pymupdf fallback.
+    """Tiered extraction: MinerU first (if enabled), then pdfplumber, then pymupdf.
 
     Returns a dict with success, text, tables, metadata, error.
     """
@@ -169,6 +216,19 @@ def extract_pdf(pdf_bytes: Optional[bytes]) -> Dict[str, Any]:
             "error": "Empty PDF bytes",
         }
 
+    # 1. Try MinerU cloud parser first when configured.
+    if _mineru_enabled() and _mineru_available():
+        try:
+            mineru_result = extract_with_mineru(pdf_bytes)
+            if mineru_result.get("success"):
+                return mineru_result
+            # MinerU returned an error object; fall through to local parsers.
+        except Exception as exc:
+            # Import or unexpected failure; fall through to local parsers.
+            pass
+
+    # 2. Local tiered extraction.
+    result = None
     if _pdfplumber_available():
         try:
             result = extract_with_pdfplumber(pdf_bytes)
@@ -192,21 +252,22 @@ def extract_pdf(pdf_bytes: Optional[bytes]) -> Dict[str, Any]:
                 fallback["tables"] = result["tables"]
             return fallback
         except Exception as exc:
-            error_msg = f"pdfplumber failed: {result.get('error')}; pymupdf failed: {exc}"
+            prev_error = (result or {}).get("error") or "pdfplumber not available"
+            error_msg = f"pdfplumber failed: {prev_error}; pymupdf failed: {exc}"
             return {
                 "success": False,
-                "text": result.get("text", ""),
-                "tables": result.get("tables", []),
-                "metadata": {**(result.get("metadata") or {}), "parser_used": "pdfplumber+pymupdf_failed"},
+                "text": (result or {}).get("text", ""),
+                "tables": (result or {}).get("tables", []),
+                "metadata": {**((result or {}).get("metadata") or {}), "parser_used": "pdfplumber+pymupdf_failed"},
                 "error": error_msg,
             }
 
     return {
         "success": False,
-        "text": result.get("text", ""),
-        "tables": result.get("tables", []),
-        "metadata": result.get("metadata") or {"page_count": 0, "parser_used": "none"},
-        "error": result.get("error") or "No PDF parser available",
+        "text": (result or {}).get("text", ""),
+        "tables": (result or {}).get("tables", []),
+        "metadata": (result or {}).get("metadata") or {"page_count": 0, "parser_used": "none"},
+        "error": (result or {}).get("error") or "No PDF parser available",
     }
 
 

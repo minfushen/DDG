@@ -117,12 +117,136 @@ def _merge_unique(items: List[str], limit: int = 10) -> List[str]:
     return result
 
 
+def _format_data_anchor_section(data_anchors: dict) -> dict:
+    """生成展示行业数据锚点的 section。"""
+    lines: List[str] = []
+    all_sources: List[Dict[str, Any]] = []
+
+    # a) 行业指数
+    index = data_anchors.get("index_data") or {}
+    if index.get("success"):
+        lines.append(
+            f"东方财富行业指数（{index.get('symbol')}）：最新收盘 {index.get('latest_close')}，"
+            f"日期 {index.get('latest_date')}，近一年涨跌幅 {index.get('year_change_pct')}%，"
+            f"近20日平均成交额 {index.get('avg_turnover')} 亿元。"
+        )
+    else:
+        lines.append(f"行业指数：未获取（{index.get('error') or '未知错误'}）")
+
+    # b) 搜索类别
+    category_labels = {
+        "market_size": "市场规模",
+        "concentration": "竞争格局",
+        "policy": "政策环境",
+        "chain": "产业链",
+    }
+    for key, label in category_labels.items():
+        cat = data_anchors.get(key) or {}
+        results = cat.get("results") or []
+        if results:
+            lines.append(f"{label}：")
+            for item in results[:3]:
+                snippet = (item.get("snippet") or "")[:100]
+                source = item.get('source') or ""
+                date = item.get('date') or ""
+                lines.append(
+                    f"• {item.get('title')} | {snippet}（{source}，{date}）"
+                )
+                all_sources.append({
+                    "title": item.get("title"),
+                    "url": item.get("url"),
+                    "source": item.get("source"),
+                })
+        else:
+            lines.append(f"{label}：未获取到有效公开线索。")
+
+    # c) 研报线索
+    rr = data_anchors.get("research_reports") or {}
+    rr_results = rr.get("results") or []
+    if rr_results:
+        lines.append("研报线索：")
+        for item in rr_results[:3]:
+            source = item.get('source') or ""
+            date = item.get('date') or ""
+            lines.append(
+                f"• {item.get('title')}（{source}，{date}）{item.get('url', '')}"
+            )
+            all_sources.append({
+                "title": item.get("title"),
+                "url": item.get("url"),
+                "source": item.get("source"),
+            })
+    else:
+        lines.append("研报线索：未获取到有效公开线索。")
+
+    # d) 数据来源声明
+    lines.append("以上公开搜索数据仅供初筛，不能替代权威研报和人工核验。")
+
+    section: Dict[str, Any] = {"title": "行业数据锚点", "analysis": lines}
+    if all_sources:
+        seen = set()
+        deduped = []
+        for s in all_sources:
+            key = (s.get("title"), s.get("url"))
+            if key not in seen:
+                seen.add(key)
+                deduped.append(s)
+        section["sources"] = deduped[:10]
+
+    # e) 质量评估
+    quality_assessment: Dict[str, Any] = {}
+    if not data_anchors:
+        quality_assessment = {
+            "overall_quality": 0,
+            "categories_present": 0,
+            "categories_missing": ["all"],
+            "needs_refill": True,
+            "category_levels": {},
+        }
+    else:
+        quality_summary = data_anchors.get("quality_summary") or {}
+        category_levels: Dict[str, str] = {}
+        for key in ("index_data", "market_size", "concentration", "policy", "chain", "research_reports"):
+            cat = data_anchors.get(key) or {}
+            if key == "index_data":
+                category_levels[key] = cat.get("quality_level") or "none"
+            else:
+                category_levels[key] = cat.get("quality_level") or "none"
+        quality_assessment = {
+            "overall_quality": quality_summary.get("overall_quality", 0),
+            "categories_present": quality_summary.get("categories_present", 0),
+            "categories_missing": quality_summary.get("categories_missing") or [],
+            "needs_refill": quality_summary.get("needs_refill", False),
+            "category_levels": category_levels,
+        }
+    section["quality_assessment"] = quality_assessment
+
+    return section
+
+
+def _renumber_sections(sections: list) -> list:
+    """按顺序重新编号 section 标题。"""
+    numerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"]
+    for i, sec in enumerate(sections):
+        if i >= len(numerals):
+            break
+        title = sec.get("title", "")
+        if "、" in title:
+            _, rest = title.split("、", 1)
+        else:
+            rest = title
+        sec["title"] = f"{numerals[i]}、{rest}"
+    return sections
+
 def build_industry_analysis_report(
     enterprise_name: str,
     classification: Dict[str, Any],
     retrieval_result: Dict[str, Any] | None = None,
     public_info: Dict[str, Any] | None = None,
     industry_knowledge_context: Dict[str, Any] | None = None,
+    annual_report_notes: Dict[str, Any] | None = None,
+    session_id: str | None = None,
+    task_id: str | None = None,
 ) -> Dict[str, Any]:
     """基于行业识别结果和本地行业指南生成结构化行业分析报告。"""
     guide_files = classification.get("guide_files") or ["manufacturing.md"]
@@ -184,7 +308,12 @@ def build_industry_analysis_report(
         classification=classification,
         public_info=public_info,
         industry_knowledge_context=industry_knowledge_context,
+        annual_report_notes=annual_report_notes,
+        session_id=session_id,
+        task_id=task_id,
     )
+
+    data_anchors = diagnostic_narrative.get("data_anchors") or {}
 
     sections = [
         {
@@ -197,6 +326,7 @@ def build_industry_analysis_report(
             "llm_elapsed_ms": diagnostic_narrative.get("llm_elapsed_ms"),
             "quality_warnings": diagnostic_narrative.get("quality_warnings") or [],
         },
+        _format_data_anchor_section(data_anchors),
         {
             "title": "二、行业识别结论",
             "analysis": [
@@ -304,12 +434,55 @@ def build_industry_analysis_report(
             "source": "本地行业尽调指南",
         },
     ]
+    if data_anchors.get("index_data", {}).get("success"):
+        idx = data_anchors["index_data"]
+        evidence.append({
+            "label": "行业指数",
+            "value": f"{idx['symbol']} 最新收盘 {idx['latest_close']}",
+            "source": "东方财富行业指数",
+        })
+    has_search_results = any(
+        (data_anchors.get(k) or {}).get("results")
+        for k in ("market_size", "concentration", "policy", "chain")
+    )
+    if has_search_results:
+        evidence.append({
+            "label": "公开搜索数据锚点",
+            "value": "市场规模/竞争格局/政策/产业链/研报",
+            "source": "Bocha/SearXNG 公开搜索",
+        })
     if public_info.get("success"):
         evidence.extend(public_info.get("evidence", []))
         if public_basic.get("industry"):
             evidence.append({"label": "上市公司行业标签", "value": public_basic.get("industry"), "source": "东方财富F10"})
         if public_review.get("business_review"):
             evidence.append({"label": "年报经营讨论", "value": public_review.get("report_name") or "已获取", "source": "东方财富F10经营分析"})
+    # 检查是否有需要人工复核的搜索结果
+    has_manual_review = False
+    for key in ("market_size", "concentration", "policy", "chain", "research_reports"):
+        cat = data_anchors.get(key) or {}
+        for item in (cat.get("results") or []):
+            if item.get("requires_manual_review") is True:
+                has_manual_review = True
+                break
+        if has_manual_review:
+            break
+    if has_manual_review:
+        evidence.append({
+            "label": "数据质量警告",
+            "value": "部分公开搜索来源可信度低，需人工复核",
+            "source": "Bocha/SearXNG 质量门控",
+        })
+
+    # 检查是否需要补充数据
+    quality_summary = data_anchors.get("quality_summary") or {}
+    if quality_summary.get("needs_refill") is True:
+        evidence.append({
+            "label": "数据缺口",
+            "value": "部分数据锚点缺失或质量低，建议补充权威来源",
+            "source": "行业数据质量摘要",
+        })
+
     for rule in triggered_rules[:8]:
         evidence.append({
             "label": "行业分析触发规则",
@@ -317,6 +490,8 @@ def build_industry_analysis_report(
             "source": "industry_analysis_rules.json",
             "confidence": rule.get("confidence", 0.78),
         })
+
+    sections = _renumber_sections(sections)
 
     risk_summary = risks[:3]
     diagnostic_summary = diagnostic_narrative.get("summary") or []

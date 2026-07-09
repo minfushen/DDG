@@ -14,20 +14,19 @@ import json
 import re
 import time
 
-from langchain_openai import ChatOpenAI
-
+from app.config.llm_config import get_llm
 from app.config import settings
 
 
 @lru_cache()
-def _get_industry_llm() -> ChatOpenAI | None:
+def _get_industry_llm() -> BaseChatModel | None:
     """Prefer the fast backup model already configured by the project."""
     api_key = settings.FINANCIAL_NARRATIVE_BACKUP_LLM_API_KEY or settings.LLM_API_KEY
     base_url = settings.FINANCIAL_NARRATIVE_BACKUP_LLM_BASE_URL or settings.LLM_BASE_URL
     model = settings.FINANCIAL_NARRATIVE_BACKUP_LLM_MODEL or settings.LLM_MODEL
     if not api_key or not base_url or not model:
         return None
-    return ChatOpenAI(
+    return get_llm(
         model=model,
         api_key=api_key,
         base_url=base_url,

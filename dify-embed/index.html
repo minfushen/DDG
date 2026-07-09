@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDG 智能尽调 — Dify 入口</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 40px 24px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+        .header p { font-size: 14px; color: #a0aec0; max-width: 600px; margin: 0 auto; }
+        .container {
+            flex: 1;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+            width: 100%;
+        }
+        .chat-wrapper {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+            min-height: 600px;
+        }
+        .chat-header {
+            background: #f8fafc;
+            padding: 16px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .chat-header .dot {
+            width: 8px; height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .chat-header h2 { font-size: 16px; color: #1e293b; }
+        .chat-header .tag {
+            font-size: 12px;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .chat-body {
+            padding: 24px;
+            min-height: 500px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 DDG 智能尽调</h1>
+        <p>基于 Dify 的智能问答入口，深度尽调由 ddg-agent 核心引擎执行。支持简单问答、企业信息查询和完整尽调报告生成。</p>
+    </div>
+
+    <div class="container">
+        <div class="chat-wrapper">
+            <div class="chat-header">
+                <div class="dot"></div>
+                <h2>智能尽调助手</h2>
+                <span class="tag">Dify 驱动</span>
+            </div>
+            <div class="chat-body" id="chat-container">
+                <!-- Dify Chatbot Embed 将注入此处 -->
+                <p style="text-align:center; color:#94a3b8; padding-top:200px;">
+                    请配置 DIFY_WEB_APP_URL 后，嵌入 Chatbot 脚本
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Powered by DDG-Agent Engine + Dify · 证据审计链独立维护 · 敏感数据不经过 Dify LLM
+    </div>
+
+    <!-- Dify Chatbot Embed Script -->
+    <!--
+    <script>
+        window.difyChatbotConfig = {
+            token: 'YOUR_DIFY_TOKEN',
+            baseUrl: 'YOUR_DIFY_BASE_URL'
+        };
+    </script>
+    <script src="YOUR_DIFY_BASE_URL/embed.min.js" id="YOUR_DIFY_TOKEN" defer></script>
+    -->
+</body>
+</html>

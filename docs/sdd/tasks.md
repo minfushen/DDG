@@ -24,7 +24,7 @@ TASK-<MILESTONE>-<编号>
 | TASK-M2-02 | 执行页错误处理 — 适配后端 data.error 格式 | [重构] | fix | S | 后端返回错误时前端正确展示 | ✅ 已完成 |
 | TASK-M2-03 | 报告页接入真实数据 — useParams + getTaskReport | [重构] | feat | M | 报告页展示后端真实授信建议 | ✅ 已完成 |
 | TASK-M2-04 | 空状态友好展示 — plan/evidence 为空时 | [重构] | fix | S | 执行页左右侧栏空状态有提示 | ✅ 已完成 |
-| TASK-M2-05 | 同步文档 — README / tasks.md 反映实际状态 | [重构] | docs | S | README 描述与代码一致 | ⬜ 进行中 |
+| TASK-M2-05 | 同步文档 — README / tasks.md 反映实际状态 | [重构] | docs | S | README 描述与代码一致 | ✅ 已完成 |
 
 ### 1.2 P1 迭代内任务
 
@@ -35,6 +35,7 @@ TASK-<MILESTONE>-<编号>
 | TASK-M2-08 | 执行页 timeline 展示优化 — 长文本/多 finding 折叠 | [UI] | feat | M | 时间轴条目支持展开/折叠 | ⬜ 待开始 |
 | TASK-M2-09 | 报告页导出功能 — PDF/Word 下载 | [feat] | feat | L | 点击"导出报告"生成可下载文件 | ⬜ 待开始 |
 | TASK-M2-10 | 添加 `.gitignore` — dist/ node_modules/ 等 | [repo] | chore | S | git status 无不应跟踪的文件 | ⬜ 待开始 |
+| TASK-M2-11 | Agent Memory System 集成 | [backend] | feat | L | 记忆模块接入任务链路，降低重复搜索和 LLM 调用成本 | ⬜ 待开始 |
 
 ---
 
@@ -68,5 +69,6 @@ TASK-<MILESTONE>-<编号>
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | v2.0 | 2026-06-07 | 重构：前端简化为 3 页 Agent 流程；清理遗留代码；更新任务清单 |
+| v2.1 | 2026-07-06 | 重写 README.md 与 backend/README.md，明确项目真实交付背景：客户已有智能体平台，需 API/SDK 交付财务/行业分析 Agent 能力，LangGraph 方案与 Dify 形成互补；升级行业分析 Agent 章节，突出工业级 RAG 优化（分层数据处理、宽进严出、RRF 融合、重排与意图路由） |
 | v1.3 | 2026-05-07 | 新增 M3+ 业务能力深化任务 |
 | v1.0 | 2026-05-06 | 首版，初始化 M1 任务 |

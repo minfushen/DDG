@@ -14,6 +14,7 @@ from app.agents.tools.industry_classifier_tool import classify_industry_tool
 from app.agents.sub_agents.industry_knowledge_context import build_industry_knowledge_context
 from app.agents.sub_agents.industry_report_builder import build_industry_analysis_report
 from app.rag.knowledge_retrieval_service import knowledge_hits_to_evidence, retrieve_knowledge
+from app.config.rag_loader import get_knowledge_retrieval_top_k
 
 
 def _now() -> str:
@@ -100,7 +101,13 @@ def _listed_company_business_scope(public_info: Optional[Dict[str, Any]]) -> str
     return " ".join(part for part in parts if part).strip()
 
 
-async def run_industry_agent(enterprise_name: str, public_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def run_industry_agent(
+    enterprise_name: str,
+    public_info: Optional[Dict[str, Any]] = None,
+    annual_report_notes: Optional[Dict[str, Any]] = None,
+    session_id: str | None = None,
+    task_id: str | None = None,
+) -> Dict[str, Any]:
     """运行行业分析Agent。"""
     try:
         timeline = []
@@ -186,7 +193,7 @@ async def run_industry_agent(enterprise_name: str, public_info: Optional[Dict[st
             f"知识库文件：{', '.join(classification.get('guide_files', []))}",
             event_type="discovery",
         ))
-        retrieval_result = industry_knowledge_context.get("retrieval") or retrieve_knowledge(query=guide_query, domain="industry", top_k=6, company_name=enterprise_name)
+        retrieval_result = industry_knowledge_context.get("retrieval") or retrieve_knowledge(query=guide_query, domain="industry", top_k=get_knowledge_retrieval_top_k("industry"), company_name=enterprise_name)
         timeline[-1]["status"] = "completed"
         timeline[-1]["findings"] = [
             f"已检索本地行业指南（{retrieval_result.get('mode')}）",
@@ -206,6 +213,9 @@ async def run_industry_agent(enterprise_name: str, public_info: Optional[Dict[st
             retrieval_result=retrieval_result,
             public_info=public_info,
             industry_knowledge_context=industry_knowledge_context,
+            annual_report_notes=annual_report_notes,
+            session_id=session_id,
+            task_id=task_id,
         )
         timeline[-1]["status"] = "completed"
         timeline[-1]["findings"] = report.get("risk_summary", [])

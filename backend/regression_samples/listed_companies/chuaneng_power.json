@@ -1,0 +1,12 @@
+{
+  "sample_id": "chuaneng_power",
+  "company_name": "四川省新能源动力股份有限公司",
+  "display_name": "川能动力",
+  "stock_code": "000155",
+  "exchange": "SZSE",
+  "test_input": "分析一下川能动力这个上市公司",
+  "expected_aliases": ["川能动力", "四川省新能源动力股份有限公司", "000155"],
+  "expected_industry_keywords": ["新能源", "锂矿", "锂电", "风电", "资源"],
+  "focus_areas": ["新能源资源属性", "项目建设和资本开支", "政策环境", "资产负债和现金流"],
+  "quality_gate": {"min_score": 78, "required_dimensions": ["industry_depth", "credit_coherence", "inline_citations"]}
+}

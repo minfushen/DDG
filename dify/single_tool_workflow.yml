@@ -1,0 +1,402 @@
+# Dify 单步工具调用工作流
+# 适用场景：通过 Dify 调用 ddg-agent 后端的三个单步工具（搜索/工商/司法）
+# 前置条件：
+#   1. 后端已启动并暴露 /api/v1/tools/search、/api/v1/tools/business、/api/v1/tools/legal
+#   2. 若 Dify 以 Docker 运行而后端在宿主机，请将 url 中的 host 改为 host.docker.internal 或对应内网 IP
+# 导入方式：Dify Studio → 创建应用 → 导入 DSL → 选择本文件
+
+version: '0.1.3'
+kind: app
+app:
+  name: DDG-Agent 单步工具
+  mode: workflow
+  icon: 🔍
+  icon_type: emoji
+  icon_background: '#E0F2FE'
+  description: 调用 ddg-agent 后端完成公开搜索、企业工商查询、司法风险查询
+  use_icon_as_answer_icon: false
+workflow:
+  environment_variables:
+    - name: DDG_API_BASE
+      value: http://host.docker.internal:8000/api/v1
+      value_type: string
+  conversation_variables: []
+  features:
+    file_upload:
+      enabled: false
+      image:
+        enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - id: start-router
+        source: start
+        sourceHandle: source
+        target: router
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: start
+          targetType: llm
+          isInIteration: false
+      - id: router-builder
+        source: router
+        sourceHandle: source
+        target: builder
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: llm
+          targetType: code
+          isInIteration: false
+      - id: builder-http
+        source: builder
+        sourceHandle: source
+        target: http_tool
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: code
+          targetType: http-request
+          isInIteration: false
+      - id: http-formatter
+        source: http_tool
+        sourceHandle: source
+        target: formatter
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: http-request
+          targetType: code
+          isInIteration: false
+      - id: formatter-answer
+        source: formatter
+        sourceHandle: source
+        target: answer
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: code
+          targetType: answer
+          isInIteration: false
+    nodes:
+      # ── 开始节点：接收用户输入 ─────────────────────────────────────────
+      - id: start
+        type: custom
+        position:
+          x: 80
+          y: 282
+        positionAbsolute:
+          x: 80
+          y: 282
+        width: 244
+        height: 116
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        data:
+          title: 开始
+          type: start
+          desc: 输入查询内容并选择工具类型
+          variables:
+            - variable: query
+              label: 查询内容
+              type: text-input
+              required: true
+              max_length: 500
+            - variable: tool_type
+              label: 工具类型
+              type: select
+              required: true
+              options:
+                - label: 自动识别
+                  value: auto
+                - label: 公开搜索
+                  value: search
+                - label: 工商信息
+                  value: business
+                - label: 司法风险
+                  value: legal
+              default: auto
+
+      # ── LLM 路由节点：自动识别应调用哪个工具 ───────────────────────────
+      - id: router
+        type: custom
+        position:
+          x: 384
+          y: 282
+        positionAbsolute:
+          x: 384
+          y: 282
+        width: 244
+        height: 116
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        data:
+          title: 工具路由
+          type: llm
+          desc: 根据 tool_type 和 query 判断应调用哪个后端工具
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.1
+              max_tokens: 512
+          prompt_template:
+            - role: system
+              text: |
+                你是一个对公尽调工具路由器。请根据用户输入和所选工具类型，判断应调用以下哪个单步工具：
+                - search：公开网页搜索，适用于一般资讯、公告、新闻
+                - business：企业工商信息查询，需要企业名称
+                - legal：企业司法风险查询，需要企业名称
+
+                如果 tool_type 不是 auto，必须按用户选择返回对应 tool。
+                输出严格的 JSON，不要带 markdown 代码块：
+                {
+                  "tool": "search|business|legal",
+                  "query": "用于搜索的关键词或企业名称",
+                  "enterprise_name": "企业名称（business/legal 时必填）",
+                  "reason": "简要判断理由"
+                }
+            - role: user
+              text: |
+                tool_type: {{#start.tool_type#}}
+                query: {{#start.query#}}
+          variables:
+            - variable: tool_type
+              value_selector:
+                - start
+                - tool_type
+            - variable: query
+              value_selector:
+                - start
+                - query
+
+      # ── 代码节点：构造请求 URL 与 JSON payload ─────────────────────────
+      - id: builder
+        type: custom
+        position:
+          x: 688
+          y: 282
+        positionAbsolute:
+          x: 688
+          y: 282
+        width: 244
+        height: 116
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        data:
+          title: 构造请求
+          type: code
+          desc: 解析 LLM 输出并生成 endpoint 与 payload
+          code_language: python3
+          code: |
+            import json
+            import re
+
+            def main(llm_text: str, api_base: str) -> dict:
+                text = llm_text.strip()
+                # 去除可能的 markdown 代码块
+                text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE)
+                decision = json.loads(text)
+
+                tool = decision.get("tool", "search")
+                query = decision.get("query") or ""
+                enterprise_name = decision.get("enterprise_name") or query
+
+                if tool == "business":
+                    endpoint = f"{api_base}/tools/business"
+                    payload = {"enterprise_name": enterprise_name}
+                elif tool == "legal":
+                    endpoint = f"{api_base}/tools/legal"
+                    payload = {"enterprise_name": enterprise_name, "top_k": 10}
+                else:
+                    endpoint = f"{api_base}/tools/search"
+                    payload = {"query": query, "max_results": 8}
+
+                return {
+                    "endpoint": endpoint,
+                    "payload_json": json.dumps(payload, ensure_ascii=False),
+                    "tool": tool,
+                }
+          variables:
+            - variable: llm_text
+              value_selector:
+                - router
+                - text
+            - variable: api_base
+              value_selector:
+                - env
+                - DDG_API_BASE
+          outputs:
+            endpoint:
+              type: string
+            payload_json:
+              type: string
+            tool:
+              type: string
+
+      # ── HTTP 请求节点：调用 ddg-agent 后端 ──────────────────────────────
+      - id: http_tool
+        type: custom
+        position:
+          x: 992
+          y: 282
+        positionAbsolute:
+          x: 992
+          y: 282
+        width: 244
+        height: 124
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        data:
+          title: 调用后端工具
+          type: http-request
+          desc: 向 /api/v1/tools/{tool} 发送 POST 请求
+          method: post
+          url: '{{#builder.endpoint#}}'
+          headers: '{"Content-Type": "application/json"}'
+          params: ''
+          body:
+            type: raw-text
+            data: '{{#builder.payload_json#}}'
+          authorization:
+            type: no-auth
+            config: {}
+          timeout:
+            max_connect_timeout: 10
+            max_read_timeout: 60
+            max_write_timeout: 10
+          retry_config:
+            retry_enabled: true
+            max_retries: 1
+            retry_interval: 1000
+          ssl_verify: false
+          variables: []
+
+      # ── 代码节点：把 JSON 响应格式化为可读 Markdown ─────────────────────
+      - id: formatter
+        type: custom
+        position:
+          x: 1296
+          y: 282
+        positionAbsolute:
+          x: 1296
+          y: 282
+        width: 244
+        height: 116
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        data:
+          title: 格式化结果
+          type: code
+          desc: 按工具类型把后端返回渲染为 Markdown
+          code_language: python3
+          code: |
+            import json
+
+            def main(body: str, tool: str) -> dict:
+                data = json.loads(body) if isinstance(body, str) else body
+                provider = data.get("provider", "")
+                error = data.get("error")
+
+                if error:
+                    return {"answer": f"**调用失败**\n\n工具：{tool}\n错误：{error}"}
+
+                lines = [f"**工具**：{tool} ｜ **来源**：{provider}\n"]
+
+                if tool == "search":
+                    results = data.get("data", {}).get("results", [])
+                    lines.append(f"找到约 {len(results)} 条结果：\n")
+                    for idx, item in enumerate(results[:5], 1):
+                        title = item.get("title", "无标题")
+                        url = item.get("url", "")
+                        snippet = item.get("snippet") or item.get("content", "")
+                        trust = item.get("trust_level", "unknown")
+                        lines.append(f"{idx}. [{title}]({url})\n   可信度：{trust}｜摘要：{snippet[:120]}\n")
+
+                elif tool == "business":
+                    basic = data.get("data", {}).get("basic_info", {})
+                    records = basic.get("records", [])
+                    rec = records[0] if records else {}
+                    risk = data.get("data", {}).get("risk_summary", {})
+                    risk_records = risk.get("records", [])
+                    risk_rec = risk_records[0] if risk_records else {}
+
+                    lines.append("**工商基础信息**\n")
+                    lines.append(f"- 企业名称：{rec.get('company_name') or rec.get('enterpriseName') or rec.get('qymc', '—')}")
+                    lines.append(f"- 法定代表人：{rec.get('legalPerson') or rec.get('frdb') or rec.get('fddbr', '—')}")
+                    lines.append(f"- 注册资本：{rec.get('registeredCapital') or rec.get('zczb', '—')}")
+                    lines.append(f"- 经营状态：{rec.get('registrationStatus') or rec.get('enterpriseStatus') or rec.get('jyzt', '—')}\n")
+                    writ_total = risk_rec.get('total') or risk_rec.get('writTotal') or risk_rec.get('writCount') or 0
+                    lines.append(f"**涉诉统计**：{writ_total} 条")
+
+                else:  # legal
+                    summaries = data.get("data", {}).get("case_summaries", [])
+                    total = data.get("data", {}).get("total", len(summaries))
+                    lines.append(f"共检索到 **{total}** 条司法记录\n")
+                    for s in summaries[:5]:
+                        title = s.get("title", "")
+                        cause = s.get("case_cause", "")
+                        court = s.get("court", "")
+                        date = s.get("judgment_date", "")
+                        parties = ", ".join(s.get("parties", []))
+                        lines.append(f"- **{title}**\n  案由：{cause}｜法院：{court}｜日期：{date}｜当事人：{parties}\n")
+
+                return {"answer": "\n".join(lines)}
+          variables:
+            - variable: body
+              value_selector:
+                - http_tool
+                - body
+            - variable: tool
+              value_selector:
+                - builder
+                - tool
+          outputs:
+            answer:
+              type: string
+
+      # ── 回答节点：输出最终答案 ─────────────────────────────────────────
+      - id: answer
+        type: custom
+        position:
+          x: 1600
+          y: 282
+        positionAbsolute:
+          x: 1600
+          y: 282
+        width: 244
+        height: 102
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        data:
+          title: 直接回复
+          type: answer
+          desc: 返回格式化后的查询结果
+          answer: '{{#formatter.answer#}}'
+          variables: []
+
+dependencies: []

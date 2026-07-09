@@ -25,6 +25,7 @@ pymupdf>=1.23.0  # PDF 解析回退（复杂版式/快速纯文本）
 openpyxl>=3.1.0
 xlrd>=2.0.0
 python-docx>=1.0.0
+reportlab>=4.0.0  # 授信报告 PDF 导出
 
 # 工具
 pydantic>=2.0.0

@@ -1,0 +1,12 @@
+{
+  "sample_id": "wuxi_apptec",
+  "company_name": "无锡药明康德新药开发股份有限公司",
+  "display_name": "药明康德",
+  "stock_code": "603259",
+  "exchange": "SSE",
+  "test_input": "分析一下药明康德这个上市公司",
+  "expected_aliases": ["药明康德", "无锡药明康德新药开发股份有限公司", "603259"],
+  "expected_industry_keywords": ["CXO", "医药外包", "CRO", "CDMO", "创新药"],
+  "focus_areas": ["海外合规和政策风险", "医药外包行业景气", "订单和收入质量", "重大公告和监管线索"],
+  "quality_gate": {"min_score": 80, "required_dimensions": ["industry_depth", "legal_business_coverage", "credit_coherence"]}
+}

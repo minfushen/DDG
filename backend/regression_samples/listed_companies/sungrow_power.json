@@ -1,0 +1,12 @@
+{
+  "sample_id": "sungrow_power",
+  "company_name": "阳光电源股份有限公司",
+  "display_name": "阳光电源",
+  "stock_code": "300274",
+  "exchange": "SZSE",
+  "test_input": "分析一下阳光电源这个上市公司",
+  "expected_aliases": ["阳光电源", "阳光电源股份有限公司", "300274"],
+  "expected_industry_keywords": ["光伏", "逆变器", "储能", "新能源", "电力电子"],
+  "focus_areas": ["光伏逆变器与储能行业景气", "海外收入和回款", "毛利率和经营现金流", "政策和贸易风险"],
+  "quality_gate": {"min_score": 80, "required_dimensions": ["financial_depth", "industry_depth", "inline_citations"]}
+}

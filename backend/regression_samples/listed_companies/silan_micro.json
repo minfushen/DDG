@@ -1,0 +1,12 @@
+{
+  "sample_id": "silan_micro",
+  "company_name": "杭州士兰微电子股份有限公司",
+  "display_name": "士兰微",
+  "stock_code": "600460",
+  "exchange": "SSE",
+  "test_input": "分析一下士兰微这个上市公司",
+  "expected_aliases": ["士兰微", "杭州士兰微电子股份有限公司", "600460"],
+  "expected_industry_keywords": ["半导体", "集成电路", "功率器件", "IDM", "芯片"],
+  "focus_areas": ["防止行业错分为贸易/进出口", "近三年财务趋势", "半导体周期与产能利用率", "功率器件竞争格局"],
+  "quality_gate": {"min_score": 80, "required_dimensions": ["financial_depth", "industry_depth", "inline_citations"]}
+}

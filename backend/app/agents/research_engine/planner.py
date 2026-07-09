@@ -86,6 +86,8 @@ def create_research_plan(
     objective: str = "完整贷前尽调",
     thought_loop_context: str = "",
     skill_context: Dict[str, Any] | None = None,
+    session_id: str | None = None,
+    task_id: str | None = None,
 ) -> Dict[str, Any]:
     """Create an executable research plan with LLM-first fallback behavior."""
 
@@ -112,6 +114,8 @@ def create_research_plan(
         max_tasks=settings.RESEARCH_PLANNER_MAX_TASKS,
         thought_loop_context=thought_loop_context,
         skill_context=str(runtime_skills.get("context") or ""),
+        session_id=session_id,
+        task_id=task_id,
     )
     if llm_result.get("success") and llm_result.get("tasks"):
         metadata = llm_result.get("metadata", {})

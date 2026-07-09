@@ -1187,63 +1187,11 @@
   line-height: 1.6;
 }
 
-.ddg-risk-grid,
 .ddg-cross-grid,
 .ddg-evidence-grid {
   margin-top: 16px;
   display: grid;
   gap: 12px;
-}
-
-.ddg-risk-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.ddg-risk-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.ddg-risk-card > div:first-child {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.ddg-risk-card h3 {
-  color: #0f172a;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.ddg-risk-card span,
-.ddg-risk-card p {
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.ddg-risk-card strong {
-  display: block;
-  margin-top: 8px;
-  color: #2563eb;
-  font-size: 32px;
-  line-height: 1.2;
-}
-
-.ddg-risk-bar {
-  margin-top: 8px;
-  height: 6px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  overflow: hidden;
-}
-
-.ddg-risk-bar span {
-  display: block;
-  height: 100%;
-  background: #2563eb;
 }
 
 .ddg-report-table-wrap {
@@ -1857,6 +1805,30 @@
   color: #334155;
   font-size: 13px;
   line-height: 1.8;
+}
+
+.ddg-analysis-paragraph {
+  display: grid;
+  gap: 10px;
+}
+
+.ddg-analysis-paragraph > p {
+  margin: 0;
+}
+
+.ddg-core-judgment {
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.ddg-analysis-paragraph .ddg-analysis-sub-paragraph {
+  margin-left: 16px;
+  text-indent: 0;
+}
+
+.ddg-analysis-paragraph .ddg-analysis-label {
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .ddg-financial-methodology-risk {

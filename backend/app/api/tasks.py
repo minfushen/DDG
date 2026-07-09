@@ -2,13 +2,16 @@
 # 任务管理API
 # ========================================
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 import json
+import os
 import uuid
 import asyncio
+import traceback
+import logging
 from datetime import datetime
 
 from app.agents.research_engine import prepare_deep_research_plan, run_deep_research_due_diligence
@@ -19,8 +22,11 @@ from app.agents.research_engine.tool_trace import public_tool_traces
 from app.agents.sub_agents.full_report_builder import build_full_due_diligence_report
 from app.api.report_exporter import export_completed_report
 from app.api.task_store import load_task_snapshot, save_task_snapshot
+from app.config import settings
+from app.engines.rebecca.report_generator import ReportGenerator
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # 任务存储（生产环境应使用数据库）
 tasks: Dict[str, Dict[str, Any]] = {}
@@ -397,6 +403,8 @@ async def run_deepresearch_task_background(task_id: str):
             )
         notify_task_update(task_id)
     except Exception as e:
+        tb = traceback.format_exc()
+        logger.error("DeepResearch task %s failed: %s\n%s", task_id, e, tb)
         task.update({
             "agent_state": "completed",
             "error": str(e),
@@ -972,8 +980,11 @@ async def resume_interrupt(task_id: str, interrupt_id: str, request: ResumeInter
 
 
 @router.get("/tasks/{task_id}/report")
-async def get_task_report(task_id: str):
-    """获取任务报告"""
+async def get_task_report(task_id: str, format: str = Query(default="json")):
+    """获取任务报告。
+
+    默认返回 JSON；传入 format=docx 或 format=pdf 时生成可下载的正式文档。
+    """
     if not ensure_task_loaded(task_id):
         raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -985,4 +996,21 @@ async def get_task_report(task_id: str):
     report = dict(task["report"])
     if task.get("tool_traces") and not report.get("tool_traces"):
         report["tool_traces"] = public_tool_traces(task.get("tool_traces", []))
+
+    fmt = (format or "json").lower()
+    if fmt in ("docx", "pdf"):
+        company = str(task.get("enterprise_name") or report.get("enterprise_name") or "未知企业")
+        generator = ReportGenerator(output_dir=str(settings.OUTPUT_DIR / "reports"))
+        try:
+            path = generator.generate_from_report(report, company, format=fmt)
+        except Exception as e:
+            logger.exception("报告导出失败")
+            raise HTTPException(status_code=500, detail=f"报告导出失败: {e}")
+        media_type = (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            if fmt == "docx"
+            else "application/pdf"
+        )
+        return FileResponse(path, filename=os.path.basename(path), media_type=media_type)
+
     return report

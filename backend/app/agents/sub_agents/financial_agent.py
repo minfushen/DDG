@@ -17,6 +17,7 @@ from app.agents.tools.cninfo_announcement_tool import search_cninfo_announcement
 from app.engines.rebecca.analyzers import FinancialDDAnalyzer
 from app.engines.rebecca.adapter import AnalyzerAdapter
 from app.agents.sub_agents.financial_report_builder import build_financial_analysis_report
+from app.api.cache_store import tool_cache_key, set_tool_cache
 
 
 def _frame_to_records(df):
@@ -81,6 +82,13 @@ def _run_rebecca_analysis(
     stock_code: str = "",
     source_type: str = "financial_statement",
     cross_provider_reconciliation: Optional[Dict[str, Any]] = None,
+    session_id: str | None = None,
+    task_id: str | None = None,
+    annual_report_notes: Optional[Dict[str, Any]] = None,
+    financial_business_hints: Optional[List[str]] = None,
+    industry_context: Optional[Dict[str, Any]] = None,
+    business_segments: Optional[List[Dict[str, Any]]] = None,
+    annual_business_review: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     timeline = []
     evidence = []
@@ -183,10 +191,64 @@ def _run_rebecca_analysis(
             stock_code=stock_code,
             source_type=source_type,
             cross_provider_reconciliation=cross_provider_reconciliation,
+            session_id=session_id,
+            task_id=task_id,
+            annual_report_notes=annual_report_notes,
+            financial_business_hints=financial_business_hints,
+            industry_context=industry_context,
+            business_segments=business_segments,
+            annual_business_review=annual_business_review,
         )
         for item in result["financial_analysis_report"].get("codeact_evidence") or []:
             evidence.append(item)
     return result
+
+def _build_industry_context_for_narrative(industry_report: dict) -> dict:
+    """从行业报告中提取对财务叙事最有用的信息。"""
+
+    def _truncate(text: str, max_len: int = 600) -> str:
+        if not text:
+            return ""
+        if len(text) <= max_len:
+            return text
+        return text[:max_len] + "..."
+
+    diagnosis = industry_report.get("industry_diagnostic_summary") or industry_report.get("summary")
+    if isinstance(diagnosis, list):
+        diagnosis = "\n".join(str(x) for x in diagnosis)
+    diagnosis_summary = _truncate(str(diagnosis) if diagnosis else "")
+
+    data_anchors = industry_report.get("data_anchors") or {}
+    anchor_parts = []
+    for key in ["index_data", "market_size", "concentration", "policy", "chain", "research_reports"]:
+        val = data_anchors.get(key)
+        if val:
+            if isinstance(val, dict):
+                summary = val.get("summary") or val.get("description") or str(val)
+            elif isinstance(val, list):
+                summary = "; ".join(str(x) for x in val[:3])
+            else:
+                summary = str(val)
+            if summary:
+                anchor_parts.append(f"{key}: {summary}")
+    data_anchors_summary = _truncate("\n".join(anchor_parts))
+
+    industry_name = (
+        (industry_report.get("industry") or {}).get("semantic_industry_name")
+        or "industry_name"
+    )
+
+    triggered_rules = (
+        (industry_report.get("industry_knowledge_context") or {}).get("triggered_rules")
+        or []
+    )[:3]
+
+    return {
+        "diagnosis_summary": diagnosis_summary,
+        "data_anchors_summary": data_anchors_summary,
+        "industry_name": industry_name,
+        "triggered_rules": triggered_rules,
+    }
 
 
 def _fetch_financial_public_context(enterprise_name: str, listed_data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -224,7 +286,160 @@ def _fetch_cninfo_annual_report_evidence(
             max_pdf_extract=1,
         )
     except Exception as exc:
-        return {"success": False, "error": str(exc), "extracted_evidence": [], "ingestion_results": [], "ingestion_gaps": []}
+        return {"success": False, "error": str(exc), "extracted_evidence": [], "ingestion_results": [], "ingestion_gaps": [], "pdf_extraction_results": []}
+
+
+def _value_by_item_from_df(df, item_keywords: List[str], year: str) -> Optional[float]:
+    """Extract a numeric value from a financial DataFrame by item keywords."""
+    if df is None or df.empty:
+        return None
+    label_col = None
+    for col in df.columns:
+        if any(keyword in str(col) for keyword in ["项目", "科目", "指标", "名称"]):
+            label_col = col
+            break
+    if label_col is None:
+        label_col = df.columns[0]
+    year_col = None
+    for col in df.columns:
+        if str(col) == str(year):
+            year_col = col
+            break
+    if year_col is None:
+        return None
+    for _, row in df.iterrows():
+        label = str(row.get(label_col, ""))
+        if any(keyword in label for keyword in item_keywords):
+            try:
+                return float(row.get(year_col, 0) or 0)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _build_annual_report_notes(
+    rebecca_data: Dict[str, Any],
+    cninfo_result: Dict[str, Any],
+    enterprise_name: str = "",
+    key_metrics: Optional[Dict[str, Any]] = None,
+    key_metric_series: Optional[Dict[str, Dict[str, str]]] = None,
+    session_id: str | None = None,
+    task_id: str | None = None,
+) -> Dict[str, Any]:
+    """Build structured annual-report note fields for deeper financial analysis.
+
+    Fields:
+      - business_segments: 主营业务分产品/分行业/分地区构成
+      - rd_expenses: 研发费用序列
+      - government_subsidies: 其他收益序列（主要为政府补助）
+      - intangible_assets: 无形资产序列
+      - development_expenses: 开发支出序列
+      - interest_bearing_debt: 有息负债分项序列
+      - business_review: 年报经营情况讨论与分析原文
+      - attribution: LLM 深度归因（仅年报有正文时抽取）
+    """
+    income = rebecca_data.get("income_statement")
+    balance = rebecca_data.get("balance_sheet")
+
+    years = []
+    if income is not None and not income.empty:
+        years = sorted(
+            [str(col) for col in income.columns if str(col).isdigit() and len(str(col)) == 4]
+        )
+
+    def series(keywords: List[str], df):
+        return {year: _value_by_item_from_df(df, keywords, year) for year in years}
+
+    rd_expenses = series(["研发费用"], income)
+    government_subsidies = series(["其他收益"], income)
+    intangible_assets = series(["无形资产"], balance)
+    development_expenses = series(["开发支出"], balance)
+
+    short_loan = series(["短期借款"], balance)
+    long_loan = series(["长期借款"], balance)
+    bonds_payable = series(["应付债券"], balance)
+    lease_liability = series(["租赁负债"], balance)
+    noncurrent_due_within_year = series(["一年内到期非流动负债"], balance)
+
+    interest_bearing_debt = {}
+    for year in years:
+        components = [
+            short_loan.get(year),
+            long_loan.get(year),
+            bonds_payable.get(year),
+            lease_liability.get(year),
+            noncurrent_due_within_year.get(year),
+        ]
+        present = [v for v in components if v is not None]
+        interest_bearing_debt[year] = {
+            "short_term_loan": short_loan.get(year),
+            "long_term_loan": long_loan.get(year),
+            "bonds_payable": bonds_payable.get(year),
+            "lease_liability": lease_liability.get(year),
+            "noncurrent_due_within_year": noncurrent_due_within_year.get(year),
+            "total": sum(present) if present else None,
+        }
+
+    business_segments: List[Dict[str, Any]] = []
+    business_review = ""
+    for pdf_result in cninfo_result.get("pdf_extraction_results") or []:
+        rows = pdf_result.get("main_business_rows") or []
+        if rows:
+            business_segments.extend(rows)
+        sections = pdf_result.get("sections") or {}
+        review_text = sections.get("business_review") or ""
+        if review_text and len(review_text) > len(business_review):
+            business_review = review_text
+
+    # 仅当年报经营讨论正文达到阈值才触发 LLM 深度归因抽取（用户确认的策略）。
+    attribution: Dict[str, Any] = {}
+    if business_review and enterprise_name:
+        try:
+            from app.agents.sub_agents.annual_report_attribution_extractor import (
+                extract_annual_report_attribution,
+            )
+            attribution = extract_annual_report_attribution(
+                enterprise_name=enterprise_name,
+                business_review=business_review,
+                key_metrics=key_metrics,
+                key_metric_series=key_metric_series,
+                business_segments=business_segments,
+                session_id=session_id,
+                task_id=task_id,
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("年报归因抽取失败：%s", exc)
+            attribution = {"source": "error", "error": str(exc)}
+
+    annual_report_notes = {
+        "business_segments": business_segments,
+        "business_review": business_review,
+        "attribution": attribution,
+        "rd_expenses": rd_expenses,
+        "government_subsidies": government_subsidies,
+        "intangible_assets": intangible_assets,
+        "development_expenses": development_expenses,
+        "interest_bearing_debt": interest_bearing_debt,
+        "years": years,
+    }
+
+    # 把年报注释缓存，供行业 Agent 等后续环节复用，避免重复抽取归因。
+    if enterprise_name:
+        try:
+            cache_key = tool_cache_key("annual_report_notes", {"enterprise_name": enterprise_name})
+            set_tool_cache(
+                cache_key=cache_key,
+                tool_name="annual_report_notes",
+                args={"enterprise_name": enterprise_name},
+                result=annual_report_notes,
+                ttl_seconds=7200,
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("缓存 annual_report_notes 失败：%s", exc)
+
+    return annual_report_notes
 
 
 def _fetch_listed_financial_data(enterprise_name: str, listed_info: Dict[str, str]) -> Dict[str, Any]:
@@ -269,7 +484,12 @@ def _fetch_listed_financial_data(enterprise_name: str, listed_info: Dict[str, st
     return eastmoney_result
 
 
-async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
+async def run_financial_agent(
+    enterprise_name: str,
+    session_id: str | None = None,
+    task_id: str | None = None,
+    industry_report: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """运行财务分析Agent
 
     Args:
@@ -311,6 +531,13 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
             public_context = _fetch_financial_public_context(enterprise_name, listed_data)
             cninfo_result = _fetch_cninfo_annual_report_evidence(enterprise_name, listed_data)
             cninfo_pdf_evidence = cninfo_result.get("extracted_evidence") or []
+            annual_report_notes = _build_annual_report_notes(
+                rebecca_data,
+                cninfo_result,
+                enterprise_name=enterprise_name,
+                session_id=session_id,
+                task_id=task_id,
+            )
             if cninfo_pdf_evidence:
                 public_context.extend([
                     {
@@ -321,6 +548,21 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
                     }
                     for item in cninfo_pdf_evidence
                 ])
+            financial_business_hints = _build_financial_business_hints(rebecca_data, annual_report_notes)
+            if industry_report is None:
+                try:
+                    from app.agents.sub_agents.industry_agent import run_industry_agent
+
+                    industry_report = await run_industry_agent(
+                        enterprise_name=enterprise_name,
+                        public_info=None,
+                        annual_report_notes=annual_report_notes,
+                        session_id=session_id,
+                        task_id=task_id,
+                    )
+                except Exception:
+                    industry_report = None
+            industry_context = _build_industry_context_for_narrative(industry_report) if industry_report else None
             result = _run_rebecca_analysis(
                 enterprise_name,
                 rebecca_data,
@@ -330,6 +572,13 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
                 stock_code=listed_data.get("secu_code") or listed_data.get("stock_code") or "",
                 source_type=listed_data.get("source_type") or "investment_research_tool",
                 cross_provider_reconciliation=listed_data.get("cross_provider_reconciliation") or None,
+                session_id=session_id,
+                task_id=task_id,
+                annual_report_notes=annual_report_notes,
+                financial_business_hints=financial_business_hints,
+                industry_context=industry_context,
+                business_segments=annual_report_notes.get("business_segments") or None,
+                annual_business_review=annual_report_notes.get("business_review") or None,
             )
             result["timeline"] = [{
                 "id": str(uuid.uuid4()),
@@ -507,13 +756,21 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
             }),
         }
 
-        result = _run_rebecca_analysis(enterprise_name, rebecca_data)
+        result = _run_rebecca_analysis(
+            enterprise_name,
+            rebecca_data,
+            include_structured_report=True,
+            session_id=session_id,
+            task_id=task_id,
+        )
         for item in result["evidence"]:
             if item.get("source") == "用户上传财报":
                 item["source"] = "模拟财务数据"
         return result
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "error": str(e),
@@ -530,52 +787,187 @@ async def run_financial_agent(enterprise_name: str) -> Dict[str, Any]:
         }
 
 
-async def run_financial_agent_with_uploaded_data(
-    enterprise_name: str,
-    parsed_financial_data: Dict[str, Any],
-) -> Dict[str, Any]:
-    """基于用户上传并解析后的财务数据运行财务分析。"""
-    try:
-        import pandas as pd
+def _build_financial_business_hints(
+    rebecca_data: Dict[str, Any],
+    annual_report_notes: Optional[Dict[str, Any]] = None,
+) -> List[str]:
+    """根据财务指标变化生成业务动因提示，供 narrative writer 做经营穿透。
 
-        rebecca_data = {}
-        for key in ["income_statement", "balance_sheet", "cash_flow"]:
-            value = parsed_financial_data.get(key)
-            if value:
-                rebecca_data[key] = pd.DataFrame(value)
+    覆盖场景：收入利润背离、毛利率下滑、短期借款大增、存货高位、
+    重资产投入、经营现金流下降、政府补助依赖、资本回报下降等。
+    最多返回 6-8 条提示，使用安全取值避免异常。
+    """
+    income = rebecca_data.get("income_statement")
+    balance = rebecca_data.get("balance_sheet")
+    cash_flow = rebecca_data.get("cash_flow")
 
-        required = ["income_statement", "balance_sheet", "cash_flow"]
-        missing = [name for name in required if name not in rebecca_data]
-        if missing:
-            return {
-                "success": False,
-                "error": f"上传财报缺少必要表格: {', '.join(missing)}",
-                "timeline": [{
-                    "id": str(uuid.uuid4()),
-                    "time": datetime.now().strftime("%H:%M:%S"),
-                    "agent": "财务Agent",
-                    "content": "上传财报解析失败",
-                    "detail": "请使用标准模板，或确保包含利润表、资产负债表、现金流量表",
-                    "status": "completed",
-                    "type": "risk",
-                }],
-                "evidence": [],
-            }
+    years = _latest_year_columns(income)
+    if len(years) < 2:
+        return []
+    latest_year = years[0]
+    prev_year = years[1]
 
-        return _run_rebecca_analysis(enterprise_name, rebecca_data, include_structured_report=True)
+    def _val(df, keywords, year):
+        return _value_by_item(df, keywords, year)
 
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "timeline": [{
-                "id": str(uuid.uuid4()),
-                "time": datetime.now().strftime("%H:%M:%S"),
-                "agent": "财务Agent",
-                "content": "上传财报分析失败",
-                "detail": str(e),
-                "status": "completed",
-                "type": "risk",
-            }],
-            "evidence": [],
-        }
+    hints: List[str] = []
+
+    # 1. 收入利润背离
+    revenue_latest = _val(income, ["营业收入", "主营业务收入", "收入"], latest_year)
+    revenue_prev = _val(income, ["营业收入", "主营业务收入", "收入"], prev_year)
+    net_profit_latest = _val(income, ["净利润"], latest_year)
+    net_profit_prev = _val(income, ["净利润"], prev_year)
+    if (
+        revenue_latest is not None
+        and revenue_prev is not None
+        and net_profit_latest is not None
+        and net_profit_prev is not None
+        and revenue_prev != 0
+        and net_profit_prev != 0
+    ):
+        revenue_growth = (revenue_latest - revenue_prev) / abs(revenue_prev)
+        profit_growth = (net_profit_latest - net_profit_prev) / abs(net_profit_prev)
+        if revenue_growth > 0.05 and profit_growth < -0.10:
+            hints.append(
+                f"收入利润背离：{latest_year}年营收同比+{revenue_growth*100:.1f}%，"
+                f"净利润同比{profit_growth*100:.1f}%，需分析是否因降价促销、"
+                f"成本上涨或非经常性损益导致增收不增利。"
+            )
+        elif revenue_growth < -0.05 and profit_growth > 0.10:
+            hints.append(
+                f"收入利润背离：{latest_year}年营收同比{revenue_growth*100:.1f}%，"
+                f"净利润同比+{profit_growth*100:.1f}%，需分析是否因资产处置、"
+                f"政府补助或费用压缩导致减收却增利。"
+            )
+
+    # 2. 毛利率下滑
+    gross_profit_latest = _val(income, ["毛利润", "毛利"], latest_year)
+    gross_profit_prev = _val(income, ["毛利润", "毛利"], prev_year)
+    if (
+        gross_profit_latest is not None
+        and gross_profit_prev is not None
+        and revenue_latest is not None
+        and revenue_prev is not None
+        and revenue_latest != 0
+        and revenue_prev != 0
+    ):
+        gm_latest = gross_profit_latest / revenue_latest
+        gm_prev = gross_profit_prev / revenue_prev
+        if gm_latest < gm_prev - 0.02:
+            hints.append(
+                f"毛利率下滑：{latest_year}年毛利率{gm_latest*100:.1f}%，"
+                f"较上年{gm_prev*100:.1f}%下降{(gm_prev-gm_latest)*100:.1f}个百分点，"
+                f"需分析是否因原材料涨价、产品结构变化或竞争加剧。"
+            )
+
+    # 3. 短期借款大增
+    short_loan_latest = _val(balance, ["短期借款"], latest_year)
+    short_loan_prev = _val(balance, ["短期借款"], prev_year)
+    if (
+        short_loan_latest is not None
+        and short_loan_prev is not None
+        and short_loan_prev != 0
+    ):
+        loan_growth = (short_loan_latest - short_loan_prev) / abs(short_loan_prev)
+        if loan_growth > 0.30:
+            hints.append(
+                f"短期借款大增：{latest_year}年短期借款同比+{loan_growth*100:.1f}%，"
+                f"需分析是否因营运资金紧张、季节性备货或债务滚动压力。"
+            )
+
+    # 4. 存货高位
+    inventory_latest = _val(balance, ["存货"], latest_year)
+    inventory_prev = _val(balance, ["存货"], prev_year)
+    if (
+        inventory_latest is not None
+        and inventory_prev is not None
+        and revenue_latest is not None
+        and revenue_prev is not None
+        and revenue_prev != 0
+    ):
+        inv_growth = (inventory_latest - inventory_prev) / abs(inventory_prev)
+        rev_growth = (revenue_latest - revenue_prev) / abs(revenue_prev) if revenue_prev != 0 else 0
+        if inv_growth > 0.20 and inv_growth > rev_growth + 0.10:
+            hints.append(
+                f"存货高位：{latest_year}年存货同比+{inv_growth*100:.1f}%，"
+                f"高于营收增速{rev_growth*100:.1f}%，需分析是否因滞销、"
+                f"备货策略调整或供应链中断。"
+            )
+
+    # 5. 重资产投入（在建工程+固定资产）
+    fixed_assets_latest = _val(balance, ["固定资产"], latest_year)
+    fixed_assets_prev = _val(balance, ["固定资产"], prev_year)
+    construction_latest = _val(balance, ["在建工程"], latest_year)
+    construction_prev = _val(balance, ["在建工程"], prev_year)
+    total_assets_latest = _val(balance, ["资产总计", "资产合计", "总资产"], latest_year)
+    if (
+        fixed_assets_latest is not None
+        and fixed_assets_prev is not None
+        and construction_latest is not None
+        and construction_prev is not None
+        and total_assets_latest is not None
+        and total_assets_latest != 0
+    ):
+        heavy_latest = (fixed_assets_latest + construction_latest) / total_assets_latest
+        heavy_prev = (fixed_assets_prev + construction_prev) / total_assets_latest
+        if heavy_latest > 0.40 and heavy_latest > heavy_prev + 0.05:
+            hints.append(
+                f"重资产投入：{latest_year}年固定资产+在建工程占比"
+                f"{heavy_latest*100:.1f}%，较上年提升{(heavy_latest-heavy_prev)*100:.1f}个百分点，"
+                f"需分析产能扩张进度、折旧压力及未来回报预期。"
+            )
+
+    # 6. 经营现金流下降
+    ocf_latest = _val(cash_flow, ["经营活动产生的现金流量净额", "经营活动现金流"], latest_year)
+    ocf_prev = _val(cash_flow, ["经营活动产生的现金流量净额", "经营活动现金流"], prev_year)
+    if (
+        ocf_latest is not None
+        and ocf_prev is not None
+        and ocf_prev != 0
+    ):
+        ocf_growth = (ocf_latest - ocf_prev) / abs(ocf_prev)
+        if ocf_growth < -0.20:
+            hints.append(
+                f"经营现金流下降：{latest_year}年经营活动现金流净额"
+                f"同比{ocf_growth*100:.1f}%，需分析是否因应收账款增加、"
+                f"存货占用或利润质量下降。"
+            )
+
+    # 7. 政府补助依赖
+    gov_subsidy_latest = _val(income, ["其他收益"], latest_year)
+    gov_subsidy_prev = _val(income, ["其他收益"], prev_year)
+    if (
+        gov_subsidy_latest is not None
+        and net_profit_latest is not None
+        and net_profit_latest != 0
+    ):
+        subsidy_ratio = gov_subsidy_latest / abs(net_profit_latest)
+        if subsidy_ratio > 0.30:
+            hints.append(
+                f"政府补助依赖：{latest_year}年其他收益（主要为政府补助）"
+                f"占净利润{subsidy_ratio*100:.1f}%，需分析政策可持续性"
+                f"及扣除补助后的真实盈利能力。"
+            )
+
+    # 8. 资本回报下降（ROE）
+    total_equity_latest = _val(balance, ["所有者权益合计", "股东权益合计", "所有者权益"], latest_year)
+    total_equity_prev = _val(balance, ["所有者权益合计", "股东权益合计", "所有者权益"], prev_year)
+    if (
+        net_profit_latest is not None
+        and net_profit_prev is not None
+        and total_equity_latest is not None
+        and total_equity_prev is not None
+        and total_equity_latest != 0
+        and total_equity_prev != 0
+    ):
+        roe_latest = net_profit_latest / total_equity_latest
+        roe_prev = net_profit_prev / total_equity_prev
+        if roe_latest < roe_prev - 0.03:
+            hints.append(
+                f"资本回报下降：{latest_year}年ROE约{roe_latest*100:.1f}%，"
+                f"较上年{roe_prev*100:.1f}%下降{(roe_prev-roe_latest)*100:.1f}个百分点，"
+                f"需分析是否因资产周转放缓、杠杆降低或利润率收缩。"
+            )
+
+    # 限制最多 8 条
+    return hints[:8]

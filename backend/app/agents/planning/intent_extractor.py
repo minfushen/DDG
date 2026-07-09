@@ -124,7 +124,7 @@ def extract_user_intent(user_input: str) -> Dict[str, Any]:
     """Extract enterprise name and task intent using the configured LLM."""
     fallback = fallback_extract_user_intent(user_input)
     try:
-        from app.config.llm_config import get_llm
+        from app.config.llm_config import get_llm, cached_invoke
 
         prompt = f"""你是银行尽调系统的入口意图解析器。请从用户输入中抽取结构化信息，只输出JSON。
 
@@ -142,7 +142,7 @@ def extract_user_intent(user_input: str) -> Dict[str, Any]:
 输入“分析一下卓胜微这家上市公司” => {{"enterprise_name":"卓胜微","task_type":"full","target_agent":null,"stock_code":null,"confidence":0.95,"reason":"用户要求对上市公司做完整尽调"}}
 输入“分析一下深圳市欣旺达能源科技有限公司的财务风险情况” => {{"enterprise_name":"深圳市欣旺达能源科技有限公司","task_type":"single","target_agent":"financial","stock_code":null,"confidence":0.95,"reason":"用户只要求财务风险分析"}}
 """
-        response = get_llm().invoke(prompt)
+        response = cached_invoke(get_llm(), prompt)
         parsed = _json_from_text(str(getattr(response, "content", response)))
         enterprise_name = str(parsed.get("enterprise_name") or "").strip()
         if not enterprise_name:
