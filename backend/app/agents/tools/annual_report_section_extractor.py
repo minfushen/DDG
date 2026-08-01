@@ -42,9 +42,11 @@ SECTION_PATTERNS: Dict[str, List[str]] = {
         r"存货跌价",
     ],
     "major_risk_warnings": [
-        r"重大风险提示",
+        r"公司面临的风险和应对措施",
+        r"公司面临的风险",
         r"可能面对的风险",
         r"风险因素",
+        r"重大风险提示",
         r"重大风险",
         r"特别风险提示",
     ],
@@ -104,8 +106,13 @@ SECTION_TERMINATORS = [
 
 
 def _clean_text(text: str) -> str:
-    """Normalize whitespace and strip noise from extracted text."""
-    text = re.sub(r"\s+", " ", text)
+    """Normalize whitespace and strip noise from extracted text.
+
+    只压缩行内空白（空格/制表符），保留换行结构——段落边界、表格行和
+    附注层级标题（（一）→ 1. → （1））都依赖换行才能被下游分块器识别。
+    """
+    text = re.sub(r"[ \t\f\v]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
 

@@ -40,6 +40,21 @@ def test_extract_all_sections_completeness():
     assert sections["major_risk_warnings"]
 
 
+def test_clean_text_preserves_line_boundaries():
+    text = (
+        "第一节 概述\n"
+        "（一）重要会计政策\n"
+        "1. 收入确认\n"
+        "坏账准备按预期信用损失模型计提。\n"
+        "第二节 其他\n"
+        "结束。"
+    )
+    section = extract_section(text, [r"重要会计政策"], context_chars=500)
+    assert section
+    # 换行结构必须保留，供下游分块器识别附注层级（（一）→ 1. → （1））
+    assert "重要会计政策\n1. 收入确认" in section
+
+
 def test_extract_main_business_tables():
     tables = [
         [["产品", "营业收入", "占比", "毛利率"], ["产品A", "50亿元", "50%", "30%"]],

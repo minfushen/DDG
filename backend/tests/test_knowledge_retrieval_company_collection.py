@@ -1,4 +1,4 @@
-from app.rag.collection_names import GENERAL_COLLECTION
+from app.rag.collection_names import GENERAL_COLLECTION, company_collection_name
 from app.rag.knowledge_retrieval_service import retrieve_knowledge
 
 
@@ -38,7 +38,7 @@ def test_retrieve_knowledge_with_company_name(monkeypatch):
 
     def fake_vector_search(query, domain, top_k, collection_name):
         searched_collections.append(collection_name)
-        if collection_name == "ddg_kb_company_测试公司":
+        if collection_name == company_collection_name("测试公司"):
             return [{
                 "id": "pdf_1",
                 "title": "测试公司 - 2025年年度报告",
@@ -67,7 +67,7 @@ def test_retrieve_knowledge_with_company_name(monkeypatch):
     result = retrieve_knowledge("速动比率 贷款", domain="credit", top_k=5, company_name="测试公司")
     assert result["success"] is True
     assert result["mode"] == "vector"
-    assert "ddg_kb_company_测试公司" in searched_collections
+    assert company_collection_name("测试公司") in searched_collections
     assert GENERAL_COLLECTION in searched_collections
     # Company hit has higher score and should rank first.
     assert result["results"][0]["id"] == "pdf_1"
@@ -98,3 +98,30 @@ def test_retrieve_knowledge_fallback_when_vector_empty(monkeypatch):
     assert result["success"] is True
     assert result["mode"] == "local_keyword"
     assert len(result["results"]) == 1
+
+
+def test_dedupe_merge_ranks_by_hierarchy_path():
+    from app.rag.knowledge_retrieval_service import _dedupe_and_merge_hits
+
+    path_hit = {
+        "id": "a",
+        "source": "s1",
+        "chunk_index": 0,
+        "content": "坏账准备按预期信用损失模型计提。",
+        "score": 6.0,
+        "hierarchy_path": "财务报告附注 > （一）重要会计政策 > 1. 收入确认 > （1）坏账准备计提方法",
+    }
+    raw_higher_hit = {
+        "id": "b",
+        "source": "s2",
+        "chunk_index": 0,
+        "content": "其他内容。",
+        "score": 8.0,
+        "hierarchy_path": "",
+    }
+
+    merged = _dedupe_and_merge_hits([[path_hit], [raw_higher_hit]], top_k=2, query="坏账准备计提方法")
+
+    # 原始分数较低但层级路径命中 query 的 hit 应排到前面
+    assert merged[0]["id"] == "a"
+    assert merged[1]["id"] == "b"

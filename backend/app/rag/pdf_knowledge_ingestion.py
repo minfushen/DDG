@@ -21,11 +21,26 @@ except Exception:  # pragma: no cover
 
 
 from app.agents.tools.annual_report_section_extractor import SECTION_LABELS
+from app.rag.chunking import (
+    MIN_CHUNK_CHARS,
+    build_group_records,
+    merge_small_chunks,
+    pack_blocks,
+    split_into_blocks,
+)
 from app.rag.collection_names import company_collection_name
 from app.rag.vector_store import VectorStoreManager
 
 
 MAX_CHUNK_CHARS = 1400
+
+# 附注/章节层级标题模式（（一）→ 1. → （1）），用于把层级路径写入 chunk 元数据。
+_HEADING_LEVELS: List[tuple[re.Pattern[str], int]] = [
+    (re.compile(r"^[（(][一二三四五六七八九十百]+[）)]"), 1),  # （一）
+    (re.compile(r"^[一二三四五六七八九十百]+、"), 1),          # 一、
+    (re.compile(r"^\d{1,2}[.、]\s*\D"), 2),                   # 1. / 1、
+    (re.compile(r"^[（(]\d{1,3}[）)]"), 3),                   # （1）
+]
 
 DOC_TYPE_CATEGORY = {
     "annual_report": "annual_report",
@@ -51,45 +66,41 @@ def _stable_chunk_id(enterprise_name: str, source_url: str, section: str, chunk_
     return "pdf_" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
 
 
-def _chunk_text(text: str, max_chars: int = MAX_CHUNK_CHARS) -> List[str]:
-    """Split text into chunks, preferring paragraph boundaries.
+def _heading_info(line: str) -> Optional[Dict[str, Any]]:
+    """识别层级标题行（（一）重要会计政策 / 1. 收入确认 / （1）坏账准备）。"""
+    if not line or len(line) > 60:
+        return None
+    if re.search(r"[。；：,，!?！？]$", line):
+        return None
+    for pattern, level in _HEADING_LEVELS:
+        if pattern.match(line):
+            return {"level": level, "title": line.strip()}
+    return None
 
-    Mirrors the strategy used by _chunk_markdown in knowledge_ingestion.py.
-    """
-    text = re.sub(r"\s+", " ", text).strip()
+
+def _chunk_text(text: str, max_chars: int = MAX_CHUNK_CHARS) -> List[str]:
+    """按段落边界切分文本；表格块保持原子（不跨行切分），末尾小块合并到相邻块。"""
     if not text:
         return []
-    if len(text) <= max_chars:
-        return [text]
+    groups = pack_blocks(split_into_blocks(text, _heading_info), max_chars)
+    chunks = ["\n".join(block["text"] for block in group) for group in groups]
+    return merge_small_chunks(chunks)
 
-    chunks: List[str] = []
-    paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
-    current: List[str] = []
-    current_len = 0
 
-    def flush() -> None:
-        nonlocal current, current_len
-        if current:
-            chunks.append("\n".join(current))
-            current = []
-            current_len = 0
+def _chunk_text_with_paths(
+    text: str,
+    section_label: str,
+    max_chars: int = MAX_CHUNK_CHARS,
+    min_chars: int = MIN_CHUNK_CHARS,
+) -> List[Dict[str, Any]]:
+    """与 ``_chunk_text`` 相同的切分策略，并携带附注层级路径与块类型。
 
-    for paragraph in paragraphs:
-        para_len = len(paragraph)
-        if current_len + para_len + 1 > max_chars and current:
-            flush()
-        if para_len > max_chars:
-            # Oversized paragraph: hard split at max_chars.
-            start = 0
-            while start < para_len:
-                end = min(start + max_chars, para_len)
-                chunks.append(paragraph[start:end])
-                start = end
-        else:
-            current.append(paragraph)
-            current_len += para_len + 1
-    flush()
-    return chunks
+    ``hierarchy_path`` 记录 chunk 内出现的全部标题链（分号拼接），形如
+    "财务报告附注 > （一）重要会计政策 > 1. 收入确认 > （1）坏账准备; ..."，
+    检索端可按层级限定召回（如查询"坏账准备计提方法"）。
+    """
+    groups = pack_blocks(split_into_blocks(text, _heading_info), max_chars)
+    return build_group_records(groups, section_label, min_chars=min_chars)
 
 
 def _table_to_text(table: List[List[str]]) -> str:
@@ -144,7 +155,8 @@ def build_documents_from_pdf_extraction(
         if not text:
             continue
         section_label = SECTION_LABELS.get(section, section)
-        for chunk_index, chunk_text in enumerate(_chunk_text(text)):
+        for chunk_index, chunk in enumerate(_chunk_text_with_paths(text, section_label)):
+            chunk_text = chunk["text"]
             doc = Document(
                 page_content=chunk_text,
                 metadata={
@@ -163,6 +175,8 @@ def build_documents_from_pdf_extraction(
                     "published_at": published_at,
                     "parser_used": parser_used,
                     "chunk_index": chunk_index,
+                    "hierarchy_path": chunk["hierarchy_path"],
+                    "chunk_type": chunk["chunk_type"],
                     "trust_level": "high",
                     "confidence": 0.85,
                     "requires_manual_review": False,
@@ -225,11 +239,133 @@ def build_documents_from_pdf_extraction(
                     "published_at": published_at,
                     "parser_used": parser_used,
                     "chunk_index": chunk_index,
+                    "hierarchy_path": "全文摘要",
+                    "chunk_type": "narrative",
                     "trust_level": "high",
                     "confidence": 0.8,
                     "requires_manual_review": False,
                 },
             ))
+
+    return docs
+
+
+def _dataframe_to_markdown_table(df) -> str:
+    """把 DataFrame 转成紧凑的 markdown 风格表格文本。"""
+    if df is None or df.empty:
+        return ""
+    lines = []
+    headers = [str(c) for c in df.columns]
+    lines.append(" | ".join(headers))
+    lines.append(" | ".join(["---"] * len(headers)))
+    for _, row in df.iterrows():
+        cells = [str(v) if v is not None else "" for v in row.values]
+        lines.append(" | ".join(cells))
+    return "\n".join(lines)
+
+
+def build_documents_from_pipeline_result(
+    enterprise_name: str,
+    pipeline_result: Any,
+) -> List[Document]:
+    """把 PDF pipeline 输出的结构化三大表和质量摘要转成 RAG Document chunks.
+
+    Args:
+        enterprise_name: 企业名称
+        pipeline_result: PipelineResult dataclass 或其 dict 形式
+
+    Returns:
+        List[Document] 包含三张表和一份质量摘要
+    """
+    if pipeline_result is None:
+        return []
+
+    # 兼容 dataclass 和 dict
+    def _get(attr: str, default: Any = None) -> Any:
+        if isinstance(pipeline_result, dict):
+            return pipeline_result.get(attr, default)
+        return getattr(pipeline_result, attr, default)
+
+    statements = _get("statements")
+    if statements is None:
+        return []
+
+    def _statement_attr(attr: str) -> Any:
+        if isinstance(statements, dict):
+            return statements.get(attr)
+        return getattr(statements, attr, None)
+
+    pdf_url = _get("pdf_url", "")
+    report_year = _get("report_year", "")
+    title = f"{report_year}年年度报告" if report_year else "年度报告"
+    source_name = DOC_TYPE_SOURCE_NAME.get("annual_report", "巨潮资讯网")
+    parser_used = "financial_pdf_pipeline"
+
+    docs: List[Document] = []
+    statement_sections = {
+        "income_statement": "利润表",
+        "balance_sheet": "资产负债表",
+        "cash_flow": "现金流量表",
+    }
+    for section, label in statement_sections.items():
+        df = _statement_attr(section)
+        table_text = _dataframe_to_markdown_table(df)
+        if not table_text:
+            continue
+        content = f"{enterprise_name} {title} - {label}\n{table_text}"
+        docs.append(Document(
+            page_content=content,
+            metadata={
+                "id": _stable_chunk_id(enterprise_name, pdf_url, f"pipeline_{section}", 0, content),
+                "title": f"{enterprise_name} - {title}",
+                "source": pdf_url,
+                "source_name": source_name,
+                "source_type": "exchange_announcement",
+                "category": "annual_report",
+                "knowledge_type": "annual_report",
+                "source_label": source_name,
+                "section": f"pipeline_{section}",
+                "section_label": f"PDF管道-{label}",
+                "enterprise_name": enterprise_name,
+                "parser_used": parser_used,
+                "chunk_index": 0,
+                "trust_level": "high",
+                "confidence": 0.85,
+                "requires_manual_review": False,
+            },
+        ))
+
+    # 质量摘要 chunk
+    quality_parts = [
+        f"三大表覆盖度: {_get('main_table_coverage', '0/3')}",
+        f"自动判定率: {_get('auto_judgment_rate', 0.0):.2f}",
+        f"需人工复核: {_get('needs_human_review', True)}",
+    ]
+    issues = _get("issues", [])
+    if issues:
+        quality_parts.append(f"问题: {'; '.join(str(i) for i in issues[:5])}")
+    quality_text = "\n".join(quality_parts)
+    docs.append(Document(
+        page_content=quality_text,
+        metadata={
+            "id": _stable_chunk_id(enterprise_name, pdf_url, "pipeline_quality", 0, quality_text),
+            "title": f"{enterprise_name} - {title}",
+            "source": pdf_url,
+            "source_name": source_name,
+            "source_type": "exchange_announcement",
+            "category": "annual_report",
+            "knowledge_type": "annual_report",
+            "source_label": source_name,
+            "section": "pipeline_quality",
+            "section_label": "PDF管道-解析质量",
+            "enterprise_name": enterprise_name,
+            "parser_used": parser_used,
+            "chunk_index": 0,
+            "trust_level": "medium",
+            "confidence": 0.75,
+            "requires_manual_review": False,
+        },
+    ))
 
     return docs
 
@@ -402,6 +538,10 @@ def auto_ingest_cninfo_annual_report(
         published_at=cninfo_extraction_result.get("published_at") or "",
         announcement_id=announcement_id,
     )
+
+    pipeline_result = cninfo_extraction_result.get("pipeline_result")
+    if pipeline_result is not None:
+        documents.extend(build_documents_from_pipeline_result(enterprise_name, pipeline_result))
 
     if not documents:
         return {

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from app.agents.evidence import normalize_evidence
+from app.config import settings
 from app.config.rag_loader import get_knowledge_fallback_split_ratio
 from app.rag.collection_names import GENERAL_COLLECTION, company_collection_name
 from app.rag.knowledge_ingestion import build_documents_from_markdown
@@ -42,7 +43,7 @@ def _keywords(query: str) -> List[str]:
 
 @lru_cache(maxsize=1)
 def _local_docs() -> List[Any]:
-    root = Path(__file__).resolve().parents[2] / "knowledge_base"
+    root = settings.KNOWLEDGE_BASE_DIR
     docs = []
     for path in sorted(root.rglob("*.md")):
         try:
@@ -60,7 +61,11 @@ def _domain_filter(doc: Any, domain: str) -> bool:
 
 
 def _score_doc(doc: Any, query_terms: List[str], domain: str) -> float:
-    text = f"{doc.metadata.get('title', '')} {doc.metadata.get('tags', '')} {doc.metadata.get('header', '')} {doc.page_content}".lower()
+    text = (
+        f"{doc.metadata.get('title', '')} {doc.metadata.get('tags', '')} "
+        f"{doc.metadata.get('header', '')} {doc.metadata.get('hierarchy_path', '')} "
+        f"{doc.page_content}"
+    ).lower()
     score = 0.0
     for term in query_terms:
         count = text.count(term)
@@ -88,6 +93,8 @@ def _format_hit(doc: Any, score: float, retrieval_mode: str) -> Dict[str, Any]:
         "source_label": doc.metadata.get("source_label") or "本地知识库",
         "disclaimer": disclaimer,
         "header": doc.metadata.get("header"),
+        "hierarchy_path": doc.metadata.get("hierarchy_path"),
+        "chunk_type": doc.metadata.get("chunk_type"),
         "score": score,
         "confidence": confidence,
         "reliability": "medium" if disclaimer else "high",
@@ -163,7 +170,28 @@ def _vector_search(query: str, domain: str, top_k: int, collection_name: str) ->
     return hits
 
 
-def _dedupe_and_merge_hits(hit_lists: List[List[Dict[str, Any]]], top_k: int) -> List[Dict[str, Any]]:
+def _hierarchy_boost(hit: Dict[str, Any], query_terms: List[str]) -> float:
+    """按层级路径做二次精排：query 词命中 hierarchy_path 时加权。
+
+    ``hierarchy_path`` 是确定性标注的章节链（如 "财务报告附注 > （一）重要
+    会计政策 > 1. 收入确认 > （1）坏账准备"），query 词命中路径比只命中正文
+    语义更强，适合对"坏账准备计提方法"这类层级定位问题加分。
+    """
+    path = str(hit.get("hierarchy_path") or "")
+    if not path:
+        return 0.0
+    boost = 0.0
+    for term in query_terms:
+        if term in path:
+            boost += 3.0
+    return boost
+
+
+def _dedupe_and_merge_hits(
+    hit_lists: List[List[Dict[str, Any]]],
+    top_k: int,
+    query: str = "",
+) -> List[Dict[str, Any]]:
     seen = set()
     merged: List[Dict[str, Any]] = []
     for hits in hit_lists:
@@ -173,7 +201,11 @@ def _dedupe_and_merge_hits(hit_lists: List[List[Dict[str, Any]]], top_k: int) ->
                 continue
             seen.add(key)
             merged.append(hit)
-    merged.sort(key=lambda item: item.get("score", 0), reverse=True)
+    terms = _keywords(query)
+    merged.sort(
+        key=lambda item: item.get("score", 0) + _hierarchy_boost(item, terms),
+        reverse=True,
+    )
     return merged[:top_k]
 
 
@@ -186,6 +218,8 @@ def retrieve_knowledge(query: str, domain: str = "all", top_k: int = 5, company_
     """
     vector_error = ""
     hit_lists: List[List[Dict[str, Any]]] = []
+    vector_contributed = False
+    editable_contributed = False
 
     try:
         if company_name:
@@ -199,6 +233,7 @@ def retrieve_knowledge(query: str, domain: str = "all", top_k: int = 5, company_
             )
             if company_hits:
                 hit_lists.append(company_hits)
+                vector_contributed = True
     except Exception as exc:
         vector_error = f"company collection search failed: {exc}"
 
@@ -211,12 +246,25 @@ def retrieve_knowledge(query: str, domain: str = "all", top_k: int = 5, company_
         )
         if general_hits:
             hit_lists.append(general_hits)
+            vector_contributed = True
     except Exception as exc:
         vector_error = f"{vector_error}; general collection search failed: {exc}".strip("; ")
 
+    # 可编辑知识库作为额外召回源（非功能需求②：前端维护的知识即时参与分析）
+    try:
+        from app.rag.editable_knowledge import search_editable_knowledge
+        editable_hits = search_editable_knowledge(query, category=None, top_k=top_k)
+        if editable_hits:
+            hit_lists.append(editable_hits)
+            editable_contributed = True
+    except Exception:
+        editable_hits = []
+
     if hit_lists:
-        hits = _dedupe_and_merge_hits(hit_lists, top_k)
-        return {"success": True, "query": query, "domain": domain, "mode": "vector", "results": hits}
+        hits = _dedupe_and_merge_hits(hit_lists, top_k, query=query)
+        mode = "vector" if vector_contributed else ("editable_knowledge" if editable_contributed else "local_keyword")
+        return {"success": True, "query": query, "domain": domain, "mode": mode, "results": hits}
+
 
     # Fallback to local keyword search against general knowledge base markdown files.
     hits = _local_keyword_search(query, domain, top_k)

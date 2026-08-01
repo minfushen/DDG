@@ -12,6 +12,14 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
+from app.config import settings
+from app.rag.chunking import (
+    MIN_CHUNK_CHARS,
+    build_group_records,
+    pack_blocks,
+    split_into_blocks,
+)
+
 try:
     from langchain_core.documents import Document
 except Exception:  # pragma: no cover - fallback for local keyword retrieval
@@ -43,7 +51,7 @@ CATEGORY_BY_DIR = {
 
 
 def _default_base_dir() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return settings.KNOWLEDGE_BASE_DIR
 
 
 def parse_front_matter(text: str) -> Tuple[Dict[str, Any], str]:
@@ -69,34 +77,29 @@ def _category_for(path: Path, root: Path) -> str:
     return CATEGORY_BY_DIR.get(first, first)
 
 
-def _chunk_markdown(body: str, max_chars: int = 1400) -> List[Tuple[str, str]]:
-    chunks: List[Tuple[str, str]] = []
-    current_header = ""
-    current: List[str] = []
+def _heading_info_md(line: str) -> Optional[Dict[str, Any]]:
+    """Markdown 标题识别：# / ## / ### 层级，返回 {level, title}。"""
+    stripped = line.strip()
+    if not stripped.startswith("#"):
+        return None
+    level = len(stripped) - len(stripped.lstrip("#"))
+    title = stripped.lstrip("#").strip()
+    if not title:
+        return None
+    return {"level": level, "title": title}
 
-    def flush() -> None:
-        nonlocal current
-        text = "\n".join(current).strip()
-        if text:
-            while len(text) > max_chars:
-                split_at = text.rfind("\n", 0, max_chars)
-                if split_at < max_chars // 2:
-                    split_at = max_chars
-                chunks.append((current_header, text[:split_at].strip()))
-                text = text[split_at:].strip()
-            if text:
-                chunks.append((current_header, text))
-        current = []
 
-    for line in body.splitlines():
-        if line.startswith("#"):
-            flush()
-            current_header = line.lstrip("#").strip()
-            current.append(line)
-        else:
-            current.append(line)
-    flush()
-    return chunks
+def _chunk_markdown(body: str, max_chars: int = 1400) -> List[Dict[str, Any]]:
+    """按标题/段落切分 Markdown：表格块原子化、小块合并、携带层级路径。
+
+    与年报 PDF 链路（pdf_knowledge_ingestion）共用 chunking 三条规则：
+    表格行串不跨行切分；chunk 元数据携带完整标题链；<200 字符的小块并入相邻块。
+    """
+    if not body:
+        return []
+    blocks = split_into_blocks(body, _heading_info_md)
+    groups = pack_blocks(blocks, max_chars, prefer_newline=True)
+    return build_group_records(groups, section_label="", min_chars=MIN_CHUNK_CHARS)
 
 
 def build_documents_from_markdown(file_path: Path, root: Path) -> List[Document]:
@@ -110,7 +113,9 @@ def build_documents_from_markdown(file_path: Path, root: Path) -> List[Document]
     rel_path = str(file_path.relative_to(root))
     docs: List[Document] = []
 
-    for index, (header, content) in enumerate(_chunk_markdown(body)):
+    for index, chunk in enumerate(_chunk_markdown(body)):
+        content = chunk["text"]
+        hierarchy_path = chunk["hierarchy_path"]
         content_hash = hashlib.sha1(f"{rel_path}|{index}|{content}".encode("utf-8")).hexdigest()[:16]
         docs.append(Document(
             page_content=content,
@@ -125,7 +130,9 @@ def build_documents_from_markdown(file_path: Path, root: Path) -> List[Document]
                 "source_label": source,
                 "disclaimer": disclaimer,
                 "tags": tags,
-                "header": header,
+                "header": hierarchy_path.split(" > ")[-1] if hierarchy_path else "",
+                "hierarchy_path": hierarchy_path,
+                "chunk_type": chunk["chunk_type"],
                 "chunk_index": index,
             },
         ))
@@ -133,7 +140,7 @@ def build_documents_from_markdown(file_path: Path, root: Path) -> List[Document]
 
 
 def scan_knowledge_documents(root_dir: Path | None = None) -> List[Document]:
-    root = root_dir or (_default_base_dir() / "knowledge_base")
+    root = root_dir or _default_base_dir()
     docs: List[Document] = []
     for path in sorted(root.rglob("*.md")):
         docs.extend(build_documents_from_markdown(path, root))
@@ -142,7 +149,6 @@ def scan_knowledge_documents(root_dir: Path | None = None) -> List[Document]:
 
 def ingest_knowledge_base(root_dir: Path | None = None, reset: bool = False) -> Dict[str, Any]:
     """Ingest all Markdown knowledge docs into Chroma."""
-    from app.config import settings
     from app.config.embedding_config import get_embedding_model
     from app.rag.vector_store import VectorStoreManager
 
@@ -166,7 +172,7 @@ def ingest_knowledge_base(root_dir: Path | None = None, reset: bool = False) -> 
 
     return {
         "success": True,
-        "root_dir": str(root_dir or (settings.BASE_DIR / "knowledge_base")),
+        "root_dir": str(root_dir or settings.KNOWLEDGE_BASE_DIR),
         "persist_dir": str(persist_dir),
         "documents": len(docs),
         "categories": category_counts,
