@@ -61,10 +61,40 @@ def _mock_cninfo_httpx_get(monkeypatch):
     monkeypatch.setattr(httpx, "get", lambda url, **kwargs: FakeResponse())
 
 
+def _sample_pipeline_result():
+    import pandas as pd
+    from app.engines.rebecca.parsers.financial_pdf_pipeline import PipelineResult, FinancialStatementData
+    return PipelineResult(
+        success=True,
+        statements=FinancialStatementData(
+            income_statement=pd.DataFrame([
+                {"field": "revenue", "label": "营业收入", "2025": 100000000.0},
+                {"field": "net_profit", "label": "净利润", "2025": 12000000.0},
+            ]),
+            balance_sheet=pd.DataFrame([
+                {"field": "total_assets", "label": "资产总计", "2025": 300000000.0},
+                {"field": "total_liabilities", "label": "负债合计", "2025": 120000000.0},
+            ]),
+            cash_flow=pd.DataFrame([
+                {"field": "net_operating_cash_flow", "label": "经营活动产生的现金流量净额", "2025": 20000000.0},
+            ]),
+        ),
+        extraction_result=_sample_extraction_result(),
+        main_table_coverage="3/3",
+        auto_judgment_rate=1.0,
+        needs_human_review=False,
+        issues=[],
+    )
+
+
 def test_fetch_and_extract_annual_report_pdf_success(monkeypatch):
     monkeypatch.setattr(
-        "app.agents.tools.cninfo_announcement_tool.extract_pdf_from_url",
-        lambda url, timeout=30: _sample_extraction_result(),
+        "app.agents.tools.cninfo_announcement_tool.download_pdf",
+        lambda url, timeout=30: b"fake pdf bytes",
+    )
+    monkeypatch.setattr(
+        "app.agents.tools.cninfo_announcement_tool.parse_annual_report_pdf",
+        lambda **kwargs: _sample_pipeline_result(),
     )
     item = normalize_cninfo_announcement({
         "secCode": "300782",
@@ -88,13 +118,18 @@ def test_fetch_and_extract_annual_report_pdf_success(monkeypatch):
     evidence_labels = {ev["label"] for ev in result["evidence_items"]}
     assert "巨潮年报-经营情况讨论与分析" in evidence_labels
     assert "巨潮年报-主营业务构成表" in evidence_labels
+    assert "年报PDF-三大表覆盖度" in evidence_labels
 
 
 def test_search_cninfo_annual_report_pdf_extraction(monkeypatch):
     _mock_cninfo_httpx_get(monkeypatch)
     monkeypatch.setattr(
-        "app.agents.tools.cninfo_announcement_tool.extract_pdf_from_url",
-        lambda url, timeout=30: _sample_extraction_result(),
+        "app.agents.tools.cninfo_announcement_tool.download_pdf",
+        lambda url, timeout=30: b"fake pdf bytes",
+    )
+    monkeypatch.setattr(
+        "app.agents.tools.cninfo_announcement_tool.parse_annual_report_pdf",
+        lambda **kwargs: _sample_pipeline_result(),
     )
     monkeypatch.setattr(
         "app.agents.tools.cninfo_announcement_tool.resolve_listed_company",
@@ -111,12 +146,17 @@ def test_search_cninfo_annual_report_pdf_extraction(monkeypatch):
     assert result["success"] is True
     assert len(result["pdf_extraction_results"]) >= 1
     assert len(result["extracted_evidence"]) > 0
+    assert len(result["pipeline_results"]) >= 1
     labels = {ev["label"] for ev in result["evidence"]}
     assert any(label.startswith("巨潮年报-") for label in labels)
 
 
 def test_search_cninfo_pdf_extraction_failure_graceful(monkeypatch):
     _mock_cninfo_httpx_get(monkeypatch)
+    monkeypatch.setattr(
+        "app.agents.tools.cninfo_announcement_tool.download_pdf",
+        lambda url, timeout=30: None,
+    )
     monkeypatch.setattr(
         "app.agents.tools.cninfo_announcement_tool.extract_pdf_from_url",
         lambda url, timeout=30: {"success": False, "text": "", "tables": [], "metadata": {}, "error": "download failed"},

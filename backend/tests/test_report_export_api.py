@@ -60,6 +60,16 @@ def test_report_docx(client):
     assert len(r.content) > 1000
 
 
+def test_report_md(client):
+    c, tid = client
+    r = c.get(f"/api/v1/tasks/{tid}/report?format=md")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "text/markdown; charset=utf-8"
+    body = r.content.decode("utf-8")
+    assert "# API测试公司" in body
+    assert "建议准入" in body
+
+
 def test_report_missing_task(client):
     c, _ = client
     r = c.get("/api/v1/tasks/does-not-exist/report?format=pdf")

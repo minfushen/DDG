@@ -44,6 +44,15 @@ def test_structured_pdf(gen):
     assert os.path.getsize(path) > 1000
 
 
+def test_structured_md(gen):
+    path = gen.generate_from_report(_sample_report(), "单元测试公司", "md")
+    assert path.endswith(".md")
+    content = open(path, encoding="utf-8").read()
+    assert "# 单元测试公司" in content
+    assert "营业收入" in content
+    assert os.path.getsize(path) > 100
+
+
 def test_financial_pdf_schema(gen):
     fin = {
         "profitability": {"毛利率": {"data": [["指标", "值"], ["毛利率", "35%"]]}},
