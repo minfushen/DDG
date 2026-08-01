@@ -1,0 +1,367 @@
+# DDG Agent 全链路闭环架构图 (横向布局版)
+# 主流程: 左→右 入口 → 编排 → Agent → 工具 → 证据 → 缺口闭环 → 报告
+# 两条闭环用紫色虚线: 递归深研 (exec_fu→gap) / 质量补证 (quality_gate→exec_fu)
+meta:
+  profile: default
+  source: generated
+  theme: arch-dark
+  layout: horizontal
+  routing: orthogonal
+  canvas: 2120x1140
+  title: "对公尽调智能体 · 全链路闭环架构"
+
+nodes:
+  # ============ ① 入口列 (x=120, 纵向) ============
+  - id: user
+    label: "客户经理 / 业务方"
+    type: user
+    position: { x: 120, y: 120 }
+
+  - id: api
+    label: "API 入口\nPOST /tasks · SSE · /report"
+    type: service
+    position: { x: 120, y: 280 }
+
+  - id: intent
+    label: "意图解析\nIntent Extractor"
+    type: process
+    position: { x: 120, y: 440 }
+
+  # ============ ② 编排列 (x=380, 纵向) ============
+  - id: hitl_entity
+    label: "HITL\n主体确认"
+    type: decision
+    position: { x: 380, y: 120 }
+
+  - id: prepare
+    label: "Prepare Plan\nSequential Thinking\n+ LLM Planner"
+    type: agent
+    position: { x: 380, y: 280 }
+
+  - id: hitl_plan
+    label: "HITL\n计划确认"
+    type: decision
+    position: { x: 380, y: 440 }
+
+  - id: exec_r1
+    label: "Execute Round 1\n并行首轮研究"
+    type: agent
+    position: { x: 380, y: 600 }
+
+  # ============ ③ 专项 Agent 列 (x=660, 纵向 6 个) ============
+  - id: agent_fin
+    label: "财务 Agent\n上市 / 非上市"
+    type: agent
+    position: { x: 660, y: 120 }
+
+  - id: agent_bus
+    label: "工商 Agent"
+    type: agent
+    position: { x: 660, y: 240 }
+
+  - id: agent_legal
+    label: "司法 Agent"
+    type: agent
+    position: { x: 660, y: 360 }
+
+  - id: agent_ind
+    label: "行业 Agent"
+    type: agent
+    position: { x: 660, y: 480 }
+
+  - id: agent_rel
+    label: "关联网络 Agent"
+    type: agent
+    position: { x: 660, y: 600 }
+
+  - id: agent_sent
+    label: "舆情 Agent"
+    type: agent
+    position: { x: 660, y: 720 }
+
+  # ============ ④ 工具列 (x=920, 纵向) ============
+  - id: hitl_bank
+    label: "HITL\n财报/流水上传"
+    type: decision
+    position: { x: 920, y: 120 }
+
+  - id: tool_fin
+    label: "CNINFO · 东方财富\nAkShare · 年报PDF"
+    type: tool
+    position: { x: 920, y: 240 }
+
+  - id: tool_bus
+    label: "元典 Yuandian MCP\n权威工商通道"
+    type: tool
+    position: { x: 920, y: 360 }
+
+  - id: tool_legal
+    label: "元典司法\n权威司法通道"
+    type: tool
+    position: { x: 920, y: 480 }
+
+  - id: tool_ind
+    label: "分类器(规则+LLM裁判)\nRAG知识库 · 研报"
+    type: tool
+    position: { x: 920, y: 600 }
+
+  - id: tool_rel
+    label: "关系网络工具"
+    type: tool
+    position: { x: 920, y: 720 }
+
+  - id: tool_sent
+    label: "Bocha · SearXNG 搜索"
+    type: tool
+    position: { x: 920, y: 840 }
+
+  # ============ ⑤ 证据总线 (纵向高节点) ============
+  - id: evidence
+    label: "Evidence Store\n证据库 · 可信度评级\nClaim-Evidence 绑定"
+    type: database
+    bounds: { x: 1160, y: 120, width: 130, height: 740 }
+
+  # ============ ⑤b 证据处理列 (x=1460) ============
+  - id: rebecca
+    label: "Rebecca 规则引擎\n财务指标 · 风险研判"
+    type: process
+    position: { x: 1460, y: 200 }
+
+  - id: claim
+    label: "Claim Builder\n结论-证据绑定"
+    type: process
+    position: { x: 1460, y: 420 }
+
+  - id: consistency
+    label: "跨源一致性校验\n超阈值→二轮补证"
+    type: decision
+    position: { x: 1460, y: 640 }
+
+  # ============ ⑥ 缺口闭环列 (x=1720) ============
+  - id: hitl_gap
+    label: "HITL\n证据缺口确认"
+    type: decision
+    position: { x: 1720, y: 200 }
+
+  - id: gap
+    label: "Gap Reflector\n缺口检测"
+    type: process
+    position: { x: 1720, y: 420 }
+
+  - id: plan_fu
+    label: "Plan Followups\n补证计划"
+    type: process
+    position: { x: 1720, y: 580 }
+
+  - id: exec_fu
+    label: "Execute Followups\n并行补证 · 递归深研"
+    type: agent
+    position: { x: 1720, y: 740 }
+
+  # ============ ⑦ 报告列 (x=1980) ============
+  - id: synth
+    label: "Report Synthesizer\n报告合成"
+    type: process
+    position: { x: 1980, y: 420 }
+
+  - id: builder
+    label: "Report Builder\n6 模块报告组装"
+    type: process
+    position: { x: 1980, y: 580 }
+
+  - id: quality_gate
+    label: "Quality Gate\n前置质量门"
+    type: decision
+    position: { x: 1980, y: 740 }
+
+  - id: evaluator
+    label: "CodeAct 评测器\n财务/行业/证据深度\n语言 · 授信逻辑"
+    type: process
+    position: { x: 1980, y: 900 }
+
+  - id: publish
+    label: "报告发布\nDOCX · PDF · MD"
+    type: terminal
+    position: { x: 1980, y: 1060 }
+
+  # ============ 图例 ============
+  - id: legend
+    label: "Legend:  灰实线=主流程   橙=控制/派发   绿实=读取证据   绿虚=写入证据   紫=反馈闭环(递归深研/质量补证)   菱形=HITL 人工中断"
+    type: text
+    position: { x: 120, y: 1060 }
+
+edges:
+  # --- 入口/编排列纵向主流程 ---
+  - from: user
+    to: api
+    type: primary
+  - from: api
+    to: intent
+    type: primary
+    label: "POST /tasks"
+  - from: intent
+    to: hitl_entity
+    type: primary
+    label: "主体识别"
+  - from: hitl_entity
+    to: prepare
+    type: primary
+    label: "确认"
+  - from: prepare
+    to: hitl_plan
+    type: primary
+  - from: hitl_plan
+    to: exec_r1
+    type: primary
+    label: "确认恢复"
+
+  # --- 首轮并行派发 (扇出到 6 Agent) ---
+  - from: exec_r1
+    to: agent_fin
+    type: control
+    label: "并行派发"
+  - from: exec_r1
+    to: agent_bus
+    type: control
+  - from: exec_r1
+    to: agent_legal
+    type: control
+  - from: exec_r1
+    to: agent_ind
+    type: control
+  - from: exec_r1
+    to: agent_rel
+    type: control
+  - from: exec_r1
+    to: agent_sent
+    type: control
+
+  # --- HITL 财报上传 ---
+  - from: hitl_bank
+    to: tool_fin
+    type: primary
+    label: "财报上传"
+
+  # --- Agent 调用工具 (横向一对一) ---
+  - from: agent_fin
+    to: tool_fin
+    type: control
+  - from: agent_bus
+    to: tool_bus
+    type: control
+  - from: agent_legal
+    to: tool_legal
+    type: control
+  - from: agent_ind
+    to: tool_ind
+    type: control
+  - from: agent_rel
+    to: tool_rel
+    type: control
+  - from: agent_sent
+    to: tool_sent
+    type: control
+
+  # --- 工具证据归集 (横向汇入证据总线) ---
+  - from: tool_fin
+    to: evidence
+    type: memory_write
+    label: "证据归集"
+  - from: tool_bus
+    to: evidence
+    type: memory_write
+  - from: tool_legal
+    to: evidence
+    type: memory_write
+  - from: tool_ind
+    to: evidence
+    type: memory_write
+  - from: tool_rel
+    to: evidence
+    type: memory_write
+  - from: tool_sent
+    to: evidence
+    type: memory_write
+
+  # --- 证据处理 ---
+  - from: evidence
+    to: rebecca
+    type: memory_read
+    label: "读取"
+    labelOffset: { x: 0, y: -14 }
+  - from: rebecca
+    to: evidence
+    type: memory_write
+    label: "研判回写"
+    labelOffset: { x: 0, y: 14 }
+  - from: evidence
+    to: claim
+    type: primary
+  - from: rebecca
+    to: claim
+    type: control
+    label: "风险研判结论"
+  - from: evidence
+    to: consistency
+    type: memory_read
+    label: "跨源核对"
+
+  # --- 缺口检测 / 补证闭环 ---
+  - from: claim
+    to: gap
+    type: primary
+  - from: consistency
+    to: gap
+    type: control
+    label: "差异→补证"
+  - from: gap
+    to: hitl_gap
+    type: control
+    label: "需确认"
+    labelOffset: { x: 14, y: 0 }
+  - from: hitl_gap
+    to: gap
+    type: feedback
+    label: "确认"
+    labelOffset: { x: -14, y: 0 }
+  - from: gap
+    to: plan_fu
+    type: primary
+  - from: plan_fu
+    to: exec_fu
+    type: primary
+  - from: exec_fu
+    to: gap
+    type: feedback
+    label: "递归深研"
+    labelOffset: { x: -18, y: 0 }
+    waypoints:
+      - { x: 1660, y: 740 }
+      - { x: 1660, y: 420 }
+
+  # --- 报告合成 ---
+  - from: gap
+    to: synth
+    type: primary
+    label: "无缺口→合成"
+  - from: synth
+    to: builder
+    type: primary
+  - from: builder
+    to: quality_gate
+    type: primary
+  - from: quality_gate
+    to: evaluator
+    type: primary
+    label: "通过"
+  - from: evaluator
+    to: publish
+    type: primary
+    label: "A级报告"
+
+  # --- 质量反馈闭环 (核心: 横向回弹) ---
+  - from: quality_gate
+    to: exec_fu
+    type: feedback
+    label: "未通过→质量补证"
+    labelOffset: { x: 0, y: -16 }

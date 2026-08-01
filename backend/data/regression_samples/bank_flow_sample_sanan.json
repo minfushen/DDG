@@ -1,0 +1,43 @@
+{
+  "enterprise_name": "三安光电股份有限公司",
+  "source_file": "bank_flow_sample_sanan.json",
+  "note": "Mock 样例：用于演示流水×年报交叉核验框架。量级参考年报，部分为演示差异故意构造。",
+  "accounts": [
+    {
+      "account_no": "1402****8821",
+      "bank_name": "工商银行厦门分行",
+      "currency": "CNY",
+      "period_start": "2023-01-01",
+      "period_end": "2023-12-31",
+      "opening_balance": 1200000000.0,
+      "closing_balance": 4000000000.0,
+      "transactions": [
+        {"date": "2023-01-15", "summary": "收回货款", "counterparty": "客户A", "debit": 0, "credit": 800000000, "balance": 2000000000, "is_related_party": false},
+        {"date": "2023-02-20", "summary": "支付采购款", "counterparty": "供应商B", "debit": 500000000, "credit": 0, "balance": 1500000000, "is_related_party": false},
+        {"date": "2023-03-31", "summary": "关联方资金拆借", "counterparty": "三安集团", "debit": 0, "credit": 500000000, "balance": 2000000000, "is_related_party": true},
+        {"date": "2023-04-10", "summary": "工资发放", "counterparty": "代发工资", "debit": 80000000, "credit": 0, "balance": 1920000000, "is_related_party": false},
+        {"date": "2023-06-30", "summary": "销售回款", "counterparty": "客户C", "debit": 0, "credit": 1200000000, "balance": 3120000000, "is_related_party": false},
+        {"date": "2023-09-18", "summary": "缴纳税费", "counterparty": "税务局", "debit": 120000000, "credit": 0, "balance": 3000000000, "is_related_party": false},
+        {"date": "2023-11-05", "summary": "关联方往来代付", "counterparty": "三安集成", "debit": 300000000, "credit": 0, "balance": 2700000000, "is_related_party": true},
+        {"date": "2023-12-31", "summary": "期末余额", "counterparty": "", "debit": 0, "credit": 1300000000, "balance": 4000000000, "is_related_party": false}
+      ]
+    },
+    {
+      "account_no": "3510****6620",
+      "bank_name": "建设银行厦门分行",
+      "currency": "CNY",
+      "period_start": "2023-01-01",
+      "period_end": "2023-12-31",
+      "opening_balance": 800000000.0,
+      "closing_balance": 3000000000.0,
+      "transactions": [
+        {"date": "2023-02-28", "summary": "收回货款", "counterparty": "客户D", "debit": 0, "credit": 600000000, "balance": 1400000000, "is_related_party": false},
+        {"date": "2023-05-12", "summary": "支付材料款", "counterparty": "供应商E", "debit": 400000000, "credit": 0, "balance": 1000000000, "is_related_party": false},
+        {"date": "2023-07-22", "summary": "销售回款", "counterparty": "客户F", "debit": 0, "credit": 900000000, "balance": 1900000000, "is_related_party": false},
+        {"date": "2023-10-30", "summary": "票据贴现款", "counterparty": "贴现银行", "debit": 0, "credit": 400000000, "balance": 2300000000, "is_related_party": false},
+        {"date": "2023-12-20", "summary": "归还借款", "counterparty": "银行G", "debit": 200000000, "credit": 0, "balance": 2100000000, "is_related_party": false},
+        {"date": "2023-12-31", "summary": "期末余额", "counterparty": "", "debit": 0, "credit": 900000000, "balance": 3000000000, "is_related_party": false}
+      ]
+    }
+  ]
+}

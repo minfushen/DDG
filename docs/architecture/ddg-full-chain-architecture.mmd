@@ -1,0 +1,130 @@
+flowchart TD
+    %% ============ 样式 ============
+    classDef hitl fill:#fef3c7,stroke:#f59e0b,stroke-width:2.5px,color:#78350f
+    classDef agent fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ecfdf5
+    classDef tool fill:#1e293b,stroke:#64748b,color:#e2e8f0
+    classDef store fill:#3b2a63,stroke:#a78bfa,stroke-width:2px,color:#ede9fe
+    classDef proc fill:#0e3a47,stroke:#22d3ee,color:#ecfeff
+    classDef entry fill:#0e3a47,stroke:#22d3ee,stroke-width:2px,color:#ecfeff
+    classDef done fill:#064e3b,stroke:#34d399,stroke-width:2.5px,color:#ecfdf5
+
+    %% ============ ① 入口层 ============
+    subgraph S1["① 入口层 / API"]
+        direction TB
+        U([客户经理 / 业务方]):::entry
+        API["API 入口<br/>POST /tasks · SSE · /report"]:::entry
+        INT[意图解析<br/>Intent Extractor]:::proc
+    end
+
+    %% ============ ② LangGraph 编排 ============
+    subgraph S2["② 编排层 · LangGraph DeepResearch (Plan-Execute)"]
+        direction TB
+        HE{HITL<br/>主体确认}:::hitl
+        PP["Prepare Plan<br/>Sequential Thinking + LLM Planner"]:::proc
+        HP{HITL<br/>计划确认}:::hitl
+        ER1["Execute Round 1<br/>并行首轮研究"]:::agent
+    end
+
+    %% ============ ③ 专项 Agent 层 ============
+    subgraph S3["③ 专项 Agent 层（并行）"]
+        direction LR
+        AF[财务 Agent<br/>上市/非上市]:::agent
+        AB[工商 Agent]:::agent
+        AL[司法 Agent]:::agent
+        AI[行业 Agent]:::agent
+        AR[关联网络 Agent]:::agent
+        AS[舆情 Agent]:::agent
+    end
+
+    %% ============ ④ 数据源 / 工具层 ============
+    subgraph S4["④ 数据源 / 工具层"]
+        direction LR
+        HB{HITL<br/>财报/流水上传}:::hitl
+        TF["CNINFO · 东方财富<br/>AkShare · 年报PDF"]:::tool
+        TB["元典 Yuandian MCP<br/>权威工商通道"]:::tool
+        TL["元典司法<br/>权威司法通道"]:::tool
+        TI["分类器(规则+LLM裁判)<br/>RAG知识库 · 研报"]:::tool
+        TR[关系网络工具]:::tool
+        TS["Bocha · SearXNG<br/>搜索"]:::tool
+    end
+
+    %% ============ ⑤ 证据链 ============
+    subgraph S5["⑤ 证据链 · 规则引擎"]
+        direction LR
+        EV[("Evidence Store<br/>证据库 · 可信度评级<br/>Claim-Evidence 绑定")]:::store
+        RB[Rebecca 规则引擎<br/>财务指标 · 风险研判]:::proc
+        CL[Claim Builder<br/>结论-证据绑定]:::proc
+        CO{跨源一致性校验<br/>超阈值→二轮补证}:::hitl
+    end
+
+    %% ============ ⑥ 缺口检测 / 补证闭环 ============
+    subgraph S6["⑥ 缺口检测 / 补证闭环"]
+        direction TB
+        HG{HITL<br/>证据缺口确认}:::hitl
+        GAP[Gap Reflector<br/>缺口检测]:::proc
+        PF[Plan Followups<br/>补证计划]:::proc
+        EF["Execute Followups<br/>并行补证 · 递归深研"]:::agent
+    end
+
+    %% ============ ⑦ 报告 · 质量门 · 评测 ============
+    subgraph S7["⑦ 报告 · 质量门 · 评测"]
+        direction TB
+        SYN[Report Synthesizer<br/>报告合成]:::proc
+        BLD[Report Builder<br/>6 模块报告组装]:::proc
+        QG{Quality Gate<br/>前置质量门}:::hitl
+        EVL["CodeAct 评测器<br/>财务/行业/证据深度 · 语言 · 授信逻辑"]:::proc
+        PUB([报告发布<br/>DOCX · PDF · MD]):::done
+    end
+
+    %% ============ 主流程骨架 ============
+    U --> API --> INT --> HE
+    HE --> PP --> HP --> ER1
+
+    %% ============ 首轮并行派发 ============
+    ER1 -->|并行派发| AF
+    ER1 --> AB
+    ER1 --> AL
+    ER1 --> AI
+    ER1 --> AR
+    ER1 --> AS
+
+    %% ============ HITL 财报上传 ============
+    HB -->|财报上传| TF
+
+    %% ============ Agent 调用工具 ============
+    AF --> TF
+    AB --> TB
+    AL --> TL
+    AI --> TI
+    AR --> TR
+    AS --> TS
+
+    %% ============ 工具证据归集 ============
+    TF -->|证据归集| EV
+    TB --> EV
+    TL --> EV
+    TI --> EV
+    TR --> EV
+    TS --> EV
+
+    %% ============ 证据处理 ============
+    EV -->|读取| RB
+    RB -.->|研判回写| EV
+    EV --> CL
+    RB -->|风险研判结论| CL
+    EV -->|跨源核对| CO
+
+    %% ============ 缺口检测 / 补证闭环 ============
+    CL --> GAP
+    CO -->|差异→补证| GAP
+    GAP -->|需确认| HG
+    HG -.->|确认| GAP
+    GAP --> PF --> EF
+    EF -.->|递归深研| GAP
+
+    %% ============ 报告合成 ============
+    GAP -->|无缺口→合成| SYN --> BLD --> QG
+    QG -->|通过| EVL -->|A级报告| PUB
+
+    %% ============ 质量反馈闭环（核心）============
+    QG -.->|未通过→质量补证| EF

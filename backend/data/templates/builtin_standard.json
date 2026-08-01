@@ -1,0 +1,159 @@
+{
+  "id": "builtin_standard",
+  "name": "标准贷前尽调模板（内置）",
+  "description": "系统内置的标准贷前尽调结构，覆盖工商、财务、司法、行业、关联与舆情，并预留指标与解读位置。",
+  "source_format": "markdown",
+  "filename": null,
+  "is_active": false,
+  "is_builtin": true,
+  "created_at": "2026-07-17T10:34:38.257254",
+  "updated_at": "2026-07-17T12:27:33.025770",
+  "sections": [
+    {
+      "id": "sec_1",
+      "title": "一、企业概况与工商治理",
+      "level": 1,
+      "blocks": [
+        {
+          "type": "subreport",
+          "key": "business",
+          "label": "工商与治理",
+          "unit": null,
+          "source_dimension": "business",
+          "text": null
+        },
+        {
+          "type": "interpretation",
+          "key": "工商治理解读",
+          "label": "工商治理解读",
+          "unit": null,
+          "source_dimension": "business",
+          "text": null
+        }
+      ]
+    },
+    {
+      "id": "sec_2",
+      "title": "二、财务健康度分析",
+      "level": 1,
+      "blocks": [
+        {
+          "type": "indicator",
+          "key": "营业收入",
+          "label": "营业收入",
+          "unit": "万元",
+          "source_dimension": null,
+          "text": null
+        },
+        {
+          "type": "indicator",
+          "key": "净利润",
+          "label": "净利润",
+          "unit": "万元",
+          "source_dimension": null,
+          "text": null
+        },
+        {
+          "type": "indicator",
+          "key": "资产负债率",
+          "label": "资产负债率",
+          "unit": "%",
+          "source_dimension": null,
+          "text": null
+        },
+        {
+          "type": "subreport",
+          "key": "financial",
+          "label": "财务专项",
+          "unit": null,
+          "source_dimension": "financial",
+          "text": null
+        },
+        {
+          "type": "interpretation",
+          "key": "财务健康度解读",
+          "label": "财务健康度解读",
+          "unit": null,
+          "source_dimension": "financial",
+          "text": null
+        }
+      ]
+    },
+    {
+      "id": "sec_3",
+      "title": "三、司法合规风险",
+      "level": 1,
+      "blocks": [
+        {
+          "type": "subreport",
+          "key": "legal",
+          "label": "司法专项",
+          "unit": null,
+          "source_dimension": "legal",
+          "text": null
+        },
+        {
+          "type": "interpretation",
+          "key": "司法合规解读",
+          "label": "司法合规解读",
+          "unit": null,
+          "source_dimension": "legal",
+          "text": null
+        }
+      ]
+    },
+    {
+      "id": "sec_4",
+      "title": "四、行业与经营环境",
+      "level": 1,
+      "blocks": [
+        {
+          "type": "subreport",
+          "key": "industry",
+          "label": "行业专项",
+          "unit": null,
+          "source_dimension": "industry",
+          "text": null
+        },
+        {
+          "type": "interpretation",
+          "key": "行业环境解读",
+          "label": "行业环境解读",
+          "unit": null,
+          "source_dimension": "industry",
+          "text": null
+        }
+      ]
+    },
+    {
+      "id": "sec_5",
+      "title": "五、关联网络与担保关系",
+      "level": 1,
+      "blocks": [
+        {
+          "type": "subreport",
+          "key": "relationship",
+          "label": "关联网络",
+          "unit": null,
+          "source_dimension": "relationship",
+          "text": null
+        }
+      ]
+    },
+    {
+      "id": "sec_6",
+      "title": "六、舆情与声誉风险",
+      "level": 1,
+      "blocks": [
+        {
+          "type": "subreport",
+          "key": "sentiment",
+          "label": "舆情专项",
+          "unit": null,
+          "source_dimension": "sentiment",
+          "text": null
+        }
+      ]
+    }
+  ]
+}

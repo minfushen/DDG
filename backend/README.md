@@ -245,7 +245,9 @@ backend/
 │   ├── memory/                 # 短期 / 长期记忆
 │   ├── rag/                    # 本地知识库检索
 │   └── config/                 # 配置管理
-├── knowledge_base/             # 行业、风控、法规、模板知识文档
+├── data/
+│   ├── knowledge_base/         # 行业、风控、法规、模板知识文档
+│   └── regression_samples/     # 回归测试样本
 ├── tests/                      # 单元测试与集成测试
 ├── output/                     # 上传文件、生成结果等运行时输出
 ├── db/                         # 本地运行时数据
@@ -306,5 +308,5 @@ pytest
 
 - [`../README.md`](../README.md) — 项目整体定位与交付价值
 - [`../DESIGN.md`](../DESIGN.md) — B2B SaaS 设计系统
-- [`../docs/sdd/tasks.md`](../docs/sdd/tasks.md) — 迭代任务清单
-- [`../docs/dify-integration/`](../docs/dify-integration/) — Dify 集成方案
+- [`../docs/specs/tasks.md`](../docs/specs/tasks.md) — 迭代任务清单
+- [`../docs/integration/dify/`](../docs/integration/dify/) — Dify 集成方案

@@ -1,0 +1,301 @@
+meta:
+  profile: default
+  theme: tech-blue
+  source: generated
+  layout: vertical
+  routing: orthogonal
+  canvas: auto
+  title: "DDG-Agent 技术架构（已实现 / 规划中）"
+  description: "分层技术架构：接入协作 → 意图编排 → 推理能力 → 专项 Agent → 数据可信证据 → 数据基础设施。[] 中标注组件落地状态。"
+
+modules:
+  - id: l0
+    label: "L0 · 接入与协作层 (Entry & Collaboration)"
+    color: $primary
+  - id: l1
+    label: "L1 · 意图理解与编排层 (Intent & Orchestration)"
+    color: $secondary
+  - id: l2
+    label: "L2 · 推理与能力层 (Reasoning & Capability)  ★ 含增强中组件"
+    color: $accent
+  - id: l3
+    label: "L3 · 专项 Agent 层 (Specialist Agents)"
+    color: $primary
+  - id: l4
+    label: "L4 · 数据可信与证据层 (Data Trust & Evidence)  ★ 含增强中组件"
+    color: $secondary
+  - id: l5
+    label: "L5 · 数据源与基础设施层 (Data Sources & Infra)"
+    color: $accent
+
+nodes:
+  # ============ L0 接入与协作层 (y=140) ============
+  - id: api_gateway
+    label: "API 网关 / FastAPI\nREST + SDK + SSE [已实现]"
+    type: gateway
+    module: l0
+    position: { x: 900, y: 140 }
+  - id: dify_entry
+    label: "Dify 对话入口\n前端对话 / 轻编排 [已实现]"
+    type: service
+    module: l0
+    position: { x: 360, y: 140 }
+  - id: workbench
+    label: "Agent Workbench 前端\n任务 / 报告 / 配置 [已实现]"
+    type: service
+    module: l0
+    position: { x: 1440, y: 140 }
+
+  # ============ L1 意图理解与编排层 (y=380) ============
+  - id: intent_extractor
+    label: "多意图识别 + 槽位抽取\nIntent Extractor [已实现 ✅]"
+    type: process
+    module: l1
+    position: { x: 240, y: 380 }
+  - id: seq_think
+    label: "Sequential Thinking\n研究思考链 [已实现]"
+    type: process
+    module: l1
+    position: { x: 600, y: 380 }
+  - id: planner
+    label: "Skill-aware Planner\n蓝图规划 [已实现·缺语义匹配]"
+    type: process
+    module: l1
+    position: { x: 960, y: 380 }
+  - id: tool_router
+    label: "Tool Router\n部署感知路由 [已实现]"
+    type: process
+    module: l1
+    position: { x: 1320, y: 380 }
+  - id: langgraph_sm
+    label: "LangGraph 状态机\nPlan→Exec→Followups→Synth [已实现·缺checkpoint/resume]"
+    type: process
+    module: l1
+    position: { x: 1680, y: 380 }
+
+  # ============ L2 推理与能力层 (y=620) ============
+  - id: multi_hop
+    label: "多跳推理引擎\nMulti-Hop Reasoning\n递归树深研 / 图式推理 / Gap 驱动 [已实现·缺语义深度]"
+    type: agent
+    module: l2
+    position: { x: 240, y: 620 }
+  - id: skill_registry
+    label: "Runtime Skill Registry\n领域方法论动态加载 [已实现·缺动态注册]"
+    type: tool
+    module: l2
+    position: { x: 600, y: 620 }
+  - id: ctx_builder
+    label: "Capability Context Builder\n上下文组装 / 预算裁剪 [未实现]"
+    type: process
+    module: l2
+    position: { x: 960, y: 620 }
+  - id: memory_svc
+    label: "Memory Service\n跨任务经验沉淀 [已实现·缺summarize/向量检索]"
+    type: memory
+    module: l2
+    position: { x: 1320, y: 620 }
+  - id: enhanced_rag
+    label: "Enhanced RAG Service\nQueryRewrite/Hybrid/Rerank/域隔离 [部分实现·缺Rewrite/Rerank]"
+    type: process
+    module: l2
+    position: { x: 1680, y: 620 }
+
+  # ============ L3 专项 Agent 层 (y=860) ============
+  - id: agent_fin
+    label: "财务 Agent\n上市/非上市 + Rebecca 规则 [已实现]"
+    type: agent
+    module: l3
+    position: { x: 200, y: 860 }
+  - id: agent_bus
+    label: "工商 Agent [已实现]"
+    type: agent
+    module: l3
+    position: { x: 520, y: 860 }
+  - id: agent_legal
+    label: "司法 Agent\n元典 Yuandian [已实现]"
+    type: agent
+    module: l3
+    position: { x: 840, y: 860 }
+  - id: agent_ind
+    label: "行业 Agent\n行业分类 + RAG [已实现]"
+    type: agent
+    module: l3
+    position: { x: 1160, y: 860 }
+  - id: agent_rel
+    label: "关联网络 Agent [已实现]"
+    type: agent
+    module: l3
+    position: { x: 1480, y: 860 }
+  - id: agent_sent
+    label: "舆情 / 声誉 Agent [已实现]"
+    type: agent
+    module: l3
+    position: { x: 1800, y: 860 }
+
+  # ============ L4 数据可信与证据层 (y=1100) ============
+  - id: credibility
+    label: "多源数据可信度取舍\nCredibility Trade-off\n冲突消解 / 加权融合 / 权威源优先级 [已实现·缺加权融合]"
+    type: process
+    module: l4
+    position: { x: 240, y: 1100 }
+  - id: evidence_store
+    label: "Evidence Store\n来源 / 置信度 / 可信等级 / 复核 [已实现]"
+    type: database
+    module: l4
+    position: { x: 600, y: 1100 }
+  - id: consistency
+    label: "跨源一致性校验\n财报差异比对 [已实现·缺多源交叉]"
+    type: process
+    module: l4
+    position: { x: 960, y: 1100 }
+  - id: claim_evidence
+    label: "Claim-Evidence 绑定 [已实现]"
+    type: process
+    module: l4
+    position: { x: 1320, y: 1100 }
+  - id: codeact
+    label: "CodeAct 确定性工具\n财务校验 / 质量评测 [已实现]"
+    type: tool
+    module: l4
+    position: { x: 1680, y: 1100 }
+
+  # ============ L5 数据源与基础设施层 (y=1340) ============
+  - id: data_sources
+    label: "多源数据接入\nCNINFO / 东方财富 / 元典 / Bocha·SearXNG / AkShare / 年报PDF [已实现]"
+    type: cloud
+    module: l5
+    position: { x: 200, y: 1340 }
+  - id: front_machine
+    label: "T+1 数据前置机\nraw / standardized / index [部分实现·仅校验]"
+    type: server
+    module: l5
+    position: { x: 520, y: 1340 }
+  - id: vector_db
+    label: "RAG / 向量库\nChroma + BM25 + Reranker + RRF [已实现雏形]"
+    type: vector_store
+    module: l5
+    position: { x: 840, y: 1340 }
+  - id: persistence
+    label: "持久化\nPostgreSQL / Redis [部分实现]"
+    type: database
+    module: l5
+    position: { x: 1160, y: 1340 }
+  - id: llm
+    label: "LLM Provider\nLiteLLM 路由 [已实现]"
+    type: llm
+    module: l5
+    position: { x: 1480, y: 1340 }
+  - id: obs
+    label: "可观测\nLangfuse / Prometheus / Grafana [部分实现 M2.5]"
+    type: server
+    module: l5
+    position: { x: 1800, y: 1340 }
+
+edges:
+  # --- 接入层 → 意图层（纵向）---
+  - from: dify_entry
+    to: api_gateway
+    type: primary
+  - from: workbench
+    to: api_gateway
+    type: primary
+  - from: api_gateway
+    to: intent_extractor
+    type: primary
+    label: "解析任务"
+
+  # --- L1 意图层内部 ---
+  - from: intent_extractor
+    to: planner
+    type: primary
+    label: "意图+槽位"
+  - from: intent_extractor
+    to: tool_router
+    type: control
+    label: "槽位映射"
+  - from: seq_think
+    to: planner
+    type: control
+    label: "思考链"
+  - from: planner
+    to: langgraph_sm
+    type: primary
+    label: "下发计划"
+
+  # --- L1 → L2 能力层（纵向）---
+  - from: planner
+    to: skill_registry
+    type: data
+    label: "加载方法论"
+  - from: planner
+    to: ctx_builder
+    type: control
+  - from: ctx_builder
+    to: memory_svc
+    type: data
+  - from: ctx_builder
+    to: enhanced_rag
+    type: data
+  - from: langgraph_sm
+    to: multi_hop
+    type: primary
+    label: "深研编排"
+
+  # --- L2 → L3 专项 Agent（纵向，仅左中三支，避免横穿）---
+  - from: multi_hop
+    to: agent_fin
+    type: primary
+  - from: multi_hop
+    to: agent_ind
+    type: primary
+  - from: multi_hop
+    to: agent_bus
+    type: primary
+
+  # --- L3 → L4 证据层（纵向，仅左中两支）---
+  - from: agent_fin
+    to: evidence_store
+    type: memory_write
+    label: "写证据"
+  - from: agent_ind
+    to: evidence_store
+    type: memory_write
+
+  # --- L4 证据层内部（顺序链 + 规划组件回边）---
+  - from: evidence_store
+    to: consistency
+    type: control
+    label: "比对"
+  - from: consistency
+    to: claim_evidence
+    type: control
+  - from: claim_evidence
+    to: codeact
+    type: control
+    label: "校验"
+  - from: consistency
+    to: credibility
+    type: control
+    label: "冲突上报"
+  - from: credibility
+    to: evidence_store
+    type: feedback
+    label: "取舍后回写"
+
+  # --- L4 → L5 基础设施（纵向）---
+  - from: evidence_store
+    to: data_sources
+    type: data
+    label: "取数"
+  - from: evidence_store
+    to: persistence
+    type: data
+    label: "持久化"
+  - from: enhanced_rag
+    to: vector_db
+    type: data
+    label: "检索"
+  - from: data_sources
+    to: front_machine
+    type: data
+    label: "T+1 入库"
