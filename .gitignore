@@ -37,6 +37,16 @@ screenshot*/
 # Runtime data
 backend/db/memory/long_term_memory.json
 backend/db/chroma/
+backend/db/
+backend/data/ddg_cache.sqlite3
+backend/output/
+backend/regression_runs/
+
+# Debug / temp artifacts
+backend/_tmp_*
+
+# drawio temp
+.drawio-tmp/
 
 # Output uploads
 backend/output/uploads/
