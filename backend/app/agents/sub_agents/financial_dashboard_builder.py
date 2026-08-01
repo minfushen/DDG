@@ -240,3 +240,76 @@ def build_financial_dashboard(
         "charts": charts,
         "data_boundary": "图表基于已解析三大表和内部财务计算结果生成；缺失科目以空值处理，需结合审计报告附注和原始凭证复核。",
     }
+
+
+def _mermaid_node(label: str, value_text: str) -> str:
+    """构造 Mermaid 节点文本：双引号包裹 + <br/> 换行，避免特殊字符破坏语法。"""
+    return f'["{label}<br/>{value_text}"]'
+
+
+def build_dupont_mermaid(
+    enterprise_name: str,
+    dupont_analysis: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """从杜邦分析结果生成 Mermaid 流程图配置。
+
+    参考 JoyAgent-JDGenie loan_report 的杜邦 Mermaid 模板，但指标全部来自
+    ``dupont_analyzer`` 的确定性计算（净利率 × 总资产周转率 × 权益乘数 = ROE），
+    不依赖 LLM 数值推理；原始科目值（净利润/营业收入/总资产/所有者权益）作为叶子节点。
+
+    Args:
+        enterprise_name: 企业名称，用于标题。
+        dupont_analysis: ``dupont_analyzer.build_dupont_analysis`` 的输出。
+
+    Returns:
+        含 ``mermaid`` 源码与标题的字典；数据不足时返回 None。
+    """
+    if not dupont_analysis or not dupont_analysis.get("success"):
+        return None
+    decomposition = dupont_analysis.get("decomposition") or []
+    if not decomposition:
+        return None
+    latest = decomposition[0]
+    year = latest.get("year", "最新年度")
+    roe = latest.get("roe")
+    net_margin = latest.get("net_margin")
+    asset_turnover = latest.get("asset_turnover")
+    equity_multiplier = latest.get("equity_multiplier")
+    revenue = latest.get("revenue")
+    net_profit = latest.get("net_profit")
+    total_assets = latest.get("total_assets")
+    equity = latest.get("equity")
+
+    roe_node = _mermaid_node("ROE 净资产收益率", _pct_text(roe))
+    nm_node = _mermaid_node("销售净利率", _pct_text(net_margin))
+    at_node = _mermaid_node("总资产周转率", _ratio_text(asset_turnover))
+    em_node = _mermaid_node("权益乘数", _ratio_text(equity_multiplier))
+
+    lines = [
+        "graph TD",
+        f"    ROE{roe_node} --> NM{nm_node}",
+        f"    ROE{roe_node} --> AT{at_node}",
+        f"    ROE{roe_node} --> EM{em_node}",
+        f"    NM{nm_node} --> P{_mermaid_node('净利润', _amount_text(net_profit))}",
+        f"    NM{nm_node} --> R1{_mermaid_node('营业收入', _amount_text(revenue))}",
+        f"    AT{at_node} --> R2{_mermaid_node('营业收入', _amount_text(revenue))}",
+        f"    AT{at_node} --> TA{_mermaid_node('总资产', _amount_text(total_assets))}",
+        f"    EM{em_node} --> TA2{_mermaid_node('总资产', _amount_text(total_assets))}",
+        f"    EM{em_node} --> EQ{_mermaid_node('所有者权益', _amount_text(equity))}",
+        "",
+        "    classDef roe fill:#dc2626,stroke:#7f1d1d,stroke-width:2px,color:#fff",
+        "    classDef factor fill:#2563eb,stroke:#1e40af,stroke-width:1px,color:#fff",
+        "    classDef data fill:#f1f5f9,stroke:#cbd5e1,stroke-width:1px,color:#1f2937",
+        "    class ROE roe",
+        "    class NM,AT,EM factor",
+        "    class P,R1,R2,TA,TA2,EQ data",
+    ]
+
+    return {
+        "title": f"{enterprise_name}杜邦分解（{year}年）",
+        "year": year,
+        "mermaid": "\n".join(lines),
+        "summary": dupont_analysis.get("summary", ""),
+        "red_flags": dupont_analysis.get("red_flags", []),
+        "data_boundary": "杜邦三因子由三大表确定性计算（净利率 × 总资产周转率 × 权益乘数 = ROE），原始科目值取自资产负债表与利润表；缺失科目以空值处理，需结合附注复核。",
+    }

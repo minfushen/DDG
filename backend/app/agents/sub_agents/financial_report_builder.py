@@ -9,10 +9,11 @@ import re
 import pandas as pd
 
 from app.codeact import run_codeact_tool
-from app.agents.sub_agents.financial_dashboard_builder import build_financial_dashboard
+from app.agents.sub_agents.financial_dashboard_builder import build_dupont_mermaid, build_financial_dashboard
 from app.agents.sub_agents.financial_narrative_writer import build_financial_narrative
 from app.agents.sub_agents.financial_knowledge_context import build_financial_knowledge_context
 from app.agents.sub_agents.structured_financial_data import build_structured_financial_package
+from app.agents.sub_agents.dupont_analyzer import build_dupont_analysis
 
 
 def _year_columns(df: Optional[pd.DataFrame]) -> List[str]:
@@ -1020,6 +1021,8 @@ def build_financial_analysis_report(
     industry_context: Optional[Dict[str, Any]] = None,
     business_segments: Optional[List[Dict[str, Any]]] = None,
     annual_business_review: Optional[Dict[str, Any]] = None,
+    five_see_analysis: Optional[Dict[str, Any]] = None,
+    approval_opinion: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """基于三大表生成银行财务状况分析报告结构。"""
     income = financial_data.get("income_statement")
@@ -1030,6 +1033,9 @@ def build_financial_analysis_report(
     years = sorted(set(_year_columns(income)) | set(_year_columns(balance)) | set(_year_columns(cash_flow)))
     years = years[-3:] if len(years) > 3 else years
     codeact_evidence_refs = [item["id"] for item in codeact_evidence if item.get("id")]
+
+    dupont_analysis = build_dupont_analysis(financial_data)
+    dupont_mermaid = build_dupont_mermaid(enterprise_name, dupont_analysis)
 
     annual_report_notes = annual_report_notes or {}
     business_segments = annual_report_notes.get("business_segments") or []
@@ -1516,4 +1522,8 @@ def build_financial_analysis_report(
         "narrative_quality_warnings": narrative.get("quality_warnings") or [],
         "risk_summary": risk_items,
         "annual_report_notes": annual_report_notes,
+        "dupont_analysis": dupont_analysis,
+        "dupont_mermaid": dupont_mermaid,
+        "five_see_analysis": five_see_analysis or {},
+        "approval_opinion": approval_opinion or {},
     }

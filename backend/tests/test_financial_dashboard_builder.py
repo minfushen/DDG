@@ -1,4 +1,4 @@
-from app.agents.sub_agents.financial_dashboard_builder import build_financial_dashboard
+from app.agents.sub_agents.financial_dashboard_builder import build_dupont_mermaid, build_financial_dashboard
 
 
 def test_financial_dashboard_builds_nine_charts_with_refs():
@@ -56,3 +56,83 @@ def test_financial_dashboard_skips_all_empty_charts():
     )
 
     assert dashboard["charts"] == []
+
+
+def _mock_dupont_analysis():
+    return {
+        "success": True,
+        "factors": {
+            "roe": {"2023": 0.015},
+            "net_margin": {"2023": 3 / 140},
+            "asset_turnover": {"2023": 140 / 400},
+            "equity_multiplier": {"2023": 2.0},
+        },
+        "decomposition": [
+            {
+                "year": "2023",
+                "roe": 0.015,
+                "net_margin": 3 / 140,
+                "asset_turnover": 140 / 400,
+                "equity_multiplier": 2.0,
+                "revenue": 14_000_000_000.0,
+                "net_profit": 300_000_000.0,
+                "total_assets": 40_000_000_000.0,
+                "equity": 20_000_000_000.0,
+                "driver": "",
+            }
+        ],
+        "red_flags": ["净利率仅 2.1%，主业盈利能力偏弱。"],
+        "summary": "杜邦分析覆盖 2023 年共 1 年。",
+    }
+
+
+def test_build_dupont_mermaid_generates_flowchart():
+    spec = build_dupont_mermaid("测试公司", _mock_dupont_analysis())
+
+    assert spec is not None
+    assert spec["title"] == "测试公司杜邦分解（2023年）"
+    assert spec["mermaid"].startswith("graph TD")
+    assert "ROE 净资产收益率<br/>1.50%" in spec["mermaid"]
+    assert "销售净利率<br/>2.14%" in spec["mermaid"]
+    assert "总资产周转率<br/>0.35" in spec["mermaid"]
+    assert "权益乘数<br/>2.00" in spec["mermaid"]
+    assert "净利润<br/>3.00亿元" in spec["mermaid"]
+    assert "营业收入<br/>140.00亿元" in spec["mermaid"]
+    assert "总资产<br/>400.00亿元" in spec["mermaid"]
+    assert "所有者权益<br/>200.00亿元" in spec["mermaid"]
+    assert "classDef roe" in spec["mermaid"]
+    assert spec["red_flags"]
+    assert spec["summary"]
+
+
+def test_build_dupont_mermaid_returns_none_without_data():
+    assert build_dupont_mermaid("测试公司", None) is None
+    assert build_dupont_mermaid("测试公司", {"success": False}) is None
+    assert build_dupont_mermaid("测试公司", {"success": True, "decomposition": []}) is None
+
+
+def test_build_dupont_mermaid_handles_missing_values():
+    spec = build_dupont_mermaid(
+        "测试公司",
+        {
+            "success": True,
+            "decomposition": [
+                {
+                    "year": "2024",
+                    "roe": None,
+                    "net_margin": None,
+                    "asset_turnover": None,
+                    "equity_multiplier": None,
+                    "revenue": None,
+                    "net_profit": None,
+                    "total_assets": None,
+                    "equity": None,
+                }
+            ],
+            "red_flags": [],
+            "summary": "",
+        },
+    )
+
+    assert spec is not None
+    assert "数据缺失" in spec["mermaid"]
