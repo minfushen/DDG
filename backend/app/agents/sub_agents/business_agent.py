@@ -8,10 +8,8 @@ from datetime import datetime
 import uuid
 import json
 
-from app.agents.tools.search_tool import search_enterprise_info
-from app.agents.tools.authoritative_business_tool import fetch_authoritative_business_info
 from app.agents.tools.business_search_tool import tavily_business_search
-from app.agents.sub_agents.business_report_builder import build_authoritative_business_report, build_business_analysis_report
+from app.agents.sub_agents.business_report_builder import build_business_analysis_report
 
 
 async def run_business_agent(enterprise_name: str) -> Dict[str, Any]:
@@ -27,7 +25,7 @@ async def run_business_agent(enterprise_name: str) -> Dict[str, Any]:
         timeline = []
         evidence = []
 
-        # 步骤1：获取工商信息
+        # 步骤1：获取工商信息（优先 Tavily 公开搜索）
         timeline.append({
             "id": str(uuid.uuid4()),
             "time": datetime.now().strftime("%H:%M:%S"),
@@ -38,27 +36,13 @@ async def run_business_agent(enterprise_name: str) -> Dict[str, Any]:
             "type": "discovery",
         })
 
-        registry_json = fetch_authoritative_business_info._run(enterprise_name=enterprise_name)
-        registry_result = json.loads(registry_json)
         search_result = None
         report = None
 
-        if registry_result.get("success"):
-            report = build_authoritative_business_report(enterprise_name, registry_result)
-            result = {
-                "统一社会信用代码": report.get("basic_info", {}).get("统一社会信用代码", {}).get("value", ""),
-                "注册资本": report.get("basic_info", {}).get("注册资本", {}).get("value", ""),
-                "成立日期": report.get("basic_info", {}).get("成立日期", {}).get("value", ""),
-                "经营范围": report.get("basic_info", {}).get("经营范围", {}).get("value", ""),
-                "股东信息": [],
-                "对外投资": [],
-            }
-        else:
-            # 调用 Tavily 搜索工具，失败时保留旧模拟工具兜底
-            search_json = tavily_business_search._run(enterprise_name=enterprise_name)
-            search_result = json.loads(search_json)
+        search_json = tavily_business_search._run(enterprise_name=enterprise_name)
+        search_result = json.loads(search_json)
 
-        if not report and search_result and search_result.get("success"):
+        if search_result and search_result.get("success"):
             report = build_business_analysis_report(enterprise_name, search_result)
             result = {
                 "统一社会信用代码": report.get("basic_info", {}).get("统一社会信用代码", {}).get("value", ""),
@@ -68,9 +52,16 @@ async def run_business_agent(enterprise_name: str) -> Dict[str, Any]:
                 "股东信息": [],
                 "对外投资": [],
             }
-        elif not report:
-            result_json = search_enterprise_info._run(enterprise_name=enterprise_name)
-            result = json.loads(result_json)
+        else:
+            report = _build_unavailable_business_report(enterprise_name, search_result)
+            result = {
+                "统一社会信用代码": "",
+                "注册资本": "",
+                "成立日期": "",
+                "经营范围": "",
+                "股东信息": [],
+                "对外投资": [],
+            }
 
         # 更新时间轴
         timeline[-1]["status"] = "completed"
@@ -79,26 +70,24 @@ async def run_business_agent(enterprise_name: str) -> Dict[str, Any]:
             f"注册资本{result.get('注册资本', '未知')}",
             f"经营范围覆盖{result.get('经营范围', '未知')[:20]}...",
         ]
-        if report:
-            if registry_result.get("success"):
-                timeline[-1]["detail"] = f"{report.get('generated_from')} + 字段级来源置信度抽取"
-            else:
-                attempts = registry_result.get("attempts", [])
-                failed_reasons = "；".join([item.get("reason", "") for item in attempts if item.get("reason")])
-                timeline[-1]["detail"] = "Tavily 搜索 + 字段级来源置信度抽取"
-                timeline[-1]["authority_attempt"] = failed_reasons or registry_result.get("error")
+        if search_result and search_result.get("success"):
+            timeline[-1]["detail"] = "Tavily 搜索 + 字段级来源置信度抽取"
             timeline[-1]["conclusion"] = "已生成结构化工商分析报告"
+        else:
+            timeline[-1]["detail"] = "公开搜索未取得稳定结果"
+            timeline[-1]["conclusion"] = "工商数据源暂未形成可用证据链，需人工复核后再纳入正式授信判断"
 
         # 添加证据
+        source_name = report.get("basic_info", {}).get("统一社会信用代码", {}).get("source_name", "Tavily 公开搜索") if search_result and search_result.get("success") else "公开搜索不可用"
         evidence.append({
             "label": "统一社会信用代码",
             "value": result.get("统一社会信用代码", ""),
-            "source": report.get("basic_info", {}).get("统一社会信用代码", {}).get("source_name", "Tavily 公开搜索") if report else "国家企业信用信息公示系统",
+            "source": source_name,
         })
         evidence.append({
             "label": "注册资本",
             "value": result.get("注册资本", ""),
-            "source": report.get("basic_info", {}).get("注册资本", {}).get("source_name", "Tavily 公开搜索") if report else "工商登记信息",
+            "source": report.get("basic_info", {}).get("注册资本", {}).get("source_name", source_name) if search_result and search_result.get("success") else source_name,
         })
 
         # 步骤2：分析股东结构
@@ -170,3 +159,33 @@ async def run_business_agent(enterprise_name: str) -> Dict[str, Any]:
             }],
             "evidence": [],
         }
+
+
+def _build_unavailable_business_report(enterprise_name: str, search_result: Dict[str, Any] | None) -> Dict[str, Any]:
+    """公开搜索不可用时返回带数据边界的兜底报告。"""
+    error = search_result.get("error", "公开搜索未取得稳定结果") if search_result else "未配置搜索工具"
+    return {
+        "report_type": "business_analysis",
+        "enterprise_name": enterprise_name,
+        "generated_from": "工商公开搜索不可用",
+        "risk_rating": "medium",
+        "risk_score": 55,
+        "recommendation": "工商数据源暂未形成可用证据链，需人工复核国家企业信用信息公示系统后再纳入正式授信判断。",
+        "basic_info": {
+            "统一社会信用代码": {"value": "", "source_name": error},
+            "注册资本": {"value": "", "source_name": error},
+            "成立日期": {"value": "", "source_name": error},
+            "经营范围": {"value": "", "source_name": error},
+        },
+        "shareholders": [],
+        "investments": [],
+        "risk_summary": [
+            "工商公开搜索未取得稳定结果，当前不展示模拟信息或推断性结论。",
+            "正式授信前需人工复核国家企业信用信息公示系统、天眼查/企查查等权威渠道。",
+        ],
+        "sections": [
+            {"title": "一、工商基本信息", "summary": []},
+            {"title": "二、股东与对外投资", "summary": []},
+            {"title": "三、人工核验要求", "risks": ["公开搜索不可用，需人工补充工商材料。"]},
+        ],
+    }

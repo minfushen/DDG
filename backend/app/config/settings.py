@@ -64,6 +64,14 @@ class Settings(BaseSettings):
     AUTO_INGEST_CNINFO_ANNUAL_REPORT: bool = True
     AUTO_INGEST_TIMEOUT_SECONDS: int = 60
 
+    # 巨潮资讯年报 PDF 是否启用四阶段解析管道（线上秒级回退开关）
+    ENABLE_CNINFO_PDF_PIPELINE: bool = True
+
+    # 财务分析 Agent 是否使用年报 PDF 解析作为三大表数据源。
+    # 关闭（默认）时仅使用东方财富/AKShare 等 API 结构化管道；
+    # PDF 解析三大表属数据治理团队职责，私有化交付时由客户提供结构化数据。
+    FINANCIAL_USE_PDF_PIPELINE: bool = False
+
     # MinerU 云端 PDF 解析服务配置
     MINERU_ENABLED: bool = True
     MINERU_API_TOKEN: str = ""
@@ -76,6 +84,30 @@ class Settings(BaseSettings):
     MINERU_POLL_INTERVAL_SECONDS: int = 5
     MINERU_MAX_FILE_SIZE_MB: int = 200
     MINERU_MAX_PAGES_PER_TASK: int = 200  # MinerU 精准解析单文件页数上限
+
+    # 四阶段 PDF 管道 Stage 2/4 视觉模型配置（OpenAI 兼容视觉 API）
+    # 若 MINICPMV_BASE_URL 非空，则优先使用本地 MiniCPM-V 服务
+    # 默认使用 OpenBMB 官方 MiniCPM-V 4.6 免费公钥（仅作 POC，有额度限制）
+    ENABLE_VISION_STAGE2: bool = True  # Stage 2：对检测到的表调用视觉模型重新照抄
+    ENABLE_VISION_STAGE4: bool = False  # Stage 4：校验失败时视觉兜底
+    VISION_LLM_PROVIDER: str = "openai_compatible"
+    # 模型名以 ModelBest API /v1/models 实际可用名为准（旧名 MiniCPM-V-4.6-1.3B-Instruct 会 404 lis_route_denied）
+    VISION_LLM_MODEL: str = "MiniCPM-V-4.6-Instruct"
+    VISION_LLM_API_KEY: str = "lis_sk_298cf78155f231c7_DkrDcNLHnK8dJRnfFrJCd4JGDbBLMkHrC3T-wLpvC9zy0BPemsyFuQ"
+    VISION_LLM_BASE_URL: str = "https://api.modelbest.co/v1"
+    VISION_LLM_TIMEOUT_SECONDS: int = 180
+    VISION_LLM_MAX_TOKENS: int = 4096
+    VISION_LLM_TEMPERATURE: float = 0.0
+    MINICPMV_BASE_URL: str = ""  # 本地 MiniCPM-V 服务地址，如 http://127.0.0.1:8000/v1
+    # 本地部署模型名可自定义；远程 ModelBest 端点要求 MiniCPM-V-4.6-Instruct
+    MINICPMV_MODEL: str = "MiniCPM-V-4.6-Instruct"
+    MINICPMV_API_KEY: str = ""  # 本地服务通常不需要，保留可覆盖
+    VISION_RENDER_DPI: int = 200
+    VISION_MAX_PAGES_PER_TABLE: int = 3
+    ACCOUNTING_VALIDATION_TOLERANCE: float = 0.005  # 相对容差 0.5%
+    # 树状递归深研：研究深度上限。1=仅首轮；2=首轮+二轮补证（旧行为，默认）；
+    # 3+=复杂企业（集团多层关联方）可继续深挖。受 max_iterations 守卫约束，不会无限递归。
+    RESEARCH_MAX_DEPTH: int = 2
 
     # Embedding 服务配置（SiliconFlow / OpenAI 兼容）
     EMBEDDING_PROVIDER: str = "siliconflow"  # dashscope | siliconflow
@@ -193,9 +225,12 @@ class Settings(BaseSettings):
 
     # 路径配置
     BASE_DIR: Path = Path(__file__).parent.parent.parent
+    DATA_DIR: Path = BASE_DIR / "data"
     OUTPUT_DIR: Path = BASE_DIR / "output"
     DB_DIR: Path = BASE_DIR / "db"
     CHECKPOINT_DIR: Path = BASE_DIR / "checkpoints"
+    KNOWLEDGE_BASE_DIR: Path = DATA_DIR / "knowledge_base"
+    REGRESSION_SAMPLES_DIR: Path = DATA_DIR / "regression_samples"
 
     class Config:
         env_file = str(Path(__file__).resolve().parents[2] / ".env")

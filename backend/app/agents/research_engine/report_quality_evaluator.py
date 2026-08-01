@@ -73,6 +73,12 @@ BAD_LANGUAGE_PATTERNS = [
     "啥玩意儿",
 ]
 
+# 合法超集短语：某些 bad pattern 是合法章节标题的子串（如"状况与偿债能力"是
+# "财务状况与偿债能力"的子串），匹配时需减去合法超集出现次数，避免对正文标题误报。
+LEGITIMATE_SUPERSETS = {
+    "状况与偿债能力": "财务状况与偿债能力",
+}
+
 FINANCIAL_KEYWORDS = [
     "近三年",
     "营业收入",
@@ -357,13 +363,23 @@ def _count_bad_phrases(text: str) -> int:
 
 
 def _find_bad_phrases(text: str) -> Dict[str, int]:
-    """Return a map of matched bad-language patterns and their occurrence counts."""
+    """Return a map of matched bad-language patterns and their occurrence counts.
+
+    某些 pattern 是合法章节标题的子串（如"状况与偿债能力"⊂"财务状况与偿债能力"），
+    需减去合法超集的出现次数，避免对正文标题误报。
+    """
     text_lower = text.lower()
-    return {
-        pattern: len(re.findall(re.escape(pattern), text, flags=re.IGNORECASE))
-        for pattern in BAD_LANGUAGE_PATTERNS
-        if pattern.lower() in text_lower
-    }
+    result: Dict[str, int] = {}
+    for pattern in BAD_LANGUAGE_PATTERNS:
+        if pattern.lower() not in text_lower:
+            continue
+        count = len(re.findall(re.escape(pattern), text, flags=re.IGNORECASE))
+        legit = LEGITIMATE_SUPERSETS.get(pattern)
+        if legit and legit.lower() in text_lower:
+            count -= len(re.findall(re.escape(legit), text, flags=re.IGNORECASE))
+        if count > 0:
+            result[pattern] = count
+    return result
 
 
 def _all_evidence_refs(chapters: Dict[str, Dict[str, Any]]) -> List[str]:

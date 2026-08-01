@@ -7,6 +7,7 @@ sse-starlette>=2.0.0  # SSE 流式响应
 
 # LLM 相关（LangGraph + LangChain）- M2 阶段
 langgraph>=0.2.0      # Agent 工作流编排
+langgraph-checkpoint-sqlite>=2.0.0  # LangGraph SQLite checkpointer（P0-1 中断恢复）
 langchain>=0.2.0      # LangChain 核心
 langchain-openai>=0.1.0  # OpenAI 兼容接口
 langchain-community>=0.2.0  # 社区集成
@@ -15,6 +16,9 @@ langchain-mcp-adapters>=0.1.0  # MCP 工具转 LangChain Tool（可选增强）
 
 # 向量库 - M3 阶段
 chromadb>=0.5.0
+# SegmentAPI（非 Rust 后端）所需向量索引 fork，带 file_handle_count 等扩展属性；
+# chromadb 1.1.x 默认走 Rust 绑定，改用 SegmentAPI 时必须显式安装。
+chroma-hnswlib>=0.7.3
 
 # 数据处理（Rebecca 依赖）
 pandas>=2.0.0

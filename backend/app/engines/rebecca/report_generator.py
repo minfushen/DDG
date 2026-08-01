@@ -6,6 +6,19 @@ from datetime import datetime
 import json
 
 
+# 财务分析报告的维度渲染顺序（key 对应 analyzers.generate_full_analysis 的输出 key）
+# P2.2/P2.3 新增的盈利趋势与归因、盈利质量在此接入报告正文。
+_FINANCIAL_SECTIONS = [
+    ("profitability", "盈利能力"),
+    ("solvency", "偿债能力"),
+    ("efficiency", "营运能力"),
+    ("growth", "成长能力"),
+    ("cash_flow", "现金流"),
+    ("profitability_trend", "盈利趋势与归因"),
+    ("earnings_quality", "盈利质量"),
+]
+
+
 class ReportGenerator:
     """尽调报告生成器"""
 
@@ -64,17 +77,11 @@ class ReportGenerator:
 
             # 添加目录
             doc.add_heading("目录", level=1)
-            toc_items = [
-                "1. 企业基本信息",
-                "2. 财务分析概览",
-                "3. 盈利能力分析",
-                "4. 偿债能力分析",
-                "5. 营运能力分析",
-                "6. 成长能力分析",
-                "7. 现金流分析",
-                "8. 风险提示",
-                "9. 结论与建议",
-            ]
+            risk_num = 3 + len(_FINANCIAL_SECTIONS)
+            conc_num = risk_num + 1
+            toc_items = ["1. 企业基本信息", "2. 财务分析概览"]
+            toc_items += [f"{i}. {name}分析" for i, (_, name) in enumerate(_FINANCIAL_SECTIONS, start=3)]
+            toc_items += [f"{risk_num}. 风险提示", f"{conc_num}. 结论与建议"]
             for item in toc_items:
                 doc.add_paragraph(item, style="List Number")
 
@@ -88,54 +95,39 @@ class ReportGenerator:
 
             # 2. 财务分析概览
             doc.add_heading("2. 财务分析概览", level=1)
-            doc.add_paragraph("本报告基于企业提供的财务数据，从以下 10 个维度进行全面分析:")
-            dimensions = [
-                "盈利能力", "偿债能力", "营运能力", "成长能力",
-                "现金流", "成本结构", "资产质量", "负债结构",
-                "盈利趋势", "风险评估",
-            ]
-            for dim in dimensions:
-                doc.add_paragraph(f"• {dim}", style="List Bullet")
+            doc.add_paragraph(
+                f"本报告基于企业提供的财务数据，从以下 {len(_FINANCIAL_SECTIONS)} 个维度进行全面分析:")
+            for _, name in _FINANCIAL_SECTIONS:
+                doc.add_paragraph(f"• {name}", style="List Bullet")
 
-            # 3-7. 各维度分析
-            dimension_names = {
-                "profitability": "盈利能力",
-                "solvency": "偿债能力",
-                "efficiency": "营运能力",
-                "growth": "成长能力",
-                "cash_flow": "现金流",
-            }
-
+            # 3~N. 各维度分析
             section_num = 3
-            for dim_key, dim_name in dimension_names.items():
+            for dim_key, dim_name in _FINANCIAL_SECTIONS:
                 doc.add_heading(f"{section_num}. {dim_name}分析", level=1)
 
                 if dim_key in analysis_result:
                     tables = analysis_result[dim_key]
                     for table_name, table_data in tables.items():
                         doc.add_heading(f"{dim_name} - {table_name}", level=2)
-                        # TODO: 将 DataFrame 转换为 Word 表格
-                        doc.add_paragraph(json.dumps(table_data, ensure_ascii=False, indent=2))
+                        self._render_table_docx(doc, table_data)
                 else:
                     doc.add_paragraph("暂无数据")
 
                 section_num += 1
 
-            # 8. 风险提示
-            doc.add_heading("8. 风险提示", level=1)
+            # 风险提示
+            doc.add_heading(f"{risk_num}. 风险提示", level=1)
             if "risk_assessment" in analysis_result:
                 risk_data = analysis_result["risk_assessment"]
-                if "risk_summary" in risk_data:
-                    for _, row in risk_data["risk_summary"].iterrows():
-                        doc.add_paragraph(
-                            f"[{row.get('风险等级', '未知')}] {row.get('风险描述', '')}",
-                            style="List Bullet"
-                        )
+                if "risk_summary" in risk_data and not risk_data["risk_summary"].empty:
+                    self._render_table_docx(doc, risk_data["risk_summary"])
+                else:
+                    doc.add_paragraph("暂无重大风险提示")
             else:
                 doc.add_paragraph("暂无重大风险提示")
 
-            # 9. 结论与建议
-            doc.add_heading("9. 结论与建议", level=1)
+            # 结论与建议
+            doc.add_heading(f"{conc_num}. 结论与建议", level=1)
             doc.add_paragraph("基于以上分析，对企业财务状况的总体评价和建议如下:")
             doc.add_paragraph("1. 企业整体财务状况良好，盈利能力稳定")
             doc.add_paragraph("2. 偿债能力处于行业正常水平")
@@ -176,6 +168,57 @@ class ReportGenerator:
         if isinstance(obj, dict):
             return {k: ReportGenerator._to_serializable(v) for k, v in obj.items()}
         return obj
+
+    @staticmethod
+    def _render_table_docx(doc, table_data: Any) -> None:
+        """把 DataFrame 渲染成 Word 表格；非 DataFrame 回退 json 文本。"""
+        try:
+            import pandas as pd
+        except Exception:
+            pd = None
+        if pd is not None and isinstance(table_data, pd.DataFrame) and not table_data.empty:
+            header = [str(c) for c in table_data.columns]
+            records = table_data.astype(str).values.tolist()
+            t = doc.add_table(rows=len(records) + 1, cols=len(header))
+            try:
+                t.style = "Light Grid Accent 1"
+            except Exception:
+                pass
+            for c, h in enumerate(header):
+                t.cell(0, c).text = str(h)
+            for r, row in enumerate(records, 1):
+                for c, val in enumerate(row):
+                    t.cell(r, c).text = str(val)
+        else:
+            doc.add_paragraph(json.dumps(table_data, ensure_ascii=False, indent=2, default=str))
+
+    @staticmethod
+    def _render_table_pdf(flow: list, table_data: Any, cn_font: str, P_func) -> None:
+        """把 DataFrame 渲染成 reportlab 表格追加到 flow；非 DataFrame 回退 Preformatted。"""
+        from reportlab.platypus import Table, TableStyle, Preformatted
+        from reportlab.lib import colors
+        try:
+            import pandas as pd
+        except Exception:
+            pd = None
+        if pd is not None and isinstance(table_data, pd.DataFrame) and not table_data.empty:
+            header = [str(c) for c in table_data.columns]
+            rows = [[str(c) for c in row] for row in table_data.astype(str).values.tolist()]
+            data = [header] + rows
+            t = Table(data, repeatRows=1)
+            t.setStyle(TableStyle([
+                ("FONTNAME", (0, 0), (-1, -1), cn_font),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]))
+            flow.append(t)
+        else:
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            pre = ParagraphStyle("PreCn", parent=getSampleStyleSheet()["Code"], fontName=cn_font, fontSize=7.5, leading=10)
+            flow.append(Preformatted(
+                json.dumps(table_data, ensure_ascii=False, indent=2, default=str), pre))
 
     @staticmethod
     def _risk_summary_rows(analysis_result: Dict[str, Any]) -> list:
@@ -243,8 +286,12 @@ class ReportGenerator:
         ]
 
         flow.append(P("目录", h1))
-        for item in ["1. 企业基本信息", "2. 财务分析概览", "3. 盈利能力分析", "4. 偿债能力分析",
-                     "5. 营运能力分析", "6. 成长能力分析", "7. 现金流分析", "8. 风险提示", "9. 结论与建议"]:
+        _risk_num = 3 + len(_FINANCIAL_SECTIONS)
+        _conc_num = _risk_num + 1
+        _toc = ["1. 企业基本信息", "2. 财务分析概览"]
+        _toc += [f"{i}. {name}分析" for i, (_, name) in enumerate(_FINANCIAL_SECTIONS, start=3)]
+        _toc += [f"{_risk_num}. 风险提示", f"{_conc_num}. 结论与建议"]
+        for item in _toc:
             flow.append(P(item, body))
         flow.append(PageBreak())
 
@@ -253,33 +300,33 @@ class ReportGenerator:
         flow.append(P("报告类型: 财务尽职调查"))
         flow.append(P(f"分析日期: {datetime.now().strftime('%Y-%m-%d')}"))
 
-        flow.append(P("2. 财务分析概览", h1))
-        flow.append(P("本报告基于企业提供的财务数据，从以下 10 个维度进行全面分析:"))
-        flow.append(bullets(["盈利能力", "偿债能力", "营运能力", "成长能力", "现金流",
-                             "成本结构", "资产质量", "负债结构", "盈利趋势", "风险评估"]))
+        risk_num = 3 + len(_FINANCIAL_SECTIONS)
+        conc_num = risk_num + 1
 
-        dimension_names = {
-            "profitability": "盈利能力", "solvency": "偿债能力",
-            "efficiency": "营运能力", "growth": "成长能力", "cash_flow": "现金流",
-        }
+        flow.append(P("2. 财务分析概览", h1))
+        flow.append(P(f"本报告基于企业提供的财务数据，从以下 {len(_FINANCIAL_SECTIONS)} 个维度进行全面分析:"))
+        flow.append(bullets([name for _, name in _FINANCIAL_SECTIONS]))
+
         num = 3
-        for dim_key, dim_name in dimension_names.items():
+        for dim_key, dim_name in _FINANCIAL_SECTIONS:
             flow.append(P(f"{num}. {dim_name}分析", h1))
             if dim_key in analysis_result:
                 tables = analysis_result[dim_key]
                 for table_name, table_data in tables.items():
                     flow.append(P(f"{dim_name} - {table_name}", body))
-                    flow.append(Preformatted(
-                        json.dumps(self._to_serializable(table_data), ensure_ascii=False, indent=2), pre))
+                    self._render_table_pdf(flow, table_data, cn, P)
             else:
                 flow.append(P("暂无数据"))
             num += 1
 
-        flow.append(P("8. 风险提示", h1))
-        risk_rows = self._risk_summary_rows(analysis_result)
-        flow.append(bullets(risk_rows) if risk_rows else P("暂无重大风险提示"))
+        flow.append(P(f"{risk_num}. 风险提示", h1))
+        risk_summary = analysis_result.get("risk_assessment", {}).get("risk_summary")
+        if risk_summary is not None and hasattr(risk_summary, "iterrows") and not risk_summary.empty:
+            self._render_table_pdf(flow, risk_summary, cn, P)
+        else:
+            flow.append(P("暂无重大风险提示"))
 
-        flow.append(P("9. 结论与建议", h1))
+        flow.append(P(f"{conc_num}. 结论与建议", h1))
         flow.append(P("基于以上分析，对企业财务状况的总体评价和建议如下:"))
         flow.append(bullets(["企业整体财务状况良好，盈利能力稳定",
                              "偿债能力处于行业正常水平",
@@ -296,11 +343,13 @@ class ReportGenerator:
     # ──────────────────────────────────────────────────────────────────────────
 
     def generate_from_report(self, report: Dict[str, Any], company_name: str, format: str = "docx") -> str:
-        """把结构化授信报告（嵌套 dict）渲染为 docx / pdf 文件并返回路径。"""
+        """把结构化授信报告（嵌套 dict）渲染为 docx / pdf / markdown 文件并返回路径。"""
         if format == "docx":
             return self._render_structured_docx(company_name, report)
         elif format == "pdf":
             return self._render_structured_pdf(company_name, report)
+        elif format == "md":
+            return self._render_structured_md(company_name, report)
         else:
             raise ValueError(f"不支持的报告格式: {format}")
 
@@ -434,4 +483,50 @@ class ReportGenerator:
         filepath = self.output_dir / filename
         doc = SimpleDocTemplate(str(filepath), pagesize=A4, title=f"{company_name} 尽职调查报告")
         doc.build(flow)
+        return str(filepath)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Markdown 报告（轻量、可版本控制、便于人工复核）
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _md_escape_cell(text: str) -> str:
+        """转义 Markdown 表格单元格中的管道符与换行。"""
+        return str(text).replace("|", "\\|").replace("\n", " ").replace("\r", "")
+
+    def _render_structured_md(self, company_name: str, report: Dict[str, Any]) -> str:
+        """把结构化授信报告渲染为 Markdown 文件并返回路径。"""
+        blocks: list = []
+        self._collect_blocks("", report, blocks, level=2)
+
+        lines: list[str] = []
+        lines.append(f"# {company_name} 尽职调查报告")
+        lines.append("")
+        lines.append(f"> 报告生成日期：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append("")
+
+        for kind, content in blocks:
+            if kind.startswith("h"):
+                level = int(kind[1])
+                lines.append(f"{'#' * level} {content}")
+                lines.append("")
+            elif kind == "p":
+                lines.append(str(content))
+                lines.append("")
+            elif kind == "bullets":
+                for item in content:
+                    lines.append(f"- {item}")
+                lines.append("")
+            elif kind == "table":
+                if content:
+                    header = [self._md_escape_cell(cell) for cell in content[0]]
+                    lines.append("| " + " | ".join(header) + " |")
+                    lines.append("| " + " | ".join(["---"] * len(header)) + " |")
+                    for row in content[1:]:
+                        lines.append("| " + " | ".join(self._md_escape_cell(cell) for cell in row) + " |")
+                    lines.append("")
+
+        filename = f"{company_name}_授信报告_{datetime.now().strftime('%Y%m%d')}.md"
+        filepath = self.output_dir / filename
+        filepath.write_text("\n".join(lines), encoding="utf-8")
         return str(filepath)

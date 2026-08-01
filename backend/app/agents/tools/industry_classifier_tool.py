@@ -17,7 +17,7 @@ from app.agents.tools.listed_company_tool import resolve_listed_company
 from app.agents.tools.industry_llm_classifier import adjudicate_industry_with_llm
 
 
-INDUSTRY_CODE_PATH = settings.BASE_DIR / "knowledge_base" / "industry_codes" / "industry_code4.json"
+INDUSTRY_CODE_PATH = settings.KNOWLEDGE_BASE_DIR / "industry_codes" / "industry_code4.json"
 
 
 GUIDE_MAP = {

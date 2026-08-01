@@ -59,6 +59,8 @@ class ResearchState(TypedDict, total=False):
     max_iterations: int
     errors: List[str]
     report: Optional[Dict[str, Any]]
+    current_depth: int
+    max_depth: int
 
 
 def timeline_event(agent: str, content: str, detail: str = "", status: str = "completed", event_type: str = "action") -> Dict[str, Any]:
@@ -93,5 +95,8 @@ def initial_state(enterprise_name: str, objective: str = "完整贷前尽调", m
         "max_iterations": max_iterations,
         "errors": [],
         "report": None,
+        "quality_rounds": 0,
+        "current_depth": 1,
+        "max_depth": 2,
     }
 

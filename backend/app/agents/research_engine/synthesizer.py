@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .report_assembler import claim_findings, financial_findings, industry_findings, refs_for_category
+from .report_assembler import claim_findings, financial_findings, industry_findings, relationship_findings, sentiment_findings, refs_for_category, sanitize_chapter_refs
 from .state import ResearchState
 from .tool_trace import public_tool_traces
 
@@ -846,18 +846,73 @@ def _chapter(
     }
 
 
-def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
+def _deepresearch_sub_reports(report_chapters: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """把 DeepResearch 报告的 ``report_chapters`` 转成渲染器可消费的 sub_reports。
+
+    渲染器（render_report_from_template）按维度取：
+    - ``report_chapters`` 用于「子报告嵌入」块（整章嵌入）；
+    - ``recommendation`` / ``risk_summary`` 用于「解读位置」块。
+    """
+
+    def _as_list(value: Any) -> List[str]:
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return [str(v) for v in value]
+        return []
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for ch in report_chapters or []:
+        cid = ch.get("id")
+        if not cid:
+            continue
+        summary = _as_list(ch.get("summary"))
+        out[cid] = {
+            "report_chapters": [ch],
+            "recommendation": "\n".join(summary[:2]) if summary else None,
+            "risk_summary": _as_list(ch.get("risks")),
+        }
+    return out
+
+
+def _deepresearch_financial_indicators(fin_sub_report: Optional[Dict[str, Any]]) -> Dict[str, str]:
+    """从 DeepResearch 财务章节文本中抽可绑定指标值，供模板指标位使用。"""
+    if not fin_sub_report:
+        return {}
+    from app.template.renderer import _find_indicator_in_text
+
+    texts: List[str] = []
+    for ch in fin_sub_report.get("report_chapters", []) or []:
+        texts.append(" ".join(str(s) for s in (ch.get("summary") or [])))
+        for sub in ch.get("subsections", []) or []:
+            items = sub.get("items") if isinstance(sub, dict) else None
+            if isinstance(items, list):
+                texts.append(" ".join(str(i) for i in items))
+    text = " ".join(texts)
+    labels = ["营业收入", "净利润", "资产负债率", "毛利率", "净利率", "经营活动现金流净额", "流动比率", "营收增速"]
+    out: Dict[str, str] = {}
+    for label in labels:
+        val = _find_indicator_in_text(label, text)
+        if val:
+            out[label] = val
+    return out
+
+
+def synthesize_research_report(state: ResearchState, template: Any = None) -> Dict[str, Any]:
     tasks = state.get("tasks", [])
     claims = state.get("claims", [])
     gaps = state.get("gaps", [])
     evidence = state.get("evidence", [])
-    high_gaps = [gap for gap in gaps if gap.get("severity") == "high"]
+    # 风险评分仅依据规则反射的确定性 gaps；排除 Sequential Thinking MCP 注入的
+    # advisory gaps（source=sequential_thinking_mcp），其非确定性会导致 risk_rating 漂移
+    rule_gaps = [gap for gap in gaps if gap.get("source") != "sequential_thinking_mcp"]
+    high_gaps = [gap for gap in rule_gaps if gap.get("severity") == "high"]
     enterprise_name = state.get("enterprise_name")
     blueprint = (state.get("planner") or {}).get("metadata", {}).get("blueprint", {})
-    financial_gaps = [gap for gap in gaps if gap.get("task_id") and "financial" in gap.get("task_id", "")]
-    legal_gaps = [gap for gap in gaps if gap.get("task_id") and "legal" in gap.get("task_id", "")]
-    business_gaps = [gap for gap in gaps if gap.get("task_id") and ("business" in gap.get("task_id", "") or "identity" in gap.get("task_id", ""))]
-    industry_gaps = [gap for gap in gaps if gap.get("task_id") and "industry" in gap.get("task_id", "")]
+    financial_gaps = [gap for gap in rule_gaps if gap.get("task_id") and "financial" in gap.get("task_id", "")]
+    legal_gaps = [gap for gap in rule_gaps if gap.get("task_id") and "legal" in gap.get("task_id", "")]
+    business_gaps = [gap for gap in rule_gaps if gap.get("task_id") and ("business" in gap.get("task_id", "") or "identity" in gap.get("task_id", ""))]
+    industry_gaps = [gap for gap in rule_gaps if gap.get("task_id") and "industry" in gap.get("task_id", "")]
 
     business_score = _score_dimension(len(business_gaps), len([gap for gap in business_gaps if gap.get("severity") == "high"]), not _category_items(evidence, "business"))
     financial_score = _score_dimension(len(financial_gaps), len([gap for gap in financial_gaps if gap.get("severity") == "high"]), not _category_items(evidence, "financial"))
@@ -893,6 +948,45 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
     financial_structured_subsections = _financial_structured_subsections(evidence)
     legal_summary = _finding_summary(legal_findings, legal_fallback)
     industry_summary = _industry_report_summary(evidence) or _finding_summary(industry_findings_rows, industry_fallback)
+
+    relationship_findings_rows = relationship_findings(evidence) or claim_findings(
+        claims, tasks, "relationship", "未获取到股权、担保与关联网络数据，需人工核验关联关系。"
+    )
+    relationship_report: Dict[str, Any] = {}
+    for item in evidence:
+        r = ((item.get("metadata") or {}).get("relationship_analysis_report") or {})
+        if r:
+            relationship_report = r
+            break
+    if relationship_report:
+        rsum = relationship_report.get("summary") or {}
+        relationship_summary = [
+            f"实际控制人：{rsum.get('实际控制人')}",
+            f"对外担保 {rsum.get('对外担保笔数')} 笔、股权冻结 {rsum.get('股权冻结项')} 项、关联方 {rsum.get('关联方数量')} 个",
+            f"关联风险评级：{relationship_report.get('risk_rating')}",
+        ]
+    else:
+        relationship_summary = ["未获取到关联网络数据，需人工核验股权、担保与关联关系。"]
+    relationship_refs = refs_for_category(evidence, "relationship")
+
+    sentiment_findings_rows = sentiment_findings(evidence) or claim_findings(
+        claims, tasks, "sentiment", "未获取到企业舆情数据，需人工监测公开信息与权威源。"
+    )
+    sentiment_report: Dict[str, Any] = {}
+    for item in evidence:
+        r = ((item.get("metadata") or {}).get("sentiment_analysis_report") or {})
+        if r:
+            sentiment_report = r
+            break
+    if sentiment_report:
+        ssum = sentiment_report.get("summary") or {}
+        sentiment_summary = [
+            f"检索舆情 {ssum.get('检索结果')} 条，负面 {ssum.get('负面')} 条（权威源 {ssum.get('权威源负面')} 条）",
+            f"声誉风险评级：{sentiment_report.get('risk_rating')}",
+        ]
+    else:
+        sentiment_summary = ["未获取到企业舆情数据，需人工监测公开信息与权威源。"]
+    sentiment_refs = refs_for_category(evidence, "sentiment")
 
     business_refs = refs_for_category(evidence, "business")
     financial_refs = refs_for_category(evidence, "financial")
@@ -1015,8 +1109,24 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
             risks=_gap_descriptions(legal_gaps),
         ),
         _chapter(
+            "relationship",
+            "七、关联网络与关联交易",
+            "股权结构、实际控制人、对外担保/质押、股权冻结与上下游供应链位置",
+            relationship_summary,
+            relationship_refs,
+            relationship_findings_rows,
+        ),
+        _chapter(
+            "sentiment",
+            "八、舆情与声誉风险",
+            "公开舆情、监管处罚、声誉风险信号与权威源负面线索",
+            sentiment_summary,
+            sentiment_refs,
+            sentiment_findings_rows,
+        ),
+        _chapter(
             "risks",
-            "七、交叉验证与重大风险",
+            "九、交叉验证与重大风险",
             "财务与经营范围、现金流与利润、司法风险与授信安全边界、行业周期与还款来源",
             [item["conclusion"] for item in cross_findings],
             all_core_refs,
@@ -1027,7 +1137,7 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
         ),
         _chapter(
             "credit",
-            "八、信贷方案建议",
+            "十、信贷方案建议",
             "准入/审慎/暂缓、额度建议、期限建议、担保建议、提款前置条件与贷后监控指标",
             credit_summary,
             credit_refs,
@@ -1043,7 +1153,7 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
         ),
         _chapter(
             "evidence",
-            "九、证据链与待补充材料",
+            "十一、证据链与待补充材料",
             "Evidence 列表、证据缺口、待客户补充材料与人工复核事项",
             ["本章节用于审查追溯：列示支撑结论的资料、仍需补充的客户材料和人工复核事项。"],
             all_core_refs,
@@ -1058,7 +1168,23 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
         ),
     ]
 
-    return {
+    # P1 修复：剔除章节内引用了不存在 evidence ID 的 evidence_refs
+    report_chapters = sanitize_chapter_refs(report_chapters, evidence)
+
+    # 多意图槽位：把用户输入的配置（时间窗口/深度/对比/细分/授信假设/材料/格式）
+    # 落为报告级 research_config，供前端渲染与下游消费（brief/slides 等）。
+    _slots = state.get("slots") or (state.get("parsed_intent") or {}).get("slots") or {}
+    research_config = {
+        "depth": _slots.get("depth"),
+        "time_window": _slots.get("time_window"),
+        "comparison": _slots.get("comparison"),
+        "industry_segment": _slots.get("industry_segment"),
+        "credit_assumptions": _slots.get("credit_assumptions"),
+        "has_on_site_materials": _slots.get("has_on_site_materials"),
+        "output_format": _slots.get("output_format"),
+    }
+
+    report = {
         "report_type": "deepresearch_due_diligence",
         "enterprise_name": enterprise_name,
         "objective": state.get("objective"),
@@ -1087,6 +1213,23 @@ def synthesize_research_report(state: ResearchState) -> Dict[str, Any]:
         "gaps": gaps,
         "summary": summary,
         "source_reliability_summary": _source_summary(evidence),
+        "research_config": research_config,
         "data_boundary": "本报告由智能尽调 DeepResearch 引擎基于公开资料、知识库和本地工具生成。公开搜索结果仅作为线索，正式授信前需结合权威工商、司法、财报和客户原始材料人工复核。",
         "timeline": state.get("timeline", []),
     }
+
+    # 非功能需求①：把用户上传模板也用于 DeepResearch 综合报告（与财务增强 DD 报告一致）。
+    # 模板章节按用户上传结构组织，并嵌入对应维度的专项结论、指标与解读位置。
+    if template is not None:
+        from app.template.models import ReportTemplate
+        from app.template.renderer import render_report_from_template
+
+        tpl = template if isinstance(template, ReportTemplate) else ReportTemplate.model_validate(template)
+        dr_sub_reports = _deepresearch_sub_reports(report_chapters)
+        dr_indicators = _deepresearch_financial_indicators(dr_sub_reports.get("financial"))
+        report["template_sections"] = render_report_from_template(
+            tpl, dr_sub_reports, indicators=dr_indicators, overall_summary=summary,
+        )
+        report["template"] = {"id": tpl.id, "name": tpl.name, "is_active": tpl.is_active}
+
+    return report

@@ -108,9 +108,13 @@ def _build_prompt(
     key_metrics: Dict[str, Any] | None,
     key_metric_series: Dict[str, Dict[str, str]] | None,
     business_segments: List[Dict[str, Any]] | None,
+    risk_section: str | None = None,
 ) -> str:
     # 经营讨论正文截到 8000 字（与 extractor 上限对齐），保证归因依据完整。
     review_text = (business_review or "").strip()[:8000]
+    # 风险因素章节（来自巨潮年报 PDF「公司面临的风险和应对措施」）截到 4000 字，
+    # 作为 forward_risks 的权威抽取来源。
+    risk_text = (risk_section or "").strip()[:4000]
     metric_context = _metric_context(key_metrics, None)
     series_lines = json.dumps(key_metric_series or {}, ensure_ascii=False)
     segment_lines = _segment_summary(business_segments) or "[无]"
@@ -122,6 +126,7 @@ def _build_prompt(
         "series_lines": series_lines,
         "segment_lines": segment_lines,
         "review_text": review_text,
+        "risk_section_text": risk_text,
         "banned_terms": ", ".join(BANNED_TERMS),
     }
     return render_prompt_template(template, variables).strip()
@@ -230,6 +235,18 @@ def _quality_warnings(attribution: Dict[str, Any]) -> List[str]:
     industry_number_pattern = re.findall(r"行业(?:中位数|均值|平均|同业)[^，。；]*?(\d+(?:\.\d+)?)", joined)
     if industry_number_pattern:
         warnings.append(f"归因输出疑似编造行业基准数字：{industry_number_pattern[:3]}")
+    # 完整性软告警：profit_drivers / capacity_status / forward_risks 是归因深度的核心。
+    # 以 [soft] 前缀标记，不阻断报告生成，但供竞速择优时优先选择更完整的候选。
+    missing = [
+        name for name, val in (
+            ("profit_drivers", attribution.get("profit_drivers")),
+            ("capacity_status", attribution.get("capacity_status")),
+            ("forward_risks", attribution.get("forward_risks")),
+        )
+        if not (val if isinstance(val, list) else str(val or "").strip())
+    ]
+    if missing and (attribution.get("revenue_drivers") or attribution.get("margin_drivers")):
+        warnings.append(f"[soft] 归因不完整：缺失 {'/'.join(missing)}")
     return warnings[:6]
 
 
@@ -267,7 +284,27 @@ def _race(
     }
     deadline = time.monotonic() + LLM_ATTRIBUTION_TIMEOUT_SECONDS
     errors: List[str] = []
-    first_candidate: Dict[str, Any] | None = None
+    best_candidate: Dict[str, Any] | None = None
+    best_score = None
+
+    def _score(result: Dict[str, Any]):
+        attr = result.get("attribution") or {}
+        warnings = result.get("quality_warnings") or []
+        # [soft] 前缀为完整性软告警，其余为硬告警（禁用词/缺证据/编造数字/空抽取）。
+        hard = sum(1 for w in warnings if not w.startswith("[soft]"))
+        soft = sum(1 for w in warnings if w.startswith("[soft]"))
+        filled = (
+            len(attr.get("revenue_drivers") or [])
+            + len(attr.get("margin_drivers") or [])
+            + len(attr.get("profit_drivers") or [])
+            + len(attr.get("forward_risks") or [])
+            + (1 if attr.get("capacity_status") else 0)
+            + (1 if attr.get("industry_context") else 0)
+            + (1 if attr.get("company_strategy") else 0)
+        )
+        # 优先级：硬告警少 > 软告警少 > 填充字段多（取负填充以便升序比较）。
+        return (hard, soft, -filled)
+
     while futures:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
@@ -290,19 +327,22 @@ def _race(
             warnings = _quality_warnings(attribution)
             result["attribution"] = attribution
             result["quality_warnings"] = warnings
+            # 完全干净（零硬零软）立即返回，兼顾深度与延迟。
             if not warnings:
                 for pending in futures:
                     pending.cancel()
                 result["race_errors"] = errors
                 return result
-            if first_candidate is None:
-                first_candidate = result
+            score = _score(result)
+            if best_score is None or score < best_score:
+                best_score = score
+                best_candidate = result
             errors.append(f"{model_id}未通过质量闸门：{'；'.join(warnings[:2])}")
     for pending in futures:
         pending.cancel()
-    if first_candidate is not None:
-        first_candidate["race_errors"] = errors
-        return first_candidate
+    if best_candidate is not None:
+        best_candidate["race_errors"] = errors
+        return best_candidate
     raise TimeoutError("；".join(errors) or f"归因抽取超过{LLM_ATTRIBUTION_TIMEOUT_SECONDS}秒未返回")
 
 
@@ -315,10 +355,14 @@ def extract_annual_report_attribution(
     key_metrics: Dict[str, Any] | None = None,
     key_metric_series: Dict[str, Dict[str, str]] | None = None,
     business_segments: List[Dict[str, Any]] | None = None,
+    risk_section: str | None = None,
     session_id: str | None = None,
     task_id: str | None = None,
 ) -> Dict[str, Any]:
     """从年报经营讨论章节抽取深度归因。
+
+    若提供 ``risk_section``（巨潮年报 PDF「公司面临的风险和应对措施」章节），
+    将作为 ``forward_risks`` 的权威抽取来源，显著丰富前瞻风险维度。
 
     返回结构见 ``EMPTY_ATTRIBUTION``；当无年报正文、池为空或 LLM 失败时，
     返回 ``source="fallback"`` 的空结构，**绝不抛异常、绝不阻塞报告生成**。
@@ -326,7 +370,14 @@ def extract_annual_report_attribution(
     if not _has_substantive_review(business_review):
         return dict(EMPTY_ATTRIBUTION)
 
-    prompt = _build_prompt(enterprise_name, business_review or "", key_metrics, key_metric_series, business_segments)
+    prompt = _build_prompt(
+        enterprise_name,
+        business_review or "",
+        key_metrics,
+        key_metric_series,
+        business_segments,
+        risk_section=risk_section,
+    )
     started_at = time.monotonic()
     try:
         candidate = _race(prompt, session_id=session_id, task_id=task_id)

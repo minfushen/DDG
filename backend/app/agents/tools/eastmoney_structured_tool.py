@@ -23,6 +23,7 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -476,6 +477,112 @@ def eastmoney_build_shareholder_table(stock_code: str) -> Dict[str, Any]:
         "report_date": latest_date[:10] if latest_date else "",
         "columns": ["股东名称", "股东性质", "持股比例", "持股数量", "质押/冻结"],
         "rows": rows,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────
+# Business Narrative (主营构成 + 经营情况讨论与分析)
+# 用于在无年报 PDF 解析时替代 PDF 的 main_business_rows 与
+# sections.business_review，保证财务深度叙述（主营分部 / 经营讨论 /
+# LLM 归因）仍可生成。数据全部来自东方财富 F10 公开接口，无需鉴权。
+# ──────────────────────────────────────────────────────────────────
+
+def _format_amount(value: Any) -> str:
+    if value is None or value == "":
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if abs(number) >= 100000000:
+        return f"{number / 100000000:.2f}亿元"
+    if abs(number) >= 10000:
+        return f"{number / 10000:.2f}万元"
+    return f"{number:.2f}元"
+
+
+def _format_percent(value: Any) -> str:
+    if value is None or value == "":
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if abs(number) <= 1:
+        number *= 100
+    return f"{number:.2f}%"
+
+
+def _eastmoney_main_business(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """主营构成（RPT_F10_FN_MAINOP）：分行业/分产品/分地区收入与毛利率。
+
+    返回 schema 与 PDF main_business_rows / listed_company_public_info_tool
+    一致（item_name / income / income_ratio / gross_margin / rank），
+    以便下游 _segment_summary 与财务叙述器无缝复用。
+    """
+    annual = [row for row in rows if "年报" in str(row.get("REPORT_NAME", ""))]
+    latest_report = next((row.get("REPORT_NAME") for row in annual), None)
+    selected = [row for row in annual if row.get("REPORT_NAME") == latest_report] if latest_report else (annual or rows)[:8]
+    business: List[Dict[str, Any]] = []
+    for row in selected[:10]:
+        item_name = str(row.get("ITEM_NAME") or "").strip()
+        if not item_name:
+            continue
+        business.append({
+            "report_name": row.get("REPORT_NAME"),
+            "item_name": item_name,
+            "income": _format_amount(row.get("MAIN_BUSINESS_INCOME")),
+            "income_ratio": _format_percent(row.get("MBI_RATIO")),
+            "gross_margin": _format_percent(row.get("GROSS_RPOFIT_RATIO")),
+            "rank": row.get("RANK") or row.get("RANKNEW"),
+        })
+    return business
+
+
+def _eastmoney_latest_business_review(rows: List[Dict[str, Any]], limit: int = 1800) -> str:
+    """经营情况讨论与分析原文（RPT_F10_OP_BUSINESSANALYSIS 年报）。"""
+    annual = [row for row in rows if "年报" in str(row.get("REPORT_NAME", ""))]
+    row = (annual or rows or [{}])[0]
+    text = str(row.get("BUSINESS_REVIEW") or "").strip()
+    # 折叠多余空白，保留语义完整性
+    text = re.sub(r"\s+", " ", text)
+    return text[:limit]
+
+
+def eastmoney_fetch_business_narrative(stock_code: str) -> Dict[str, Any]:
+    """从东方财富 F10 获取主营构成 + 经营讨论原文，作为 PDF 管道的替代数据源。
+
+    返回：
+        {
+            "success": bool,
+            "stock_code": str,
+            "business_segments": List[Dict],   # 主营构成明细
+            "business_review": str,            # 经营情况讨论与分析原文
+            "error": str,
+        }
+    """
+    secu_code = _secu_code_from(stock_code)
+    try:
+        mainop_rows = _fetch_f10(secu_code, "RPT_F10_FN_MAINOP", page_size=60)
+        business_rows = _fetch_f10(secu_code, "RPT_F10_OP_BUSINESSANALYSIS", page_size=6)
+    except Exception as exc:
+        logger.warning("东方财富 F10 主营/经营分析接口失败（%s）：%s", stock_code, exc)
+        return {
+            "success": False,
+            "stock_code": stock_code,
+            "business_segments": [],
+            "business_review": "",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    business_segments = _eastmoney_main_business(mainop_rows)
+    business_review = _eastmoney_latest_business_review(business_rows)
+    return {
+        "success": bool(business_segments or business_review),
+        "stock_code": stock_code,
+        "business_segments": business_segments,
+        "business_review": business_review,
+        "error": "",
     }
 
 

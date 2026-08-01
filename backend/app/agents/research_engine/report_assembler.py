@@ -86,6 +86,66 @@ def industry_findings(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return findings
 
 
+def relationship_findings(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    findings: List[Dict[str, Any]] = []
+    for item in evidence:
+        report = ((item.get("metadata") or {}).get("relationship_analysis_report") or {})
+        if not report:
+            continue
+        refs = [item.get("id")] if item.get("id") else []
+        summary = report.get("summary") or {}
+        findings.append({
+            "title": "股权结构与实际控制人",
+            "risk_level": report.get("risk_rating") or "medium",
+            "conclusion": (
+                f"实际控制人：{summary.get('实际控制人')}；"
+                f"股东 {summary.get('股东数量')} 个；"
+                f"对外担保 {summary.get('对外担保笔数')} 笔、股权冻结 {summary.get('股权冻结项')} 项。"
+            ),
+            "evidence_refs": refs,
+        })
+        for tag in report.get("risk_tags", []):
+            findings.append({
+                "title": tag.get("tag", "关联风险"),
+                "risk_level": tag.get("level", "medium"),
+                "conclusion": tag.get("detail", ""),
+                "evidence_refs": refs,
+            })
+        if findings:
+            return findings[:5]
+    return []
+
+
+def sentiment_findings(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    findings: List[Dict[str, Any]] = []
+    for item in evidence:
+        report = ((item.get("metadata") or {}).get("sentiment_analysis_report") or {})
+        if not report:
+            continue
+        refs = [item.get("id")] if item.get("id") else []
+        summary = report.get("summary") or {}
+        findings.append({
+            "title": "舆情概览与声誉风险",
+            "risk_level": report.get("risk_rating") or "medium",
+            "conclusion": (
+                f"检索舆情 {summary.get('检索结果')} 条；"
+                f"负面 {summary.get('负面')} 条（权威源 {summary.get('权威源负面')} 条）；"
+                f"声誉风险评级 {report.get('risk_rating')}。"
+            ),
+            "evidence_refs": refs,
+        })
+        for tag in report.get("risk_tags", []):
+            findings.append({
+                "title": tag.get("tag", "声誉风险"),
+                "risk_level": tag.get("level", "medium"),
+                "conclusion": tag.get("detail", ""),
+                "evidence_refs": refs,
+            })
+        if findings:
+            return findings[:5]
+    return []
+
+
 def claim_findings(claims: List[Dict[str, Any]], tasks: List[Dict[str, Any]], category: str, fallback: str) -> List[Dict[str, Any]]:
     task_ids = {task.get("id") for task in tasks if task.get("category") == category}
     rows = []
@@ -99,3 +159,34 @@ def claim_findings(claims: List[Dict[str, Any]], tasks: List[Dict[str, Any]], ca
                 "requires_manual_review": claim.get("requires_manual_review"),
             })
     return rows[:4] or [{"title": "证据边界", "risk_level": "medium", "conclusion": fallback, "evidence_refs": []}]
+
+
+def sanitize_chapter_refs(chapters: List[Dict[str, Any]], evidence: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """剔除章节内引用了不存在 evidence ID 的 evidence_refs。
+
+    报告合成层会从财务/行业专项分析报告的嵌套元数据（codeact_evidence_refs、
+    diagnostics.evidence_ids 等）回填引用，这些 ID 可能不在顶层 evidence 列表中，
+    导致质量门检出“无效 evidence_refs”。本函数在报告返回前做一次统一清洗。
+    """
+    valid_ids = {str(item.get("id")) for item in evidence if item.get("id")}
+    if not valid_ids:
+        return chapters
+
+    def _filter(refs: Any) -> List[str]:
+        return [str(r) for r in (refs or []) if str(r) in valid_ids]
+
+    for chapter in chapters:
+        if not isinstance(chapter, dict):
+            continue
+        if chapter.get("evidence_refs"):
+            chapter["evidence_refs"] = _filter(chapter.get("evidence_refs"))
+        for citation in chapter.get("summary_citations") or []:
+            if isinstance(citation, dict):
+                citation["evidence_refs"] = _filter(citation.get("evidence_refs"))
+        for finding in chapter.get("findings") or []:
+            if isinstance(finding, dict):
+                finding["evidence_refs"] = _filter(finding.get("evidence_refs"))
+        for sub in chapter.get("subsections") or []:
+            if isinstance(sub, dict):
+                sub["evidence_refs"] = _filter(sub.get("evidence_refs"))
+    return chapters

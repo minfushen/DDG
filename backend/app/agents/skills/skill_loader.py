@@ -9,8 +9,10 @@ from typing import Any, Dict, List
 import json
 import re
 
+from app.config.settings import settings
 
-SKILL_ROOT = Path(__file__).resolve().parents[3] / "knowledge_base" / "skills"
+
+SKILL_ROOT = settings.KNOWLEDGE_BASE_DIR / "skills"
 
 
 @dataclass(frozen=True)

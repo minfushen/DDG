@@ -6,13 +6,15 @@ from typing import Any, Dict, List
 import json
 
 
-ALLOWED_RESEARCH_CATEGORIES = ["business", "financial", "legal", "industry", "credit", "general"]
+ALLOWED_RESEARCH_CATEGORIES = ["business", "financial", "legal", "industry", "relationship", "sentiment", "credit", "general"]
 ALLOWED_TOOL_HINTS = [
     "listed_company",
     "business_agent",
     "financial_agent",
     "legal_agent",
     "industry_agent",
+    "relationship_network",
+    "sentiment_monitor",
     "uploaded_files",
     "bocha_search",
     "rag",

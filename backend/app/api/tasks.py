@@ -15,8 +15,9 @@ import logging
 from datetime import datetime
 
 from app.agents.research_engine import prepare_deep_research_plan, run_deep_research_due_diligence
-from app.agents.state import SSEEvent
+from app.agents.state import SSEEvent, TaskLifecycleState
 from app.agents.evidence import normalize_evidence_list
+from app.agents.evidence.evidence_db import save_evidence_batch, save_claims_batch
 from app.agents.hitl import create_interrupt, get_active_interrupt, public_interrupts, resolve_interrupt
 from app.agents.research_engine.tool_trace import public_tool_traces
 from app.agents.sub_agents.full_report_builder import build_full_due_diligence_report
@@ -75,12 +76,41 @@ def normalize_task_snapshot(task: Dict[str, Any]) -> Dict[str, Any]:
         "sequential_thought_loop": None,
         "sequential_plan_review": None,
         "engine_mode": "deepresearch",
+        "template_id": None,
         "agent_state": "completed",
+        "task_state": "report_ready",
         "enterprise_name": task.get("enterprise_name") or "未知企业",
     }
     for key, value in defaults.items():
         task.setdefault(key, value)
+    task["task_state"] = derive_task_state(task)
     return task
+
+
+def derive_task_state(task: Dict[str, Any]) -> TaskLifecycleState:
+    """把内部 agent_state 映射为 PRD 显式生命周期状态。
+
+    保留 agent_state 作为内部细化状态，API/SSE 统一暴露 task_state。
+    """
+    agent_state = task.get("agent_state") or "creating_task"
+    report = task.get("report")
+    pending_report = task.get("pending_report")
+    active_interrupt = get_active_interrupt(task)
+
+    if agent_state in {"creating_task", "planning", "calling_tools", "fetching_data", "calling_financial", "waiting_upload"}:
+        return "gathering"
+    if agent_state in {"analyzing", "forming_conclusion", "generating_report"}:
+        return "analyzing"
+    if agent_state in {"waiting_confirm", "waiting_human"}:
+        return "under_review"
+    if agent_state == "completed":
+        if report or pending_report:
+            return "report_ready"
+        return "gathering"
+    # 显式的人工审核终态（未来由审批接口写入）
+    if agent_state in {"approved", "rejected", "archived"}:
+        return agent_state
+    return "gathering"
 
 
 def _create_financial_upload_interrupt(task: Dict[str, Any], reason: str = "完整尽调需要补充近三年财务报表。") -> Dict[str, Any]:
@@ -275,6 +305,10 @@ def _publish_pending_report(task_id: str) -> None:
 async def run_deepresearch_task_background(task_id: str):
     """Run the Plan-Execute DeepResearch engine inside the existing task system."""
     task = tasks[task_id]
+    # P0 修复：重跑守卫——研究已执行（报告或待发布报告已存在）则不重复执行，
+    # 避免 schedule_task_background 与外部驱动并发导致重复累积证据（1062 vs 150 根因）
+    if (task.get("plan_approved") or task.get("approved_research_state")) and (task.get("report") or task.get("pending_report")):
+        return
     try:
         task.update({
             "agent_state": "planning",
@@ -309,6 +343,7 @@ async def run_deepresearch_task_background(task_id: str):
                 objective="完整贷前尽调",
                 max_iterations=task.get("max_iterations", 6),
                 on_update=publish_prepare_update,
+                task_id=task_id,
             )
             research_state = prepared.get("research_state", {})
             research_plan = research_state.get("tasks", [])
@@ -336,11 +371,18 @@ async def run_deepresearch_task_background(task_id: str):
             notify_task_update(task_id)
             return
 
+        approved_state = task.get("approved_research_state") or task.get("research_state") or {}
+        if isinstance(approved_state, dict):
+            approved_state = dict(approved_state)
+            # 非功能需求①：把任务使用的尽调模板一并带入 DeepResearch 综合报告生成
+            approved_state["template"] = _resolve_template(task)
         result = await run_deep_research_due_diligence(
             enterprise_name=task["enterprise_name"],
             objective="完整贷前尽调",
             max_iterations=task.get("max_iterations", 6),
-            approved_state=task.get("approved_research_state") or task.get("research_state"),
+            approved_state=approved_state,
+            parsed_intent=task.get("input_parse"),
+            task_id=task_id,
         )
         research_state = result.get("research_state", {})
         report = result.get("report") or {}
@@ -427,12 +469,97 @@ def schedule_task_background(task_id: str, delay_seconds: float = 0.5):
     loop.call_later(delay_seconds, lambda: asyncio.create_task(run_deepresearch_task_background(task_id)))
 
 
+# 执行中途的 agent_state：这些状态说明任务在 execute 阶段被进程重启打断
+_RESUMABLE_EXECUTING_STATES = {
+    "calling_tools", "fetching_data", "calling_financial",
+    "analyzing", "forming_conclusion", "generating_report",
+}
+
+
+async def automatic_resume_crashed_tasks() -> int:
+    """P0-1 第二阶段：进程重启后自动续跑 execute 中途崩溃的任务。
+
+    只续跑 agent_state 处于执行中途、无活跃 HITL 中断、无报告的任务。
+    HITL 等待中（waiting_human）和已完成的任务不续跑，避免误触发。
+    续跑走 LangGraph checkpoint 断点恢复（resume_deep_research）。
+    """
+    resumed = 0
+    for task_id, task in list(tasks.items()):
+        try:
+            agent_state = task.get("agent_state")
+            if agent_state not in _RESUMABLE_EXECUTING_STATES:
+                continue
+            if get_active_interrupt(task):
+                continue  # 有活跃 HITL 中断，等人工，不续跑
+            if task.get("report") or task.get("pending_report"):
+                continue  # 已有报告，无需续跑
+            asyncio.create_task(_safe_resume_task(task_id))
+            resumed += 1
+        except Exception:
+            continue
+    return resumed
+
+
+async def _safe_resume_task(task_id: str) -> None:
+    """安全续跑单个崩溃任务：从 LangGraph checkpoint 断点恢复 execute。"""
+    from app.agents.research_engine import resume_deep_research
+    task = tasks.get(task_id)
+    if not task:
+        return
+    try:
+        task["agent_state"] = "calling_tools"
+        task.setdefault("timeline", []).append({
+            "id": uuid.uuid4().hex,
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "agent": "DeepResearch Engine",
+            "content": "进程重启后自动续跑",
+            "detail": "从 LangGraph checkpoint 断点恢复执行。",
+            "status": "running",
+            "type": "action",
+        })
+        notify_task_update(task_id)
+        result = await resume_deep_research(task_id)
+        research_state = result.get("research_state", {})
+        report = result.get("report") or {}
+        if report:
+            task["report"] = report
+            task["agent_state"] = "completed"
+            task["timeline"] = report.get("timeline") or research_state.get("timeline", task.get("timeline", []))
+            task["evidence"] = report.get("evidence") or research_state.get("evidence", task.get("evidence", []))
+            task["error"] = None
+        else:
+            task["error"] = result.get("error") or "自动续跑未返回报告"
+            task["agent_state"] = "completed"
+        persist_task(task_id)
+        notify_task_update(task_id)
+    except Exception as exc:
+        task = tasks.get(task_id) or {}
+        task["error"] = f"自动续跑失败: {type(exc).__name__}: {exc}"
+        task["agent_state"] = "completed"
+        persist_task(task_id)
+        notify_task_update(task_id)
+
+
 def notify_task_update(task_id: str):
     """通知 SSE 订阅者任务状态已变化。"""
     task = tasks.get(task_id)
     if task:
         export_completed_report(task)
     persist_task(task_id)
+    # P0-2: 同步 evidence + claims 到独立表（跨任务查询/审计/生命周期）
+    if task:
+        evidence = task.get("evidence") or []
+        claims = task.get("research_claims") or (task.get("research_state") or {}).get("claims") or []
+        if evidence:
+            try:
+                save_evidence_batch(task_id, task.get("enterprise_name", ""), evidence)
+            except Exception:
+                pass
+        if claims:
+            try:
+                save_claims_batch(task_id, task.get("enterprise_name", ""), claims)
+            except Exception:
+                pass
     if task_id in task_events:
         task_events[task_id].set()
         task_events[task_id] = asyncio.Event()
@@ -455,6 +582,7 @@ def append_timeline(task_id: str, agent: str, content: str, detail: str = "", st
 def make_task_state_event(task_id: str) -> SSEEvent:
     """把当前任务状态包装为 SSE state 事件。"""
     task = tasks[task_id]
+    task["task_state"] = derive_task_state(task)
     return SSEEvent(
         type="state",
         data={
@@ -462,6 +590,7 @@ def make_task_state_event(task_id: str) -> SSEEvent:
             "original_input": task.get("original_input"),
             "input_parse": task.get("input_parse"),
             "agent_state": task.get("agent_state"),
+            "task_state": task.get("task_state"),
             "timeline": task.get("timeline", []),
             "plan": task.get("plan", []),
             "evidence": task.get("evidence", []),
@@ -498,7 +627,11 @@ class CreateTaskRequest(BaseModel):
     enterprise_name: str = Field(..., description="企业名称")
     template_name: str = Field(
         default="due_diligence_report_template",
-        description="尽调报告模板名称"
+        description="尽调报告模板名称（兼容字段，已弃用，改用 template_id）"
+    )
+    template_id: Optional[str] = Field(
+        default=None,
+        description="尽调模板 ID（非功能需求①：若为空则使用当前激活模板）"
     )
     engine_mode: str = Field(
         default="deepresearch",
@@ -511,6 +644,7 @@ class CreateTaskResponse(BaseModel):
     task_id: str
     enterprise_name: str
     status: str
+    task_state: str = "gathering"
 
 
 class TaskStatusResponse(BaseModel):
@@ -518,6 +652,7 @@ class TaskStatusResponse(BaseModel):
     task_id: str
     enterprise_name: str
     agent_state: str
+    task_state: str
     timeline: List[dict]
     plan: List[dict]
     evidence: List[dict]
@@ -554,6 +689,40 @@ class ResumeInterruptRequest(BaseModel):
     resolution: Dict[str, Any] = Field(default_factory=dict)
 
 
+def _resolve_template_id(template_id: Optional[str]) -> Optional[str]:
+    """解析任务使用的模板 ID：显式指定优先，否则取当前激活模板。"""
+    from app.template.store import get_active_template, get_template
+    if template_id:
+        if get_template(template_id):
+            return template_id
+    active = get_active_template()
+    return active.id if active else None
+
+
+def _resolve_template(task: Dict[str, Any]):
+    """按任务保存的 template_id 解析模板对象（供报告生成时按模板组织章节）。"""
+    from app.template.store import get_template
+    tid = task.get("template_id")
+    if not tid:
+        return None
+    return get_template(tid)
+
+
+def _extract_task_industry_name(task: Dict[str, Any]) -> Optional[str]:
+    """从任务上下文（完整尽调上下文里的行业子报告）抽取行业名，供 P2.1 同业对标。"""
+    ctx = task.get("full_due_diligence_context") or {}
+    # 常见存放位置：sub_reports.industry.industry.semantic_industry_name
+    industry_sub = (ctx.get("sub_reports") or {}).get("industry") or {}
+    report = industry_sub.get("industry_analysis_report") or industry_sub
+    name = (
+        (report.get("industry") or {}).get("semantic_industry_name")
+        or (report.get("industry") or {}).get("industry_name")
+        or industry_sub.get("industry_name")
+        or task.get("industry_name")
+    )
+    return name or None
+
+
 async def resume_financial_task_with_uploaded_data(
     task_id: str,
     parsed_financial_data: Dict[str, Any],
@@ -562,6 +731,8 @@ async def resume_financial_task_with_uploaded_data(
     from app.agents.sub_agents.financial_agent import run_financial_agent_with_uploaded_data
 
     task = tasks[task_id]
+    # P2.1：若此前已完成行业分析，复用其行业名做同业中位数对标
+    industry_name = _extract_task_industry_name(task)
     task.update({
         "agent_state": "calling_financial",
         "error": None,
@@ -607,6 +778,7 @@ async def resume_financial_task_with_uploaded_data(
         result = await run_financial_agent_with_uploaded_data(
             enterprise_name=task["enterprise_name"],
             parsed_financial_data=parsed_financial_data,
+            industry_name=industry_name,
         )
         task["timeline"] = previous_timeline + result.get("timeline", [])
         financial_evidence = normalize_evidence_list(result.get("evidence", []), agent="financial")
@@ -623,6 +795,14 @@ async def resume_financial_task_with_uploaded_data(
 
         sub_reports = dict(context.get("sub_reports") or {})
         sub_reports["financial"] = result["financial_analysis_report"]
+        # 若此前已完成关联网络分析，复用其报告（关联网络模块）
+        rel_raw = (context.get("raw_outputs") or {}).get("relationship_agent") or {}
+        if rel_raw.get("relationship_analysis_report"):
+            sub_reports["relationship"] = rel_raw["relationship_analysis_report"]
+        # 若此前已完成舆情分析，复用其报告（舆情/声誉风险模块）
+        sent_raw = (context.get("raw_outputs") or {}).get("sentiment_agent") or {}
+        if sent_raw.get("sentiment_analysis_report"):
+            sub_reports["sentiment"] = sent_raw["sentiment_analysis_report"]
         merged_evidence = normalize_evidence_list(context.get("evidence", []), agent="research") + financial_evidence
         report = build_full_due_diligence_report(
             enterprise_name=task["enterprise_name"],
@@ -631,6 +811,7 @@ async def resume_financial_task_with_uploaded_data(
             pending_upload=False,
             report_mode="financial_enhanced_dd",
             financial_data_status="complete",
+            template=_resolve_template(task),
         )
         updated_context = {
             **context,
@@ -661,6 +842,7 @@ async def resume_financial_task_with_uploaded_data(
     result = await run_financial_agent_with_uploaded_data(
         enterprise_name=task["enterprise_name"],
         parsed_financial_data=parsed_financial_data,
+        industry_name=industry_name,
     )
 
     task["timeline"] = task.get("timeline", []) + result.get("timeline", [])
@@ -729,6 +911,7 @@ async def create_task(request: CreateTaskRequest):
         "template_name": request.template_name,
         "engine_mode": engine_mode,
         "agent_state": "creating_task",
+        "task_state": "gathering",
         "timeline": [],
         "plan": [],
         "evidence": [],
@@ -756,6 +939,8 @@ async def create_task(request: CreateTaskRequest):
         "sequential_plan_review": None,
         "created_at": datetime.now().isoformat(),
     }
+    # 非功能需求①：解析并保存使用的尽调模板（template_id 优先，否则取激活模板）
+    tasks[task_id]["template_id"] = _resolve_template_id(request.template_id)
     task_events[task_id] = asyncio.Event()
     persist_task(task_id)
     if _should_confirm_entity(request.enterprise_name, enterprise_name, input_parse):
@@ -775,6 +960,7 @@ async def create_task(request: CreateTaskRequest):
         task_id=task_id,
         enterprise_name=enterprise_name,
         status="created",
+        task_state=derive_task_state(tasks[task_id]),
     )
 
 
@@ -817,11 +1003,13 @@ async def get_task(task_id: str):
         raise HTTPException(status_code=404, detail="任务不存在")
 
     task = tasks[task_id]
+    task["task_state"] = derive_task_state(task)
 
     return TaskStatusResponse(
         task_id=task["task_id"],
         enterprise_name=task["enterprise_name"],
         agent_state=task["agent_state"],
+        task_state=task["task_state"],
         timeline=task["timeline"],
         plan=task["plan"],
         evidence=task["evidence"],
@@ -979,6 +1167,23 @@ async def resume_interrupt(task_id: str, interrupt_id: str, request: ResumeInter
     return {"task_id": task_id, "status": "resumed", "action": action}
 
 
+@router.get("/tasks/{task_id}/evidence")
+async def get_task_evidence(task_id: str):
+    """获取任务持久化的证据和声明（P0-2 审计查询入口）。"""
+    if not ensure_task_loaded(task_id):
+        raise HTTPException(status_code=404, detail="task_not_found")
+    from app.agents.evidence.evidence_db import load_evidence_for_task, load_claims_for_task
+    evidence = load_evidence_for_task(task_id)
+    claims = load_claims_for_task(task_id)
+    return {
+        "task_id": task_id,
+        "evidence_count": len(evidence),
+        "claims_count": len(claims),
+        "evidence": evidence,
+        "claims": claims,
+    }
+
+
 @router.get("/tasks/{task_id}/report")
 async def get_task_report(task_id: str, format: str = Query(default="json")):
     """获取任务报告。
@@ -998,7 +1203,7 @@ async def get_task_report(task_id: str, format: str = Query(default="json")):
         report["tool_traces"] = public_tool_traces(task.get("tool_traces", []))
 
     fmt = (format or "json").lower()
-    if fmt in ("docx", "pdf"):
+    if fmt in ("docx", "pdf", "md"):
         company = str(task.get("enterprise_name") or report.get("enterprise_name") or "未知企业")
         generator = ReportGenerator(output_dir=str(settings.OUTPUT_DIR / "reports"))
         try:
@@ -1006,11 +1211,11 @@ async def get_task_report(task_id: str, format: str = Query(default="json")):
         except Exception as e:
             logger.exception("报告导出失败")
             raise HTTPException(status_code=500, detail=f"报告导出失败: {e}")
-        media_type = (
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            if fmt == "docx"
-            else "application/pdf"
-        )
+        media_type = {
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "pdf": "application/pdf",
+            "md": "text/markdown",
+        }[fmt]
         return FileResponse(path, filename=os.path.basename(path), media_type=media_type)
 
     return report

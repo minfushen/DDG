@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
+import hashlib
 import json
 import re
 import time
@@ -12,6 +13,17 @@ from app.config import settings
 
 from .prompts import ALLOWED_RESEARCH_CATEGORIES, ALLOWED_TOOL_HINTS, build_research_planner_prompt
 from .state import ResearchTask, stable_id
+
+
+def _plan_cache_key(enterprise_name: str, objective: str, max_tasks: int, skill_context: str) -> str:
+    """构造稳定的 planner 缓存键。
+
+    仅按确定性输入（企业名、目标、任务上限、技能上下文）派生，排除 MCP
+    thought_loop_context 与 STM 上下文噪声，使相同企业跨运行复用同一计划，
+    降低 LLM 规划非确定性对 risk_rating 的漂移影响。
+    """
+    stable = f"{enterprise_name}|{objective}|{max_tasks}|{(skill_context or '')[:200]}"
+    return "research_plan:" + hashlib.sha256(stable.encode("utf-8")).hexdigest()[:24]
 
 
 def _recent_stm_context(session_id: str | None, task_id: str | None, max_entries: int = 12) -> str:
@@ -187,6 +199,7 @@ def create_llm_research_plan(
         response = cached_invoke(
             llm,
             prompt,
+            cache_key=_plan_cache_key(enterprise_name, objective, max_tasks, skill_context),
             ttl_seconds=settings.LLM_CACHE_TTL_SECONDS,
             session_id=session_id,
             task_id=task_id,

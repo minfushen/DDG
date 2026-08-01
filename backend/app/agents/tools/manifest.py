@@ -287,6 +287,42 @@ TOOL_MANIFEST: List[ToolManifest] = [
         fallback_to=["yuandian_legal", "listed_company_public_info"],
     ),
 
+    # --------------------------- Relationship --------------------------------
+    ToolManifest(
+        key="relationship_network",
+        display_name="关联网络构建",
+        category="relationship",
+        entry="app.agents.tools.relationship_network_tool:build_relationship_network",
+        description="整合股权、担保/质押、上下游供应链等关联数据，构建企业关联网络并输出关联风险标签（担保圈、股权冻结、高比例质押、股权分散）。上市公司走 cninfo/东方财富，非上市走元典企业工商；失败安全降级，不伪造数据。",
+        negative_boundaries=[
+            "不替代权威财报/司法/工商源（属 financial/legal/business 工具）",
+            "供应链上下游为行业知识库补充，非企业级精确交易对手清单",
+            "非上市企业股权/担保数据有限，可能仅含工商登记层面信息",
+        ],
+        accepts=["enterprise_name", "stock_code(可选)", "industry_name(可选)"],
+        relevance_contract="能解析到股东/实控人/担保/冻结则高；全缺失则 relevance 降低并标注降级",
+        guidance_on_low_relevance="关联数据缺失时换 yuandian_company 或人工核验工商登记，不要据此下结论",
+        fallback_to=["yuandian_company", "listed_company_public_info"],
+    ),
+
+    # --------------------------- Sentiment ----------------------------------
+    ToolManifest(
+        key="sentiment_monitor",
+        display_name="舆情/声誉风险监测",
+        category="sentiment",
+        entry="app.agents.tools.sentiment_tool:search_enterprise_sentiment",
+        description="通过公开网络搜索（Bocha 为主、SearXNG 兜底）监测企业正/负舆情，按情感分类并标注权威源（监管/司法/公示）负面。用于声誉风险前置预警。",
+        negative_boundaries=[
+            "公开搜索仅作舆情线索，不替代司法/工商/财务权威源",
+            "不含结构化财报/工商/司法数据",
+            "搜索结果权威性低于权威库，需交叉验证与人工复核",
+        ],
+        accepts=["enterprise_name", "max_results(可选)"],
+        relevance_contract="返回结果数 + 负面情感命中；无结果=0.0",
+        guidance_on_low_relevance="低相关→换关键词或人工监测；权威负面请以监管/司法源复核",
+        fallback_to=["searxng_search", "bocha_search"],
+    ),
+
     # ------------------------------ Legal -----------------------------------
     ToolManifest(
         key="yuandian_legal",
@@ -567,7 +603,7 @@ def render_markdown() -> str:
     lines.append("")
     lines.append(f"**相关性阈值**：`relevance_score < {LOW_RELEVANCE_THRESHOLD}` 时，应采纳工具的 `guidance_on_low_relevance`。")
     lines.append("")
-    cats = ["financial", "industry", "business", "legal", "search", "infra", "resolve"]
+    cats = ["financial", "industry", "business", "legal", "relationship", "sentiment", "search", "infra", "resolve"]
     for cat in cats:
         group = [t for t in TOOL_MANIFEST if t.category == cat and t.status == "active"]
         if not group:

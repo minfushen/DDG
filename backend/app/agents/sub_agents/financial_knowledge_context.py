@@ -12,7 +12,7 @@ from app.config import settings
 from app.rag.knowledge_retrieval_service import retrieve_knowledge
 
 
-RULE_PATH = settings.BASE_DIR / "knowledge_base" / "risk_frameworks" / "financial_abnormal_rules.json"
+RULE_PATH = settings.KNOWLEDGE_BASE_DIR / "risk_frameworks" / "financial_abnormal_rules.json"
 
 
 @lru_cache(maxsize=1)

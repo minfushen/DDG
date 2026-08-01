@@ -107,8 +107,15 @@ async def run_industry_agent(
     annual_report_notes: Optional[Dict[str, Any]] = None,
     session_id: str | None = None,
     task_id: str | None = None,
+    comparison: str | None = None,
+    industry_segment: str | None = None,
 ) -> Dict[str, Any]:
-    """运行行业分析Agent。"""
+    """运行行业分析Agent。
+
+    ``comparison`` / ``industry_segment`` 来自多意图解析的 slots：
+    - ``industry_segment`` 作为行业识别的强提示注入上下文，引导分类器偏向用户指定的细分方向；
+    - ``comparison``（none/peer/self）透传给报告生成器，决定是否产出同业/纵向对比章节。
+    """
     try:
         timeline = []
         evidence = []
@@ -170,6 +177,10 @@ async def run_industry_agent(
         ]
         timeline[-1]["conclusion"] = classification.get("semantic_industry_name") or classification.get("industry_name")
 
+        # 多意图槽位：行业细分方向作为强提示注入分类上下文
+        if industry_segment:
+            extra_context = f"{extra_context} 用户指定行业细分方向（重点参照）：{industry_segment}。"
+
         evidence.append({
             "label": "标准行业分类",
             "value": f"{classification.get('industry_code')} {classification.get('industry_name')}",
@@ -216,6 +227,8 @@ async def run_industry_agent(
             annual_report_notes=annual_report_notes,
             session_id=session_id,
             task_id=task_id,
+            comparison=comparison,
+            industry_segment=industry_segment,
         )
         timeline[-1]["status"] = "completed"
         timeline[-1]["findings"] = report.get("risk_summary", [])

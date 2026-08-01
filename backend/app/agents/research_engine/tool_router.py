@@ -20,8 +20,54 @@ from .tool_middleware import run_tool
 from .tool_trace import annotate_evidence, finish_tool_trace, start_tool_trace
 
 
-def _bocha_query(enterprise_name: str, task: ResearchTask) -> tuple[str, str, str]:
+# ── 槽位 → 检索参数映射（多意图解析产出的 slots 深层消费）──────────────
+_TIME_WINDOW_YEARS = {
+    "latest": 1,
+    "近一年": 1,
+    "近三年": 3,
+    "近五年": 5,
+}
+_TIME_WINDOW_FRESHNESS = {
+    "latest": "oneYear",
+    "近一年": "oneYear",
+    "近三年": "noLimit",
+    "近五年": "noLimit",
+}
+_TIME_WINDOW_YEAR_CLAUSE = {
+    "latest": "最新报告期",
+    "近一年": "最近一年",
+    "近三年": "2024 2023 2022",
+    "近五年": "2024 2023 2022 2021 2020",
+}
+_DEPTH_MAX_RESULTS = {
+    "quick": 3,
+    "standard": 5,
+    "full": 8,
+}
+
+
+def _years_back_for_time_window(time_window: str | None) -> int:
+    """时间窗口 → 巨潮公告回溯年数。"""
+    return _TIME_WINDOW_YEARS.get(time_window or "", 3)
+
+
+def _freshness_for_time_window(time_window: str | None) -> str:
+    return _TIME_WINDOW_FRESHNESS.get(time_window or "", "noLimit")
+
+
+def _year_clause_for_time_window(time_window: str | None) -> str:
+    """时间窗口 → 财报检索关键词中的年份从句。"""
+    return _TIME_WINDOW_YEAR_CLAUSE.get(time_window or "", "2024 2023 2022")
+
+
+def _max_results_for_depth(depth: str | None) -> int:
+    """报告深度 → 公开搜索返回条数（深度越大，候选证据越多）。"""
+    return _DEPTH_MAX_RESULTS.get(depth or "", 5)
+
+
+def _bocha_query(enterprise_name: str, task: ResearchTask, slots: Dict[str, Any] | None = None) -> tuple[str, str, str]:
     category = task.get("category")
+    slots = slots or task.get("slots") or {}
     if task.get("search_query"):
         include = ""
         if category == "financial":
@@ -35,14 +81,19 @@ def _bocha_query(enterprise_name: str, task: ResearchTask) -> tuple[str, str, st
         return f"{enterprise_name} 重大诉讼 被执行 失信 行政处罚 公告", "oneYear", "cninfo.com.cn|sse.com.cn|szse.cn|creditchina.gov.cn|court.gov.cn"
     if category == "industry":
         return f"{enterprise_name} 主营业务 行业地位 研报 年报 竞争格局", "noLimit", ""
+    if category == "relationship":
+        return f"{enterprise_name} 股权结构 实际控制人 对外担保 股权质押 关联交易 上下游供应链", "noLimit", ""
+    if category == "sentiment":
+        return f"{enterprise_name} 负面新闻 处罚 诉讼 失信 被执行 投诉 舆情 监管", "noLimit", ""
     if category == "financial":
-        return f"{enterprise_name} 2024 2023 2022 年报 财务报表 营业收入 净利润 经营现金流 东方财富 巨潮资讯", "noLimit", "cninfo.com.cn|sse.com.cn|szse.cn|eastmoney.com|finance.eastmoney.com|data.eastmoney.com"
+        year_clause = _year_clause_for_time_window(slots.get("time_window"))
+        return f"{enterprise_name} {year_clause} 年报 财务报表 营业收入 净利润 经营现金流 东方财富 巨潮资讯", "noLimit", "cninfo.com.cn|sse.com.cn|szse.cn|eastmoney.com|finance.eastmoney.com|data.eastmoney.com"
     return f"{enterprise_name} 授信 尽调 风险 审查", "noLimit", ""
 
 
 def _cninfo_keyword(category: str) -> str:
     if category == "financial":
-        return "年报 业绩快报 审计意见"
+        return "年度报告"
     if category == "legal":
         return "诉讼 仲裁 处罚 监管函"
     if category == "industry":
@@ -73,6 +124,10 @@ def execute_research_task(
     errors: List[str] = []
     tool_traces: List[Dict[str, Any]] = []
     research_task_id = str(task.get("id") or "unknown_task")
+    # 多意图槽位（来自 intent_extractor）：驱动时间窗口、检索深度、同业对比等。
+    slots: Dict[str, Any] = task.get("slots") or {}
+    time_window = slots.get("time_window")
+    depth = slots.get("depth")
 
     # ── Step 0: Listed company identification ──────────────────────
     # This step has special logic (sets stock_code in raw_outputs for
@@ -261,10 +316,15 @@ def execute_research_task(
     # ── Step 2: Cninfo announcements (financial / industry / legal) ─
     if category in {"financial", "industry", "legal"}:
         def _fetch_cninfo_announcements():
+            stock_code = _listed_stock_code(raw_outputs)
             return search_cninfo_announcements(
                 enterprise_name=enterprise_name,
+                stock_code=stock_code or "",
                 keyword=_cninfo_keyword(category),
-                max_results=6,
+                max_results=20,
+                extract_pdf_content=False,  # RAG 已有入库年报数据，不重复解析
+                max_pdf_extract=0,
+                years_back=_years_back_for_time_window(time_window),
             )
 
         def _extract_cninfo_announcements(result):
@@ -278,8 +338,8 @@ def execute_research_task(
             research_task_id=research_task_id,
             session_id=session_id,
             category=category,
-            query=f"{enterprise_name} {_cninfo_keyword(category)}",
-            query_summary="检索巨潮资讯公告和年报原文证据",
+            query=f"{enterprise_name} {_cninfo_keyword(category)} 年报全量解析max20",
+            query_summary="检索巨潮资讯公告和年报PDF全量解析（含三大表视觉转录）",
             evidence=evidence,
             raw_outputs=raw_outputs,
             errors=errors,
@@ -402,6 +462,8 @@ def execute_research_task(
                     annual_report_notes=annual_report_notes,
                     session_id=session_id,
                     task_id=research_task_id,
+                    comparison=slots.get("comparison"),
+                    industry_segment=slots.get("industry_segment"),
                 )),
                 research_task_id=research_task_id,
                 session_id=session_id,
@@ -570,6 +632,142 @@ def execute_research_task(
             tool_traces=tool_traces,
             extract_evidence=_extract_yuandian_legal,
             result_key="yuandian_legal_risk",
+        )
+
+    # ── Step 4.5: Relationship network analysis ─────────────────
+    if category == "relationship":
+        def _fetch_relationship():
+            from app.agents.sub_agents.relationship_agent import run_relationship_agent
+
+            return asyncio.run(run_relationship_agent(enterprise_name, session_id=session_id, task_id=research_task_id))
+
+        def _extract_relationship(result):
+            raw_outputs["relationship_agent"] = {
+                "success": result.get("success"),
+                "error": result.get("error"),
+                "evidence_count": len(result.get("evidence", [])),
+            }
+            if not result.get("success"):
+                evidence.append(normalize_evidence({
+                    "label": "关联网络分析（不可用）",
+                    "value": "关联网络工具未返回数据，已降级",
+                    "claim": f"关联网络构建失败：{result.get('error') or '接口调用失败'}；关联结论需人工核验股权、担保与关联关系。",
+                    "source": "关联网络工具",
+                    "source_name": "企业关联网络",
+                    "source_type": "relationship_unavailable",
+                    "confidence": 0.3,
+                    "trust_level": "low",
+                    "requires_manual_review": True,
+                    "metadata": {},
+                }, agent=category, domain=category))
+                return
+            for item in result.get("evidence", []):
+                evidence.append(normalize_evidence({
+                    **item,
+                    "source_type": "relationship_analysis",
+                    "confidence": 0.82,
+                    "trust_level": "high",
+                    "requires_manual_review": False,
+                }, agent=category, domain=category))
+            report = result.get("relationship_analysis_report") or {}
+            if report:
+                raw_outputs["relationship_agent"]["relationship_analysis_report"] = report
+                summary = report.get("summary") or {}
+                evidence.append(normalize_evidence({
+                    "label": "关联网络分析",
+                    "value": f"实控人：{summary.get('实际控制人')} / 对外担保：{summary.get('对外担保笔数')}笔 / 评级：{report.get('risk_rating')}",
+                    "claim": f"基于{report.get('generated_from')}构建关联网络，实控人为{summary.get('实际控制人')}，对外担保{summary.get('对外担保笔数')}笔、股权冻结{summary.get('股权冻结项')}项，关联风险评级{report.get('risk_rating')}。",
+                    "source": report.get("generated_from") or "关联网络工具",
+                    "source_name": "企业关联网络分析",
+                    "source_type": "relationship_analysis_report",
+                    "confidence": 0.85,
+                    "trust_level": "high",
+                    "requires_manual_review": report.get("risk_rating") == "high",
+                    "metadata": {"relationship_analysis_report": report},
+                }, agent=category, domain=category))
+
+        run_tool(
+            tool_name="relationship_network",
+            tool_fn=_fetch_relationship,
+            research_task_id=research_task_id,
+            session_id=session_id,
+            category=category,
+            query=enterprise_name,
+            query_summary="构建股权/担保/上下游关联网络并识别关联风险",
+            evidence=evidence,
+            raw_outputs=raw_outputs,
+            errors=errors,
+            tool_traces=tool_traces,
+            extract_evidence=_extract_relationship,
+            result_key="relationship_network",
+        )
+
+    # ── Step 4.6: Sentiment / reputation monitoring ───────────────
+    if category == "sentiment":
+        def _fetch_sentiment():
+            from app.agents.sub_agents.sentiment_agent import run_sentiment_agent
+
+            return asyncio.run(run_sentiment_agent(enterprise_name))
+
+        def _extract_sentiment(result):
+            raw_outputs["sentiment_agent"] = {
+                "success": result.get("success"),
+                "error": result.get("error"),
+                "evidence_count": len(result.get("evidence", [])),
+            }
+            if not result.get("success"):
+                evidence.append(normalize_evidence({
+                    "label": "舆情监测（不可用）",
+                    "value": "公开搜索未返回数据，已降级",
+                    "claim": f"舆情监测失败：{result.get('error') or '接口调用失败'}；声誉风险需人工监测公开信息与权威源。",
+                    "source": "公开搜索",
+                    "source_name": "企业舆情监测",
+                    "source_type": "sentiment_unavailable",
+                    "confidence": 0.3,
+                    "trust_level": "low",
+                    "requires_manual_review": True,
+                    "metadata": {},
+                }, agent=category, domain=category))
+                return
+            for item in result.get("evidence", []):
+                evidence.append(normalize_evidence({
+                    **item,
+                    "source_type": "sentiment_analysis",
+                    "confidence": 0.7,
+                    "trust_level": "medium",
+                    "requires_manual_review": True,
+                }, agent=category, domain=category))
+            report = result.get("sentiment_analysis_report") or {}
+            if report:
+                raw_outputs["sentiment_agent"]["sentiment_analysis_report"] = report
+                summary = report.get("summary") or {}
+                evidence.append(normalize_evidence({
+                    "label": "舆情与声誉风险",
+                    "value": f"负面：{summary.get('负面')}条 / 权威源负面：{summary.get('权威源负面')}条 / 评级：{report.get('risk_rating')}",
+                    "claim": f"基于{report.get('generated_from')}监测舆情，负面线索{summary.get('负面')}条（权威源{summary.get('权威源负面')}条），声誉风险评级{report.get('risk_rating')}。",
+                    "source": report.get("generated_from") or "公开搜索",
+                    "source_name": "企业舆情与声誉风险",
+                    "source_type": "sentiment_analysis_report",
+                    "confidence": 0.7,
+                    "trust_level": "medium",
+                    "requires_manual_review": True,
+                    "metadata": {"sentiment_analysis_report": report},
+                }, agent=category, domain=category))
+
+        run_tool(
+            tool_name="sentiment_monitor",
+            tool_fn=_fetch_sentiment,
+            research_task_id=research_task_id,
+            session_id=session_id,
+            category=category,
+            query=enterprise_name,
+            query_summary="监测企业公开舆情并识别声誉风险",
+            evidence=evidence,
+            raw_outputs=raw_outputs,
+            errors=errors,
+            tool_traces=tool_traces,
+            extract_evidence=_extract_sentiment,
+            result_key="sentiment_monitor",
         )
 
     # ── Step 5: Business / shareholder analysis ────────────────────
@@ -838,7 +1036,7 @@ def execute_research_task(
             )
 
     # ── Step 6: RAG knowledge retrieval ────────────────────────────
-    if "rag" in task.get("tool_hints", []) or category in {"industry", "credit"}:
+    if "rag" in task.get("tool_hints", []) or category in {"industry", "credit", "financial"}:
         domain = "industry" if category == "industry" else "credit" if category == "credit" else "all"
         rag_query = " ".join([enterprise_name, task.get("question", ""), " ".join(task.get("required_evidence", []))])
 
@@ -866,11 +1064,11 @@ def execute_research_task(
         )
 
     # ── Step 7: Public search (bocha + optional searxng) ───────────
-    if "bocha_search" in task.get("tool_hints", []) or category in {"business", "legal", "industry", "financial"}:
-        query, freshness, include = _bocha_query(enterprise_name, task)
+    if "bocha_search" in task.get("tool_hints", []) or category in {"business", "legal", "industry", "financial", "relationship", "sentiment"}:
+        query, freshness, include = _bocha_query(enterprise_name, task, slots)
 
         def _fetch_bocha():
-            return search_with_bocha(query=query, max_results=5, freshness=freshness, include=include, summary=True)
+            return search_with_bocha(query=query, max_results=_max_results_for_depth(depth), freshness=freshness, include=include, summary=True)
 
         def _extract_bocha(bocha_result):
             raw_outputs["bocha"] = {

@@ -32,7 +32,7 @@ def main():
     kb = KnowledgeBase(manager)
 
     # 知识库目录
-    knowledge_dir = settings.BASE_DIR / "knowledge_base"
+    knowledge_dir = settings.KNOWLEDGE_BASE_DIR
 
     if not knowledge_dir.exists():
         print(f"❌ 知识库目录不存在: {knowledge_dir}")

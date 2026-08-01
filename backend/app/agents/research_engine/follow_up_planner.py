@@ -30,6 +30,7 @@ def _task(
     required_evidence: List[str],
     search_query: str,
     priority: int,
+    depth: int = 2,
 ) -> ResearchTask:
     return {
         "id": stable_id("rt_follow", enterprise_name, parent_task_id, question),
@@ -43,7 +44,8 @@ def _task(
         "planner_source": "sequential_thinking_follow_up",
         "generated_by": "sequential_thinking_mcp",
         "parent_task_id": parent_task_id,
-        "round": 2,
+        "round": depth,
+        "depth": depth,
         "search_query": search_query,
     }
 
@@ -53,15 +55,22 @@ def _from_gap(enterprise_name: str, gap: ResearchGap, priority: int) -> Research
     description = _clean(gap.get("description"))
     actions = [str(item) for item in gap.get("suggested_next_actions", []) if str(item).strip()]
 
-    if "financial" in task_id or "财务" in description or "三大表" in description:
+    if "financial" in task_id or "财务" in description or "三大表" in description or "审计意见" in description or "审计报告" in description or "同业财务对标" in description:
+        # 审计意见缺口走更精准的补证检索词
+        if "审计意见" in description or "审计报告" in description:
+            search_query = f"{enterprise_name} 年报 审计意见 标准无保留 保留意见 强调事项 巨潮资讯"
+            required = actions or ["审计意见类型", "审计报告", "非标意见说明"]
+        else:
+            search_query = f"{enterprise_name} 年报 审计意见 扣非净利润 经营现金流 应收账款 业绩说明 巨潮资讯 东方财富"
+            required = actions or ["业绩预告/年报公告", "审计意见", "扣非净利润", "经营现金流说明"]
         return _task(
             enterprise_name,
             task_id,
             "financial",
             f"补充核查{enterprise_name}财务专项缺口：{description}",
             "围绕财报真实性、现金流质量和偿债能力缺口进行二轮公开资料补证。",
-            actions or ["业绩预告/年报公告", "审计意见", "扣非净利润", "经营现金流说明"],
-            f"{enterprise_name} 年报 审计意见 扣非净利润 经营现金流 应收账款 业绩说明 巨潮资讯 东方财富",
+            required,
+            search_query,
             priority,
         )
 
@@ -77,15 +86,31 @@ def _from_gap(enterprise_name: str, gap: ResearchGap, priority: int) -> Research
             priority,
         )
 
-    if "industry" in task_id or "行业" in description or "竞争" in description:
+    if "industry" in task_id or "行业" in description or "竞争" in description or "主营构成" in description or "行业KPI" in description or "行业指标" in description or "行业诊断" in description or "同业对标" in description:
+        # 根据缺口类型选择更精准的补证检索词
+        if "主营构成" in description or "产品收入" in description:
+            search_query = f"{enterprise_name} 主营构成 产品收入占比 主营业务 年报 细分产品"
+            required = actions or ["主营构成", "产品收入占比", "细分产品收入"]
+        elif "行业KPI" in description or "行业指标" in description or "关键指标" in description or "KPI" in description or "产能" in description or "良率" in description:
+            search_query = f"{enterprise_name} 行业 产能利用率 良率 市占率 渗透率 行业增速 研报"
+            required = actions or ["产能利用率", "良率", "市占率", "行业增速"]
+        elif "同业对标" in description or "竞争格局" in description or "行业地位" in description:
+            search_query = f"{enterprise_name} 同业对标 竞争格局 行业地位 龙头 市场份额 研报"
+            required = actions or ["同业对标", "竞争格局", "行业地位", "市场份额"]
+        elif "诊断报告" in description:
+            search_query = f"{enterprise_name} 行业分析 行业诊断 行业研报 细分赛道"
+            required = actions or ["行业分类", "行业研报", "行业诊断"]
+        else:
+            search_query = f"{enterprise_name} 主营构成 行业地位 研报 同业对标 竞争格局 年报 产能利用率"
+            required = actions or ["主营构成", "行业地位", "研报摘要", "同业对标", "行业KPI"]
         return _task(
             enterprise_name,
             task_id,
             "industry",
             f"补充核查{enterprise_name}行业专项缺口：{description}",
             "围绕细分赛道、主营构成、行业地位、竞争格局和行业KPI进行二轮补证。",
-            actions or ["主营构成", "行业地位", "研报摘要", "同业对标", "行业KPI"],
-            f"{enterprise_name} 主营构成 行业地位 研报 同业对标 竞争格局 年报 产能利用率",
+            required,
+            search_query,
             priority,
         )
 
@@ -143,8 +168,12 @@ def build_follow_up_tasks(
     gaps: List[ResearchGap],
     claims: List[Dict[str, Any]],
     limit: int = FOLLOW_UP_LIMIT,
+    depth: int = 2,
 ) -> List[ResearchTask]:
-    """Create at most ``limit`` executable second-round tasks."""
+    """Create at most ``limit`` executable second-round tasks.
+
+    ``depth`` 标记本批 follow-up 所属的递归层级（2=二轮补证，3+=更深树状深研）。
+    """
     candidates: List[ResearchTask] = []
     seen_ids = {task.get("id") for task in tasks}
 
@@ -158,14 +187,19 @@ def build_follow_up_tasks(
             candidates.append(task)
             seen_ids.add(task.get("id"))
         if len(candidates) >= limit:
-            return candidates
+            break
 
-    for index, claim in enumerate(claims, start=1):
-        task = _from_claim_missing(enterprise_name, claim, priority=130 + index)
-        if task and task.get("id") not in seen_ids:
-            candidates.append(task)
-            seen_ids.add(task.get("id"))
-        if len(candidates) >= limit:
-            return candidates
+    if len(candidates) < limit:
+        for index, claim in enumerate(claims, start=1):
+            task = _from_claim_missing(enterprise_name, claim, priority=130 + index)
+            if task and task.get("id") not in seen_ids:
+                candidates.append(task)
+                seen_ids.add(task.get("id"))
+            if len(candidates) >= limit:
+                break
 
+    # 统一标记本批 follow-up 的递归层级（2=二轮补证，3+=更深树状深研）
+    for task in candidates:
+        task["depth"] = depth
+        task["round"] = depth
     return candidates[:limit]

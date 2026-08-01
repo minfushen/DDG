@@ -10,7 +10,7 @@ from app.config import settings
 from app.agents.sub_agents.industry_diagnostic_writer import build_industry_diagnostic_narrative
 
 
-INDUSTRY_GUIDE_DIR = settings.BASE_DIR / "knowledge_base" / "industry_guides"
+INDUSTRY_GUIDE_DIR = settings.KNOWLEDGE_BASE_DIR / "industry_guides"
 
 
 def _read_guide(file_name: str) -> Dict[str, str]:
@@ -238,6 +238,40 @@ def _renumber_sections(sections: list) -> list:
         sec["title"] = f"{numerals[i]}、{rest}"
     return sections
 
+def _comparison_section(comparison: str | None, data_anchors: Dict[str, Any], classification: Dict[str, Any]) -> Dict[str, Any] | None:
+    """根据多意图槽位 comparison 生成同业/纵向对比章节。"""
+    if comparison not in ("peer", "self"):
+        return None
+    industry_name = classification.get("semantic_industry_name") or classification.get("industry_name") or "本行业"
+    if comparison == "peer":
+        index = (data_anchors or {}).get("index_data") or {}
+        market = (data_anchors or {}).get("market_size") or {}
+        concentration = (data_anchors or {}).get("concentration") or {}
+        lines = [f"同业对比基准：以「{industry_name}」行业整体为参照，用于判断目标企业在行业中的相对位置。"]
+        if index.get("success"):
+            lines.append(
+                f"行业指数 {index.get('symbol')} 最新收盘 {index.get('latest_close')}，"
+                f"近一年涨跌幅 {index.get('year_change_pct')}%，可作为同业估值与景气度的参照锚。"
+            )
+        mr = market.get("results") or []
+        if mr:
+            lines.append("市场规模与增速（公开线索）：" + "；".join(item.get("title", "") for item in mr[:2] if item.get("title")))
+        cr = concentration.get("results") or []
+        if cr:
+            lines.append("竞争格局（公开线索）：" + "；".join(item.get("title", "") for item in cr[:2] if item.get("title")))
+        if len(lines) == 1:
+            lines.append("暂未获取到稳定的行业指数或同业公开数据，同业对比需补充券商研报与行业协会数据后人工完成。")
+        return {"title": "同业对比分析", "analysis": lines}
+    # self：自身纵向对比
+    return {
+        "title": "自身纵向对比",
+        "analysis": [
+            "自身纵向对比（同比/环比）需基于多期财报与经营数据；本报告已按时间窗口归集近年财务与经营指标，建议在同一口径下对比营收、净利润、毛利率与经营现金流的变动趋势。",
+            "若已上传多期财报或银行流水，可在财务章节叠加同比/环比变动分析，识别盈利质量与回款节奏的变化。",
+        ],
+    }
+
+
 def build_industry_analysis_report(
     enterprise_name: str,
     classification: Dict[str, Any],
@@ -247,6 +281,8 @@ def build_industry_analysis_report(
     annual_report_notes: Dict[str, Any] | None = None,
     session_id: str | None = None,
     task_id: str | None = None,
+    comparison: str | None = None,
+    industry_segment: str | None = None,
 ) -> Dict[str, Any]:
     """基于行业识别结果和本地行业指南生成结构化行业分析报告。"""
     guide_files = classification.get("guide_files") or ["manufacturing.md"]
@@ -330,15 +366,18 @@ def build_industry_analysis_report(
         {
             "title": "二、行业识别结论",
             "analysis": [
-                f"目标企业被识别为 {industry.get('semantic_industry_name') or industry.get('name')}。",
-                f"标准行业路径：{' > '.join(industry.get('path') or [])}。",
-                f"行业识别置信度：{round((industry.get('confidence') or 0) * 100)}%。",
-                f"行业识别方式：{source_label}。",
-                f"LLM判断依据：{industry.get('llm_reason')}。" if industry.get("llm_reason") else "",
-                f"已忽略通用经营范围噪声：{'、'.join(industry.get('ignored_noise') or [])}。" if industry.get("ignored_noise") else "",
-                f"LLM裁判未启用或未通过：{industry.get('llm_error')}。" if industry.get("llm_error") else "",
-                f"上市公司公开行业标签：{public_basic.get('industry') or '未获取'}。" if public_basic else "",
-                f"主营业务：{public_basic.get('main_business') or '未获取'}。" if public_basic else "",
+                line for line in [
+                    f"目标企业被识别为 {industry.get('semantic_industry_name') or industry.get('name')}。",
+                    f"标准行业路径：{' > '.join(industry.get('path') or [])}。",
+                    f"行业识别置信度：{round((industry.get('confidence') or 0) * 100)}%。",
+                    f"行业识别方式：{source_label}。",
+                    f"LLM判断依据：{industry.get('llm_reason')}。" if industry.get("llm_reason") else "",
+                    f"已忽略通用经营范围噪声：{'、'.join(industry.get('ignored_noise') or [])}。" if industry.get("ignored_noise") else "",
+                    f"LLM裁判未启用或未通过：{industry.get('llm_error')}。" if industry.get("llm_error") else "",
+                    f"上市公司公开行业标签：{public_basic.get('industry') or '未获取'}。" if public_basic else "",
+                    f"主营业务：{public_basic.get('main_business') or '未获取'}。" if public_basic else "",
+                    f"用户指定行业细分方向：{industry_segment}。" if industry_segment else "",
+                ] if line
             ],
             "signals": industry.get("matched_signals", []),
         },
@@ -490,6 +529,13 @@ def build_industry_analysis_report(
             "source": "industry_analysis_rules.json",
             "confidence": rule.get("confidence", 0.78),
         })
+
+    # 多意图槽位 comparison：在「行业地位与研报摘要」之后插入同业/纵向对比章节
+    comp_sec = _comparison_section(comparison, data_anchors, industry)
+    if comp_sec is not None:
+        # sections[3] 为「四、行业地位与研报摘要」，其后插入对比章节
+        insert_at = min(4, len(sections))
+        sections.insert(insert_at, comp_sec)
 
     sections = _renumber_sections(sections)
 

@@ -10,7 +10,6 @@ import json
 
 from app.agents.tools.authoritative_legal_tool import probe_authoritative_legal_sources
 from app.agents.tools.legal_search_tool import tavily_legal_search
-from app.agents.tools.search_tool import search_legal_records
 from app.agents.sub_agents.legal_report_builder import build_legal_analysis_report
 
 
@@ -105,40 +104,6 @@ async def run_legal_agent(enterprise_name: str) -> Dict[str, Any]:
         }
 
 
-def _build_legacy_mock_report(enterprise_name: str, mock_result: Dict[str, Any], authority_probe: Dict[str, Any]) -> Dict[str, Any]:
-    legal_items = []
-    for item in mock_result.get("裁判文书", []):
-        legal_items.append({
-            "title": item.get("案由", "裁判文书"),
-            "types": ["裁判文书"],
-            "case_numbers": [item.get("案号", "")],
-            "causes": [item.get("案由", "")],
-            "excerpt": item.get("判决结果", ""),
-            "source": "旧模拟司法工具",
-            "trust_level": "low",
-            "confidence": 0.3,
-        })
-    for item in mock_result.get("行政处罚", []):
-        legal_items.append({
-            "title": item.get("处罚类型", "行政处罚"),
-            "types": ["行政处罚"],
-            "case_numbers": [item.get("处罚文号", "")],
-            "causes": [item.get("处罚类型", "")],
-            "excerpt": f"{item.get('处罚机关', '')}，处罚金额：{item.get('处罚金额', '')}",
-            "source": "旧模拟司法工具",
-            "trust_level": "low",
-            "confidence": 0.3,
-        })
-
-    summary = {
-        "裁判文书": len(mock_result.get("裁判文书", [])),
-        "被执行": 0,
-        "失信": len(mock_result.get("失信被执行人", [])),
-        "行政处罚": len(mock_result.get("行政处罚", [])),
-        "开庭公告": 0,
-    }
-
-
 def _build_unavailable_legal_report(enterprise_name: str, authority_probe: Dict[str, Any]) -> Dict[str, Any]:
     summary = {
         "裁判文书": 0,
@@ -167,22 +132,4 @@ def _build_unavailable_legal_report(enterprise_name: str, authority_probe: Dict[
         ],
         "risk_summary": risk_summary,
         "evidence": [{"label": "司法数据边界", "value": "公开搜索未取得稳定结果", "source": "系统判定"}],
-    }
-    return {
-        "report_type": "legal_analysis",
-        "enterprise_name": enterprise_name,
-        "generated_from": "旧模拟司法工具兜底",
-        "risk_rating": "medium",
-        "risk_score": 60,
-        "recommendation": "公开搜索不可用，本报告仅为兜底模拟结果，不应用于正式授信判断",
-        "summary": summary,
-        "legal_items": legal_items,
-        "sections": [
-            {"title": "一、司法风险概览", "summary": [{"label": key, "value": value} for key, value in summary.items()]},
-            {"title": "二、司法线索明细", "items": legal_items},
-            {"title": "三、权威源可用性", "attempts": authority_probe.get("attempts", [])},
-            {"title": "四、风险提示", "risks": ["当前结果来自模拟兜底，需配置 Tavily 或人工查询权威司法网站。"]},
-        ],
-        "risk_summary": ["当前结果来自模拟兜底，需配置 Tavily 或人工查询权威司法网站。"],
-        "evidence": [{"label": "司法线索", "value": f"{len(legal_items)}条", "source": "旧模拟司法工具"}],
     }

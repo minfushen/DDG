@@ -12,6 +12,8 @@ SUB_REPORT_KEYS = {
     "financial": "financial_analysis_report",
     "legal": "legal_analysis_report",
     "industry": "industry_analysis_report",
+    "relationship": "relationship_analysis_report",
+    "sentiment": "sentiment_analysis_report",
 }
 
 DIMENSION_META = {
@@ -19,6 +21,8 @@ DIMENSION_META = {
     "financial": {"name": "财务健康度", "weight": 0.35},
     "legal": {"name": "司法合规", "weight": 0.25},
     "industry": {"name": "行业与经营环境", "weight": 0.20},
+    "relationship": {"name": "关联网络", "weight": 0.10},
+    "sentiment": {"name": "舆情与声誉", "weight": 0.10},
 }
 
 
@@ -331,6 +335,59 @@ def _legal_highlights(report: Optional[Dict[str, Any]]) -> List[str]:
     return highlights[:5] or _report_risks(report)
 
 
+def _relationship_highlights(relationship: Optional[Dict[str, Any]]) -> List[str]:
+    if not relationship:
+        return ["未获取到关联网络数据，需人工核验股权、担保与关联关系。"]
+    rsum = relationship.get("summary") or {}
+    return [
+        f"实际控制人：{rsum.get('实际控制人')}",
+        f"对外担保 {rsum.get('对外担保笔数')} 笔、股权冻结 {rsum.get('股权冻结项')} 项",
+        f"关联风险评级：{relationship.get('risk_rating')}",
+    ]
+
+
+def _relationship_chapter(relationship: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not relationship:
+        return None
+    return {
+        "id": "relationship",
+        "title": "关联网络与关联交易",
+        "subtitle": "股权结构、实际控制人、对外担保/质押、股权冻结与上下游供应链位置",
+        "summary": _relationship_highlights(relationship),
+        "highlights": _relationship_highlights(relationship),
+        "risks": _report_risks(relationship),
+        "score": None,
+        "risk_level": relationship.get("risk_rating"),
+        "evidence_refs": ["股权结构", "对外担保", "股权质押", "上下游供应链"],
+    }
+
+
+def _sentiment_highlights(sentiment: Optional[Dict[str, Any]]) -> List[str]:
+    if not sentiment:
+        return ["未获取到企业舆情数据，需人工监测公开信息与权威源。"]
+    ssum = sentiment.get("summary") or {}
+    return [
+        f"检索舆情 {ssum.get('检索结果')} 条，负面 {ssum.get('负面')} 条（权威源 {ssum.get('权威源负面')} 条）",
+        f"声誉风险评级：{sentiment.get('risk_rating')}",
+    ]
+
+
+def _sentiment_chapter(sentiment: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not sentiment:
+        return None
+    return {
+        "id": "sentiment",
+        "title": "舆情与声誉风险",
+        "subtitle": "公开舆情、监管处罚、声誉风险信号与权威源负面线索",
+        "summary": _sentiment_highlights(sentiment),
+        "highlights": _sentiment_highlights(sentiment),
+        "risks": _report_risks(sentiment),
+        "score": None,
+        "risk_level": sentiment.get("risk_rating"),
+        "evidence_refs": ["公开舆情", "监管处罚", "声誉风险"],
+    }
+
+
 def _build_report_chapters(
     enterprise_name: str,
     report_mode: str,
@@ -411,6 +468,8 @@ def _build_report_chapters(
             "risk_level": risk_map.get("legal", {}).get("status"),
             "evidence_refs": ["裁判文书", "执行信息", "行政处罚", "公开搜索线索"],
         },
+        *([_relationship_chapter(sub_reports.get("relationship"))] if sub_reports.get("relationship") else []),
+        *([_sentiment_chapter(sub_reports.get("sentiment"))] if sub_reports.get("sentiment") else []),
         {
             "id": "risks",
             "title": "重大风险识别与交叉验证",
@@ -458,6 +517,37 @@ def _build_report_chapters(
     ]
 
 
+def _financial_indicators(financial: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """从财务子报告抽取可供模板指标位绑定的中文标签指标值。"""
+    if not financial:
+        return {}
+    km = financial.get("key_metrics") or {}
+    if not km:
+        return {}
+    mapping = {
+        "revenue": "营业收入",
+        "net_profit": "净利润",
+        "debt_ratio": "资产负债率",
+        "gross_margin": "毛利率",
+        "net_margin": "净利率",
+        "operating_cash_flow": "经营活动现金流净额",
+        "current_ratio": "流动比率",
+        "revenue_growth": "营收增速",
+    }
+    out: Dict[str, Any] = {}
+    for key, label in mapping.items():
+        val = km.get(key)
+        if val in (None, ""):
+            continue
+        if key == "debt_ratio":
+            out[label] = f"{val}%"
+        elif key in ("gross_margin", "net_margin", "revenue_growth"):
+            out[label] = f"{val}%"
+        else:
+            out[label] = str(val)
+    return out
+
+
 def build_full_due_diligence_report(
     enterprise_name: str,
     sub_reports: Dict[str, Optional[Dict[str, Any]]],
@@ -465,9 +555,18 @@ def build_full_due_diligence_report(
     pending_upload: bool = False,
     report_mode: str = "financial_enhanced_dd",
     financial_data_status: Optional[str] = None,
+    template: Optional[Any] = None,
 ) -> Dict[str, Any]:
-    """基于四个专项报告生成完整尽调报告。"""
+    """基于四个专项报告生成完整尽调报告。
+
+    ``template`` 为可选的已解析尽调模板（ReportTemplate 或 dict）；传入后报告会按模板
+    章节顺序组织并填充指标/解读位置（非功能需求①：自由模板驱动报告结构）。
+    """
     dimensions = [_dimension(key, sub_reports.get(key)) for key in ["business", "financial", "legal", "industry"]]
+    if sub_reports.get("relationship"):
+        dimensions.append(_dimension("relationship", sub_reports.get("relationship")))
+    if sub_reports.get("sentiment"):
+        dimensions.append(_dimension("sentiment", sub_reports.get("sentiment")))
     score = _weighted_score(dimensions)
     missing_keys = [key for key in ["business", "legal", "industry"] if not sub_reports.get(key)]
     if missing_keys:
@@ -536,6 +635,16 @@ def build_full_due_diligence_report(
         ],
         "pending_upload": pending_upload,
     }
+    # 模板驱动：按用户上传模板的章节顺序组织并填充指标/解读位置
+    if template:
+        from app.template.models import BlockType, ReportTemplate
+        from app.template.renderer import render_report_from_template
+        tpl = template if isinstance(template, ReportTemplate) else ReportTemplate.model_validate(template)
+        indicators = _financial_indicators(sub_reports.get("financial"))
+        report["template_sections"] = render_report_from_template(
+            tpl, sub_reports, indicators=indicators, overall_summary=summary,
+        )
+        report["template"] = {"id": tpl.id, "name": tpl.name, "is_active": tpl.is_active}
     if missing_keys or legal_report.get("generated_from") == "司法公开搜索不可用":
         report["recommendation"] = f"建议作为初步尽调结果使用。当前综合评分{score}分，但工商、行业或司法证据链仍需补齐，正式授信前应完成权威工商登记、司法公开信息和行业经营事实核验。"
         report["credit_decision"]["suggestion"] = "初步谨慎准入"

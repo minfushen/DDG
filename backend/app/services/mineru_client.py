@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import certifi
 import io
+import json
 import logging
 import shutil
 import ssl
@@ -171,14 +172,72 @@ def poll_batch_results(
     raise MinerUError(f"MinerU poll timeout after {timeout}s for batch {batch_id}")
 
 
+def _extract_tables_from_content_list(content_list: List[Dict[str, Any]]) -> List[List[List[str]]]:
+    """从 MinerU content_list 的 table 类型块中提取表格。
+
+    content_list 中每个 item 大致为：
+      {"type": "table", "page_idx": 0, "bbox": [...],
+       "content": {"items": [{"row": 0, "col": 0, "text": "..."}, ...]}}
+    或更早版本：
+      {"type": "table", "content": [["cell", ...], ...]}
+    """
+    tables: List[List[List[str]]] = []
+    for block in content_list:
+        if block.get("type") != "table":
+            continue
+        content = block.get("content") or {}
+        if isinstance(content, list):
+            # 旧版：content 直接是二维数组
+            table = [[str(cell or "") for cell in row] for row in content if row]
+            if table:
+                tables.append(table)
+            continue
+
+        items = content.get("items") or []
+        if not items:
+            continue
+
+        # 按 row/col 分组重建二维表
+        by_row: Dict[int, Dict[int, str]] = {}
+        for cell in items:
+            if not isinstance(cell, dict):
+                continue
+            row = cell.get("row")
+            col = cell.get("col")
+            if row is None or col is None:
+                continue
+            text = str(cell.get("text") or cell.get("content") or "").strip()
+            by_row.setdefault(int(row), {})[int(col)] = text
+
+        if not by_row:
+            continue
+
+        max_row = max(by_row.keys())
+        max_col = max(max(cols.keys()) for cols in by_row.values())
+        table = []
+        for r in range(max_row + 1):
+            row = [by_row.get(r, {}).get(c, "") for c in range(max_col + 1)]
+            if any(row):
+                table.append(row)
+        if len(table) >= 2:
+            tables.append(table)
+    return tables
+
+
 def parse_mineru_zip(zip_bytes: bytes) -> Dict[str, Any]:
-    """解压 MinerU 返回的 zip 包，提取 markdown 文本和表格。
+    """解压 MinerU 返回的 zip 包，提取 markdown 文本、表格和 content_list。
 
     Returns:
-        {"text": str, "tables": List[List[List[str]]], "metadata": dict}
+        {
+            "text": str,
+            "tables": List[List[List[str]]],
+            "content_list": List[Dict[str, Any]],
+            "metadata": dict,
+        }
     """
     text = ""
     tables: List[List[List[str]]] = []
+    content_list: List[Dict[str, Any]] = []
     metadata: Dict[str, Any] = {}
 
     try:
@@ -192,44 +251,58 @@ def parse_mineru_zip(zip_bytes: bytes) -> Dict[str, Any]:
             if md_candidates:
                 text = zf.read(md_candidates[0]).decode("utf-8", errors="ignore")
                 tables = extract_tables(text)
+
+            # 同时解析 content_list.json，补充 markdown 中缺失的表格结构
+            content_list_candidates = [
+                n for n in namelist if n.lower().endswith("content_list.json")
+            ]
+            if content_list_candidates:
+                raw = zf.read(content_list_candidates[0]).decode("utf-8", errors="ignore")
+                try:
+                    content_list = json.loads(raw) or []
+                except json.JSONDecodeError:
+                    content_list = []
+                if content_list and not tables:
+                    tables = _extract_tables_from_content_list(content_list)
     except Exception as exc:
         raise MinerUError(f"Failed to parse MinerU zip: {exc}") from exc
 
     return {
         "text": text,
         "tables": tables,
+        "content_list": content_list,
         "metadata": metadata,
     }
 
 
 def _download_zip(zip_url: str) -> bytes:
-    """下载 MinerU 结果 zip，优先使用 httpx，失败时 fallback 到 curl。
+    """下载 MinerU 结果 zip，curl 优先 + httpx 兜底。
 
     部分 Python/OpenSSL 组合（如 macOS/uv Python 3.12）与
-    cdn-mineru.openxlab.org.cn 的 TLS 握手会出现 UNEXPECTED_EOF，curl 在此类环境下更稳定。
+    cdn-mineru.openxlab.org.cn 的 TLS 握手会出现 UNEXPECTED_EOF，curl 更稳定。
     """
+    # ── curl 优先 ──
+    if shutil.which("curl"):
+        try:
+            result = subprocess.run(
+                ["curl", "-sSL", "--fail", "--max-time", "120", "-o", "-", zip_url],
+                capture_output=True, check=True, timeout=130,
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr.decode("utf-8", errors="ignore") if exc.stderr else ""
+            logger.warning("[MinerU] curl download failed: %s, trying httpx fallback", stderr[:200])
+        except Exception as exc:
+            logger.warning("[MinerU] curl download failed: %s, trying httpx fallback", exc)
+
+    # ── httpx 兜底 ──
     try:
         with httpx.Client(verify=_ssl_context()) as client:
             zip_resp = client.get(zip_url, timeout=60)
             zip_resp.raise_for_status()
             return zip_resp.content
     except Exception as exc:
-        logger.warning("[MinerU] httpx download failed: %s, trying curl fallback", exc)
-
-    if not shutil.which("curl"):
-        raise MinerUError("httpx download failed and curl is not available")
-
-    try:
-        result = subprocess.run(
-            ["curl", "-s", "-L", "--fail", "-o", "-", zip_url],
-            capture_output=True,
-            check=True,
-            timeout=120,
-        )
-        return result.stdout
-    except subprocess.CalledProcessError as exc:
-        stderr = exc.stderr.decode("utf-8", errors="ignore") if exc.stderr else ""
-        raise MinerUError(f"curl download failed: {stderr}") from exc
+        raise MinerUError(f"both curl and httpx download failed: {exc}") from exc
 
 
 def _get_pdf_page_count(pdf_bytes: bytes) -> int:
@@ -344,9 +417,10 @@ def extract_pdf_bytes(
             parsed["metadata"]["model_version"] = model
             parsed["metadata"]["parser_used"] = "mineru"
             return {
-                "success": bool(parsed["text"].strip()) or bool(parsed["tables"]),
+                "success": bool(parsed["text"].strip()) or bool(parsed["tables"]) or bool(parsed.get("content_list")),
                 "text": parsed["text"],
                 "tables": parsed["tables"],
+                "content_list": parsed.get("content_list", []),
                 "metadata": parsed["metadata"],
                 "error": "",
             }
@@ -377,8 +451,10 @@ def extract_pdf_bytes(
         parsed_chunks.sort(key=lambda x: x[0])
         full_text = "\n\n".join(p["text"] for _, p in parsed_chunks)
         all_tables: List[List[List[str]]] = []
+        all_content_list: List[Dict[str, Any]] = []
         for _, p in parsed_chunks:
             all_tables.extend(p["tables"])
+            all_content_list.extend(p.get("content_list", []))
 
         metadata = {
             "parser_used": "mineru",
@@ -388,9 +464,10 @@ def extract_pdf_bytes(
             "chunks": len(parsed_chunks),
         }
         return {
-            "success": bool(full_text.strip()) or bool(all_tables),
+            "success": bool(full_text.strip()) or bool(all_tables) or bool(all_content_list),
             "text": full_text,
             "tables": all_tables,
+            "content_list": all_content_list,
             "metadata": metadata,
             "error": "",
         }

@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from app.agents.sub_agents.financial_agent import run_financial_agent
+from app.agents.sub_agents.financial_agent import run_financial_agent, run_financial_agent_with_uploaded_data
 from app.agents.sub_agents.public_financial_agent import run_public_financial_agent
 
 logger = logging.getLogger(__name__)
@@ -46,20 +46,23 @@ class FinancialService:
             "error": None,
         }
 
-    async def analyze_full(self, enterprise_name: str, financial_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def analyze_full(self, enterprise_name: str, financial_data: Dict[str, Any], industry_name: Optional[str] = None) -> Dict[str, Any]:
         """基于上传的财报数据进行完整财务分析。
 
         Args:
             enterprise_name: 企业名称
             financial_data: 财务数据（包含利润表、资产负债表、现金流量表）
+            industry_name: 行业名称（可选，用于 P2.1 同业中位数对标）
 
         Returns:
             财务分析结果字典
         """
-        logger.info("[FinancialService] analyze_full enterprise=%s", enterprise_name)
+        logger.info("[FinancialService] analyze_full enterprise=%s industry=%s", enterprise_name, industry_name)
 
         try:
-            result = run_financial_agent(enterprise_name, financial_data)
+            result = await run_financial_agent_with_uploaded_data(
+                enterprise_name, financial_data, industry_name=industry_name
+            )
         except Exception as exc:
             logger.warning("[FinancialService] 完整财务分析失败: %s", exc)
             return {

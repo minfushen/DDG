@@ -22,9 +22,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app.agents.research_engine.report_quality_evaluator import evaluate_report_quality
+from app.config import settings
 
 
-DEFAULT_SAMPLE_DIR = ROOT / "regression_samples" / "listed_companies"
+DEFAULT_SAMPLE_DIR = settings.REGRESSION_SAMPLES_DIR / "listed_companies"
 DEFAULT_INPUT_DIR = ROOT / "output" / "reports"
 DEFAULT_OUTPUT_ROOT = ROOT / "regression_runs"
 

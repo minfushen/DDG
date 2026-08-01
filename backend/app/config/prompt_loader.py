@@ -43,6 +43,15 @@ def load_prompt_template(name: str, config_path: Path | str | None = None) -> st
         ValueError: If the requested template section is missing or empty.
     """
     path = Path(config_path) if config_path else DEFAULT_PROMPTS_PATH
+    if not config_path:
+        # 非功能需求②：优先返回前端覆盖层中的提示词（灵活修改提示词配置）
+        try:
+            from app.config import prompt_overrides
+            ov = prompt_overrides.load_override(name)
+            if ov is not None:
+                return ov
+        except Exception:
+            pass
     if not path.exists():
         raise FileNotFoundError(f"Prompt config not found: {path}")
     with open(path, "r", encoding="utf-8") as f:

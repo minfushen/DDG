@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ingest backend/knowledge_base Markdown files into Chroma."""
+"""Ingest backend/data/knowledge_base Markdown files into Chroma."""
 
 from __future__ import annotations
 
@@ -13,12 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.config import settings
 from app.rag.knowledge_ingestion import ingest_knowledge_base
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Ingest Markdown knowledge base into Chroma")
-    parser.add_argument("--root", default=str(ROOT / "knowledge_base"), help="Knowledge base root directory")
+    parser.add_argument("--root", default=str(settings.KNOWLEDGE_BASE_DIR), help="Knowledge base root directory")
     parser.add_argument("--reset", action="store_true", help="Delete existing Chroma store before ingesting")
     args = parser.parse_args()
 

@@ -102,8 +102,10 @@ class DueDiligenceService:
 
         try:
             result = await run_deep_research_due_diligence(
-                task,
-                task_id=task_id,
+                enterprise_name=task["enterprise_name"],
+                objective="完整贷前尽调",
+                max_iterations=task.get("max_iterations", 6),
+                parsed_intent=task.get("input_parse"),
             )
             task["agent_state"] = "completed"
             task["report"] = result.get("report")

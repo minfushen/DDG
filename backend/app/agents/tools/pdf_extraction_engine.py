@@ -88,10 +88,37 @@ def extract_with_mineru(pdf_bytes: bytes) -> Dict[str, Any]:
 def download_pdf(url: str, timeout: int = DEFAULT_TIMEOUT_SECONDS, max_size_mb: int = MAX_PDF_SIZE_MB) -> Optional[bytes]:
     """Download PDF from URL with size guard.
 
+    优先 curl（巨潮 PDF 下载 httpx 常 SSL EOF），httpx 兜底。
     Returns None if the response is not a PDF, exceeds size limit, or request fails.
     """
     if not url:
         return None
+    max_bytes = max_size_mb * 1024 * 1024
+
+    # ── curl 优先（cninfo/巨潮 SSL 兼容性更好） ──
+    try:
+        import subprocess, tempfile, os as _os
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as _tf:
+            _tmp = _tf.name
+        try:
+            _proc = subprocess.run(
+                ["curl", "-sSL", "-o", _tmp, "--max-time", str(timeout), "--max-filesize", str(max_bytes), url],
+                capture_output=True, text=True, timeout=timeout + 5,
+            )
+            if _proc.returncode == 0:
+                with open(_tmp, "rb") as _f:
+                    data = _f.read()
+                if len(data) >= 4 and data[:4] == b"%PDF":
+                    return data
+        finally:
+            try:
+                _os.unlink(_tmp)
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+    # ── httpx 兜底 ──
     try:
         with httpx.stream("GET", url, timeout=timeout, follow_redirects=True) as response:
             response.raise_for_status()
@@ -99,7 +126,6 @@ def download_pdf(url: str, timeout: int = DEFAULT_TIMEOUT_SECONDS, max_size_mb: 
             if "pdf" not in content_type and "octet-stream" not in content_type:
                 # Some CNINFO URLs may not set content-type; continue cautiously.
                 pass
-            max_bytes = max_size_mb * 1024 * 1024
             chunks: List[bytes] = []
             total = 0
             for chunk in response.iter_bytes(chunk_size=64 * 1024):

@@ -7,7 +7,20 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-# ── Agent 执行状态 ─────────────────────────────────────
+# ── 任务生命周期状态（PRD V1.0.0 企业级状态机）────────────────────────
+
+TaskLifecycleState = Literal[
+    'gathering',      # 证据采集中（计划、工具调用、数据获取）
+    'analyzing',      # 分析中（专项分析、形成结论）
+    'report_ready',   # 报告已生成
+    'under_review',   # 人工审核/确认中（含 HITL 中断）
+    'approved',       # 已批准
+    'rejected',       # 已驳回
+    'archived',       # 已归档
+]
+
+
+# ── Agent 执行状态（内部细化状态，保留兼容）────────────────────────────
 
 AgentState = Literal[
     'creating_task',      # 创建任务
@@ -121,6 +134,7 @@ class TaskState(TypedDict):
     task_id: str
     enterprise_name: str
     agent_state: AgentState
+    task_state: TaskLifecycleState
     timeline: List[dict]
     plan: List[dict]
     evidence: List[dict]

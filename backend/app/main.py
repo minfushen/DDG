@@ -9,9 +9,12 @@ from app.api import tasks
 from app.api import tools
 from app.api import upload
 from app.api import report_quality
+from app.api import templates
+from app.api import config
 from app.api.task_store import init_task_store, load_recent_task_snapshots, task_store_path
 from app.api.cache_store import init_cache_store, clear_cache
 from app.memory import init_memory_db
+from app.agents.evidence.evidence_db import init_evidence_db
 
 
 @asynccontextmanager
@@ -29,6 +32,7 @@ async def lifespan(app: FastAPI):
     init_task_store()
     init_cache_store()
     init_memory_db()
+    init_evidence_db()
     if settings.CLEAR_CACHE_ON_START:
         cleared = clear_cache()
         print(f"🧹 启动时清空缓存: {cleared} 条")
@@ -43,6 +47,11 @@ async def lifespan(app: FastAPI):
         restored += 1
     print(f"📦 任务快照库: {task_store_path()}")
     print(f"♻️ 已恢复任务快照: {restored}")
+
+    # P0-1 第二阶段：自动续跑 execute 中途崩溃的任务
+    resumed = await tasks.automatic_resume_crashed_tasks()
+    if resumed:
+        print(f"♻️ 自动续跑崩溃任务: {resumed}")
 
     yield
 
@@ -78,6 +87,8 @@ app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(tools.router, prefix="/api/v1", tags=["tools"])
 app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
 app.include_router(report_quality.router, prefix="/api/v1", tags=["report-quality"])
+app.include_router(templates.router, prefix="/api/v1", tags=["templates"])
+app.include_router(config.router, prefix="/api/v1", tags=["config"])
 
 # 注册 Dify 适配层路由（Dify 作为轻量入口和问答增强层）
 from app.api import dify_adapter
